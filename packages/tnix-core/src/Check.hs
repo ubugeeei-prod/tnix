@@ -264,14 +264,17 @@ inferStaticSelect ctx ty field =
   zonk ty >>= \resolvedTy ->
     let base' = resolveType (checkAliases ctx) resolvedTy
      in if base' == tAny
-      then pure tAny
-      else
-        if base' == tDynamic || base' == tUnknown
-          then pure tDynamic
+          then pure tAny
           else
-            case lookupRecordField (checkAliases ctx) resolvedTy field of
-          Just fieldTy -> instantiate (schemeFromAnnotation fieldTy)
-          Nothing -> lift (Left ("missing field " <> show field))
+            if base' == tDynamic
+              then pure tDynamic
+              else
+                if base' == tUnknown
+                  then lift (Left ("cannot select field " <> show field <> " from unknown"))
+                  else
+                    case lookupRecordField (checkAliases ctx) resolvedTy field of
+                      Just fieldTy -> instantiate (schemeFromAnnotation fieldTy)
+                      Nothing -> lift (Left ("missing field " <> show field))
 
 inferDynamicSelect :: CheckContext -> Type -> Type -> InferM Type
 inferDynamicSelect ctx baseTy keyTy = do
@@ -283,20 +286,26 @@ inferDynamicSelect ctx baseTy keyTy = do
   if base' == tAny || key' == tAny
     then pure tAny
     else
-      if base' == tDynamic || key' == tDynamic || key' == tUnknown
+      if base' == tDynamic || key' == tDynamic
         then pure tDynamic
         else
-          case selectionKeyNames key' of
-            Just names ->
-              case traverse (lookupRecordField aliases base') names of
-                Just fieldTypes -> do
-                  instantiated <- traverse (instantiate . schemeFromAnnotation) fieldTypes
-                  pure (foldr1 (joinTypes aliases) instantiated)
-                Nothing -> lift $ Left ("missing field selected by dynamic key of type " <> show key')
-            Nothing ->
-              if isSubtype aliases key' tString || isConsistent aliases key' tString
-                then pure tDynamic
-                else lift $ Left ("dynamic field selection expects a string-like key, but got " <> show key')
+          if base' == tUnknown
+            then lift (Left "cannot select dynamic field from unknown")
+            else
+              if key' == tUnknown
+                then lift (Left "dynamic field selection expects a string-like key, but got unknown")
+                else
+                  case selectionKeyNames key' of
+                    Just names ->
+                      case traverse (lookupRecordField aliases base') names of
+                        Just fieldTypes -> do
+                          instantiated <- traverse (instantiate . schemeFromAnnotation) fieldTypes
+                          pure (foldr1 (joinTypes aliases) instantiated)
+                        Nothing -> lift $ Left ("missing field selected by dynamic key of type " <> show key')
+                    Nothing ->
+                      if isSubtype aliases key' tString || isConsistent aliases key' tString
+                        then pure tDynamic
+                        else lift $ Left ("dynamic field selection expects a string-like key, but got " <> show key')
 
 selectionKeyNames :: Type -> Maybe [Name]
 selectionKeyNames = \case

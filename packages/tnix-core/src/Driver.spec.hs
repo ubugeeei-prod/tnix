@@ -381,6 +381,41 @@ spec = describe "analysis" $ do
       )
       >>= (`expectLeftContaining` "type mismatch")
 
+  it "rejects field selection on unknown instead of widening to dynamic" $ do
+    analyzeText
+      "main.tnix"
+      ( source
+          [ "let",
+            "  value :: unknown;",
+            "  value = { nested = 1; };",
+            "in value.missing"
+          ]
+      )
+      >>= (`expectLeftContaining` "cannot select field")
+    analyzeText
+      "main.tnix"
+      ( source
+          [ "let",
+            "  value :: unknown;",
+            "  value = { nested = 1; };",
+            "  key :: \"nested\";",
+            "  key = \"nested\";",
+            "in value.${key}"
+          ]
+      )
+      >>= (`expectLeftContaining` "cannot select dynamic field from unknown")
+    analyzeText
+      "main.tnix"
+      ( source
+          [ "let",
+            "  value = { nested = 1; };",
+            "  key :: unknown;",
+            "  key = \"nested\";",
+            "in value.${key}"
+          ]
+      )
+      >>= (`expectLeftContaining` "string-like key")
+
   it "supports widening, narrowing, and gradual as-casts" $ do
     widenAnalysis <- analyzeText "main.tnix" "1 as Number" >>= expectRight
     narrowAnalysis <-
