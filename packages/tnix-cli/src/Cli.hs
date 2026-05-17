@@ -2,15 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Testable CLI helpers for tnix.
-module Cli
-  ( Command (..),
-    OutputFormat (..),
-    commandOutputPath,
-    commandParser,
-    executeCommand,
-    renderAnalysis,
-    writeOutput,
-  )
+module Cli (
+  Command (..),
+  OutputFormat (..),
+  commandOutputPath,
+  commandParser,
+  executeCommand,
+  renderAnalysis,
+  writeOutput,
+)
 where
 
 import Data.Aeson (Value, encode, object, (.=))
@@ -44,6 +44,10 @@ data Command
   | EmitProject (Maybe FilePath) OutputFormat
   deriving (Eq, Show)
 
+data PlannedWrite = PlannedWrite FilePath Text
+
+type ProjectOutputPlan = (ProjectSource, FilePath, FilePath, Either String [PlannedWrite])
+
 -- | Command-line parser definition.
 commandParser :: Parser Command
 commandParser =
@@ -57,27 +61,27 @@ commandParser =
         <> command "build" (info buildProjectP (progDesc "Compile project sources and emit generated declarations"))
         <> command "emit-project" (info emitProjectP (progDesc "Emit declaration files for every discovered project source file"))
     )
-  where
-    fileArg = strArgument (metavar "FILE")
-    dirArg = optional (strArgument (metavar "DIRECTORY"))
-    outputOpt = optional (strOption (short 'o' <> long "output" <> metavar "OUTPUT"))
-    formatOpt =
-      option
-        formatReader
-        ( long "format"
-            <> short 'f'
-            <> value TextFormat
-            <> showDefaultWith renderFormat
-            <> metavar "text|json"
-        )
-    compileP = Compile <$> fileArg <*> outputOpt
-    checkP = Check <$> fileArg <*> formatOpt
-    emitP = Emit <$> fileArg <*> outputOpt
-    initP = Init <$> dirArg
-    scaffoldP = Scaffold <$> dirArg
-    checkProjectP = CheckProject <$> dirArg <*> formatOpt
-    buildProjectP = BuildProject <$> dirArg <*> formatOpt
-    emitProjectP = EmitProject <$> dirArg <*> formatOpt
+ where
+  fileArg = strArgument (metavar "FILE")
+  dirArg = optional (strArgument (metavar "DIRECTORY"))
+  outputOpt = optional (strOption (short 'o' <> long "output" <> metavar "OUTPUT"))
+  formatOpt =
+    option
+      formatReader
+      ( long "format"
+          <> short 'f'
+          <> value TextFormat
+          <> showDefaultWith renderFormat
+          <> metavar "text|json"
+      )
+  compileP = Compile <$> fileArg <*> outputOpt
+  checkP = Check <$> fileArg <*> formatOpt
+  emitP = Emit <$> fileArg <*> outputOpt
+  initP = Init <$> dirArg
+  scaffoldP = Scaffold <$> dirArg
+  checkProjectP = CheckProject <$> dirArg <*> formatOpt
+  buildProjectP = BuildProject <$> dirArg <*> formatOpt
+  emitProjectP = EmitProject <$> dirArg <*> formatOpt
 
 -- | Extract the explicit destination path carried by a command, if any.
 commandOutputPath :: Command -> Maybe FilePath
@@ -146,8 +150,12 @@ executeProjectBuild target format = do
       if null sources
         then pure (renderedFailure format (projectErrorJson "build" (Just config) "no project source files discovered") "no project source files discovered")
         else do
-          entries <- traverse (buildOne config) sources
-          pure (renderProjectBuild format config entries)
+          plans <- traverse (planBuildOne config) sources
+          case renderProjectBuild format config (reportEntries plans) of
+            Left err -> pure (Left err)
+            Right report -> do
+              writeOutputPlans plans
+              pure (Right report)
 
 executeProjectEmit :: Maybe FilePath -> OutputFormat -> IO (Either String Text)
 executeProjectEmit target format = do
@@ -159,8 +167,12 @@ executeProjectEmit target format = do
       if null sources
         then pure (renderedFailure format (projectErrorJson "emit-project" (Just config) "no project source files discovered") "no project source files discovered")
         else do
-          entries <- traverse (emitOne config) sources
-          pure (renderProjectEmit format config entries)
+          plans <- traverse (planEmitOne config) sources
+          case renderProjectEmit format config (reportEntries plans) of
+            Left err -> pure (Left err)
+            Right report -> do
+              writeOutputPlans plans
+              pure (Right report)
 
 renderSingleCheck :: FilePath -> OutputFormat -> Either String Analysis -> Either String Text
 renderSingleCheck input format result =
@@ -173,23 +185,23 @@ renderSingleCheck input format result =
             Text.unpack $
               jsonText $
                 object
-                  [ "action" .= ("check" :: Text),
-                    "file" .= input,
-                    "success" .= False,
-                    "root" .= (Nothing :: Maybe Text),
-                    "bindings" .= (Map.empty :: Map.Map Text Text),
-                    "error" .= err
+                  [ "action" .= ("check" :: Text)
+                  , "file" .= input
+                  , "success" .= False
+                  , "root" .= (Nothing :: Maybe Text)
+                  , "bindings" .= (Map.empty :: Map.Map Text Text)
+                  , "error" .= err
                   ]
         Right analysis ->
           Right $
             jsonText $
               object
-                [ "action" .= ("check" :: Text),
-                  "file" .= input,
-                  "success" .= True,
-                  "root" .= fmap renderScheme (analysisRoot analysis),
-                  "bindings" .= Map.map renderScheme (analysisBindings analysis),
-                  "error" .= (Nothing :: Maybe Text)
+                [ "action" .= ("check" :: Text)
+                , "file" .= input
+                , "success" .= True
+                , "root" .= fmap renderScheme (analysisRoot analysis)
+                , "bindings" .= Map.map renderScheme (analysisBindings analysis)
+                , "error" .= (Nothing :: Maybe Text)
                 ]
 
 renderProjectCheck :: OutputFormat -> ProjectConfig -> [(ProjectSource, Either String Analysis)] -> Either String Text
@@ -197,161 +209,174 @@ renderProjectCheck format config entries =
   if any (either (const True) (const False) . snd) entries
     then renderedFailure format payload (Text.unpack textReport)
     else Right (if format == JsonFormat then jsonText payload else textReport)
-  where
-    payload =
-      object
-        [ "action" .= ("check-project" :: Text),
-          "projectRoot" .= configRoot config,
-          "projectName" .= configName config,
-          "summary" .= summaryJson entries,
-          "files" .= map fileJson entries
-        ]
-    textReport =
-      Text.unlines $
-        [ "checked project " <> configName config,
-          "root: " <> Text.pack (configRoot config)
-        ]
-          <> concatMap fileLines entries
-    fileLines (source, result) =
-      [ "- " <> statusLabel result <> " " <> displaySourcePath config source
+ where
+  payload =
+    object
+      [ "action" .= ("check-project" :: Text)
+      , "projectRoot" .= configRoot config
+      , "projectName" .= configName config
+      , "summary" .= summaryJson entries
+      , "files" .= map fileJson entries
       ]
-        <> case result of
-          Left err -> ["  " <> Text.pack err]
-          Right analysis -> map ("  " <>) (Text.lines (Text.stripEnd (renderAnalysis analysis)))
-    fileJson (source, result) =
-      object
-        [ "source" .= projectSourcePath source,
-          "relative" .= projectSourceRelative source,
-          "success" .= either (const False) (const True) result,
-          "root" .= either (const Nothing) (fmap renderScheme . analysisRoot) result,
-          "bindings" .= either (const Map.empty) (Map.map renderScheme . analysisBindings) result,
-          "error" .= either Just (const Nothing) result
-        ]
+  textReport =
+    Text.unlines $
+      [ "checked project " <> configName config
+      , "root: " <> Text.pack (configRoot config)
+      ]
+        <> concatMap fileLines entries
+  fileLines (source, result) =
+    [ "- " <> statusLabel result <> " " <> displaySourcePath config source
+    ]
+      <> case result of
+        Left err -> ["  " <> Text.pack err]
+        Right analysis -> map ("  " <>) (Text.lines (Text.stripEnd (renderAnalysis analysis)))
+  fileJson (source, result) =
+    object
+      [ "source" .= projectSourcePath source
+      , "relative" .= projectSourceRelative source
+      , "success" .= either (const False) (const True) result
+      , "root" .= either (const Nothing) (fmap renderScheme . analysisRoot) result
+      , "bindings" .= either (const Map.empty) (Map.map renderScheme . analysisBindings) result
+      , "error" .= either Just (const Nothing) result
+      ]
 
-buildOne :: ProjectConfig -> ProjectSource -> IO (ProjectSource, FilePath, FilePath, Either String ())
-buildOne config source = do
+planBuildOne :: ProjectConfig -> ProjectSource -> IO ProjectOutputPlan
+planBuildOne config source = do
   let runtimeOutput = projectBuildOutputPath config source
       declarationOutput = projectDeclarationOutputPath config source
   compileResult <- compileFile (projectSourcePath source)
-  emitResult <- emitFileAs (projectSourcePath source) runtimeOutput declarationOutput
-  case (compileResult, emitResult) of
-    (Right compiled, Right declaration) -> do
-      writeTextFile runtimeOutput compiled
-      writeTextFile declarationOutput declaration
-      pure (source, runtimeOutput, declarationOutput, Right ())
-    (Left err, _) -> pure (source, runtimeOutput, declarationOutput, Left err)
-    (_, Left err) -> pure (source, runtimeOutput, declarationOutput, Left err)
+  case compileResult of
+    Left err -> pure (source, runtimeOutput, declarationOutput, Left err)
+    Right compiled -> do
+      emitResult <- emitFileAs (projectSourcePath source) runtimeOutput declarationOutput
+      case emitResult of
+        Left err -> pure (source, runtimeOutput, declarationOutput, Left err)
+        Right declaration ->
+          pure (source, runtimeOutput, declarationOutput, Right [PlannedWrite runtimeOutput compiled, PlannedWrite declarationOutput declaration])
 
-emitOne :: ProjectConfig -> ProjectSource -> IO (ProjectSource, FilePath, FilePath, Either String ())
-emitOne config source = do
+planEmitOne :: ProjectConfig -> ProjectSource -> IO ProjectOutputPlan
+planEmitOne config source = do
   let runtimeOutput = projectBuildOutputPath config source
       declarationOutput = projectDeclarationOutputPath config source
   result <- emitFileAs (projectSourcePath source) runtimeOutput declarationOutput
   case result of
     Left err -> pure (source, runtimeOutput, declarationOutput, Left err)
-    Right declaration -> do
-      writeTextFile declarationOutput declaration
-      pure (source, runtimeOutput, declarationOutput, Right ())
+    Right declaration ->
+      pure (source, runtimeOutput, declarationOutput, Right [PlannedWrite declarationOutput declaration])
+
+reportEntries :: [ProjectOutputPlan] -> [(ProjectSource, FilePath, FilePath, Either String ())]
+reportEntries =
+  map (\(source, runtimeOutput, declarationOutput, result) -> (source, runtimeOutput, declarationOutput, () <$ result))
+
+writeOutputPlans :: [ProjectOutputPlan] -> IO ()
+writeOutputPlans plans =
+  if any (either (const True) (const False) . fourth) plans
+    then pure ()
+    else mapM_ writePlannedWrite [planned | (_, _, _, Right plannedWrites) <- plans, planned <- plannedWrites]
+
+writePlannedWrite :: PlannedWrite -> IO ()
+writePlannedWrite (PlannedWrite path content) =
+  writeTextFile path content
 
 renderProjectBuild :: OutputFormat -> ProjectConfig -> [(ProjectSource, FilePath, FilePath, Either String ())] -> Either String Text
 renderProjectBuild format config entries =
   if any (either (const True) (const False) . fourth) entries
     then renderedFailure format payload (Text.unpack textReport)
     else Right (if format == JsonFormat then jsonText payload else textReport)
-  where
-    payload =
-      object
-        [ "action" .= ("build" :: Text),
-          "projectRoot" .= configRoot config,
-          "projectName" .= configName config,
-          "summary" .= buildSummaryJson entries,
-          "files" .= map buildJson entries
-        ]
-    textReport =
-      Text.unlines $
-        [ "built project " <> configName config,
-          "root: " <> Text.pack (configRoot config)
-        ]
-          <> concatMap buildLines entries
-    buildLines (source, runtimeOutput, declarationOutput, result) =
-      [ "- " <> statusLabel result <> " " <> displaySourcePath config source
+ where
+  payload =
+    object
+      [ "action" .= ("build" :: Text)
+      , "projectRoot" .= configRoot config
+      , "projectName" .= configName config
+      , "summary" .= buildSummaryJson entries
+      , "files" .= map buildJson entries
       ]
-        <> case result of
-          Left err -> ["  " <> Text.pack err]
-          Right () ->
-            [ "  nix -> " <> Text.pack runtimeOutput,
-              "  decl -> " <> Text.pack declarationOutput
-            ]
-    buildJson (source, runtimeOutput, declarationOutput, result) =
-      object
-        [ "source" .= projectSourcePath source,
-          "relative" .= projectSourceRelative source,
-          "runtimeOutput" .= runtimeOutput,
-          "declarationOutput" .= declarationOutput,
-          "success" .= either (const False) (const True) result,
-          "error" .= either Just (const Nothing) result
-        ]
+  textReport =
+    Text.unlines $
+      [ "built project " <> configName config
+      , "root: " <> Text.pack (configRoot config)
+      ]
+        <> concatMap buildLines entries
+  buildLines (source, runtimeOutput, declarationOutput, result) =
+    [ "- " <> statusLabel result <> " " <> displaySourcePath config source
+    ]
+      <> case result of
+        Left err -> ["  " <> Text.pack err]
+        Right () ->
+          [ "  nix -> " <> Text.pack runtimeOutput
+          , "  decl -> " <> Text.pack declarationOutput
+          ]
+  buildJson (source, runtimeOutput, declarationOutput, result) =
+    object
+      [ "source" .= projectSourcePath source
+      , "relative" .= projectSourceRelative source
+      , "runtimeOutput" .= runtimeOutput
+      , "declarationOutput" .= declarationOutput
+      , "success" .= either (const False) (const True) result
+      , "error" .= either Just (const Nothing) result
+      ]
 
 renderProjectEmit :: OutputFormat -> ProjectConfig -> [(ProjectSource, FilePath, FilePath, Either String ())] -> Either String Text
 renderProjectEmit format config entries =
   if any (either (const True) (const False) . fourth) entries
     then renderedFailure format payload (Text.unpack textReport)
     else Right (if format == JsonFormat then jsonText payload else textReport)
-  where
-    payload =
-      object
-        [ "action" .= ("emit-project" :: Text),
-          "projectRoot" .= configRoot config,
-          "projectName" .= configName config,
-          "summary" .= buildSummaryJson entries,
-          "files" .= map emitJson entries
-        ]
-    textReport =
-      Text.unlines $
-        [ "emitted declarations for project " <> configName config,
-          "root: " <> Text.pack (configRoot config)
-        ]
-          <> concatMap emitLines entries
-    emitLines (source, _, declarationOutput, result) =
-      [ "- " <> statusLabel result <> " " <> displaySourcePath config source
+ where
+  payload =
+    object
+      [ "action" .= ("emit-project" :: Text)
+      , "projectRoot" .= configRoot config
+      , "projectName" .= configName config
+      , "summary" .= buildSummaryJson entries
+      , "files" .= map emitJson entries
       ]
-        <> case result of
-          Left err -> ["  " <> Text.pack err]
-          Right () -> ["  decl -> " <> Text.pack declarationOutput]
-    emitJson (source, runtimeOutput, declarationOutput, result) =
-      object
-        [ "source" .= projectSourcePath source,
-          "relative" .= projectSourceRelative source,
-          "runtimeOutput" .= runtimeOutput,
-          "declarationOutput" .= declarationOutput,
-          "success" .= either (const False) (const True) result,
-          "error" .= either Just (const Nothing) result
-        ]
+  textReport =
+    Text.unlines $
+      [ "emitted declarations for project " <> configName config
+      , "root: " <> Text.pack (configRoot config)
+      ]
+        <> concatMap emitLines entries
+  emitLines (source, _, declarationOutput, result) =
+    [ "- " <> statusLabel result <> " " <> displaySourcePath config source
+    ]
+      <> case result of
+        Left err -> ["  " <> Text.pack err]
+        Right () -> ["  decl -> " <> Text.pack declarationOutput]
+  emitJson (source, runtimeOutput, declarationOutput, result) =
+    object
+      [ "source" .= projectSourcePath source
+      , "relative" .= projectSourceRelative source
+      , "runtimeOutput" .= runtimeOutput
+      , "declarationOutput" .= declarationOutput
+      , "success" .= either (const False) (const True) result
+      , "error" .= either Just (const Nothing) result
+      ]
 
 summaryJson :: [(ProjectSource, Either String Analysis)] -> Value
 summaryJson entries =
   object
-    [ "total" .= length entries,
-      "ok" .= length [() | (_, Right _) <- entries],
-      "failed" .= length [() | (_, Left _) <- entries]
+    [ "total" .= length entries
+    , "ok" .= length [() | (_, Right _) <- entries]
+    , "failed" .= length [() | (_, Left _) <- entries]
     ]
 
 buildSummaryJson :: [(ProjectSource, FilePath, FilePath, Either String ())] -> Value
 buildSummaryJson entries =
   object
-    [ "total" .= length entries,
-      "ok" .= length [() | (_, _, _, Right ()) <- entries],
-      "failed" .= length [() | (_, _, _, Left _) <- entries]
+    [ "total" .= length entries
+    , "ok" .= length [() | (_, _, _, Right ()) <- entries]
+    , "failed" .= length [() | (_, _, _, Left _) <- entries]
     ]
 
 projectErrorJson :: Text -> Maybe ProjectConfig -> String -> Value
 projectErrorJson actionName maybeConfig err =
   object
-    [ "action" .= actionName,
-      "projectRoot" .= fmap configRoot maybeConfig,
-      "projectName" .= fmap configName maybeConfig,
-      "success" .= False,
-      "error" .= err
+    [ "action" .= actionName
+    , "projectRoot" .= fmap configRoot maybeConfig
+    , "projectName" .= fmap configName maybeConfig
+    , "success" .= False
+    , "error" .= err
     ]
 
 renderedFailure :: OutputFormat -> Value -> String -> Either String Text

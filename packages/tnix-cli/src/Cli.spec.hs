@@ -2,15 +2,15 @@
 
 module Main (main) where
 
+import Cli (Command (..), OutputFormat (..), commandOutputPath, commandParser, executeCommand, renderAnalysis, writeOutput)
 import Control.Exception (bracket)
 import Control.Monad (forM_)
-import Data.Map.Strict qualified as Map
 import Data.List (isInfixOf)
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Driver (Analysis (..))
-import Cli (Command (..), OutputFormat (..), commandOutputPath, commandParser, executeCommand, renderAnalysis, writeOutput)
 import Options.Applicative (ParserPrefs, ParserResult (..), defaultPrefs, execParserPure, getParseResult, info, renderFailure)
 import System.Directory (createDirectory, createDirectoryIfMissing, doesFileExist, getTemporaryDirectory, removeFile, removePathForcibly)
 import System.FilePath (takeDirectory, (</>))
@@ -49,11 +49,11 @@ spec = do
     it "renders root schemes before named bindings" $ do
       let analysis =
             Analysis
-              { analysisProgram = error "unused in cli tests",
-                analysisRoot = Just (Scheme [] tInt),
-                analysisBindings = Map.fromList [("box", Scheme [] tString), ("id", Scheme ["a"] (TFun Many (TVar "a") (TVar "a")))],
-                analysisAliases = mempty,
-                analysisAmbient = mempty
+              { analysisProgram = error "unused in cli tests"
+              , analysisRoot = Just (Scheme [] tInt)
+              , analysisBindings = Map.fromList [("box", Scheme [] tString), ("id", Scheme ["a"] (TFun Many (TVar "a") (TVar "a")))]
+              , analysisAliases = mempty
+              , analysisAmbient = mempty
               }
       renderAnalysis analysis
         `shouldBe` Text.unlines ["root: Int", "box :: String", "id :: forall a. a -> a"]
@@ -69,12 +69,13 @@ spec = do
   describe "executeCommand" $ do
     it "compiles source files through the driver end-to-end" $
       withTempTree
-        [ ( "main.tnix",
-            source
-              [ "let",
-                "  value :: Int;",
-                "  value = 1;",
-                "in value"
+        [
+          ( "main.tnix"
+          , source
+              [ "let"
+              , "  value :: Int;"
+              , "  value = 1;"
+              , "in value"
               ]
           )
         ]
@@ -85,12 +86,13 @@ spec = do
 
     it "renders check output for analyzed files" $
       withTempTree
-        [ ( "main.tnix",
-            source
-              [ "let",
-                "  id :: forall a. a -> a;",
-                "  id = x: x;",
-                "in id"
+        [
+          ( "main.tnix"
+          , source
+              [ "let"
+              , "  id :: forall a. a -> a;"
+              , "  id = x: x;"
+              , "in id"
               ]
           )
         ]
@@ -147,45 +149,47 @@ spec = do
         Text.isInfixOf "Hello from" entry `shouldBe` True
         Text.isInfixOf "tnix.config.tnix" output `shouldBe` True
 
-    it "scaffolds from tnix.config.tnix path overrides without overwriting existing files" $
-      withTempTree
-        [ ( "tnix.config.tnix",
-            source
-              [ "{",
-                "  name = \"demo\";",
-                "  sourceDir = ./app;",
-                "  entry = ./app/custom.tnix;",
-                "  declarationDir = \"./decls\";",
-                "  builtins = true;",
-                "}"
+    it "scaffolds from tnix.config.tnix path overrides without overwriting existing files"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"demo\";"
+              , "  sourceDir = ./app;"
+              , "  entry = ./app/custom.tnix;"
+              , "  declarationDir = \"./decls\";"
+              , "  builtins = true;"
+              , "}"
               ]
-          ),
-          ("app/custom.tnix", "existing")
+          )
+        , ("app/custom.tnix", "existing")
         ]
-        $ \root -> do
-          output <- executeCommand (Scaffold (Just root)) >>= expectRight
-          doesFileExist (root </> "tnix.config.d.tnix") `shouldReturn` True
-          TextIO.readFile (root </> "app/custom.tnix") `shouldReturn` "existing"
-          doesFileExist (root </> "decls/builtins.d.tnix") `shouldReturn` True
-          Text.isInfixOf "skipped" output `shouldBe` True
-          Text.isInfixOf "builtins.d.tnix" output `shouldBe` True
-          Text.isInfixOf "tnix.config.d.tnix" output `shouldBe` True
+      $ \root -> do
+        output <- executeCommand (Scaffold (Just root)) >>= expectRight
+        doesFileExist (root </> "tnix.config.d.tnix") `shouldReturn` True
+        TextIO.readFile (root </> "app/custom.tnix") `shouldReturn` "existing"
+        doesFileExist (root </> "decls/builtins.d.tnix") `shouldReturn` True
+        Text.isInfixOf "skipped" output `shouldBe` True
+        Text.isInfixOf "builtins.d.tnix" output `shouldBe` True
+        Text.isInfixOf "tnix.config.d.tnix" output `shouldBe` True
 
-    it "respects builtins = false when scaffolding" $
-      withTempTree
-        [ ( "tnix.config.tnix",
-            source
-              [ "{",
-                "  name = \"demo\";",
-                "  builtins = false;",
-                "}"
+    it "respects builtins = false when scaffolding"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"demo\";"
+              , "  builtins = false;"
+              , "}"
               ]
           )
         ]
-        $ \root -> do
-          _ <- executeCommand (Scaffold (Just root)) >>= expectRight
-          doesFileExist (root </> "src/main.tnix") `shouldReturn` True
-          doesFileExist (root </> "types/builtins.d.tnix") `shouldReturn` False
+      $ \root -> do
+        _ <- executeCommand (Scaffold (Just root)) >>= expectRight
+        doesFileExist (root </> "src/main.tnix") `shouldReturn` True
+        doesFileExist (root </> "types/builtins.d.tnix") `shouldReturn` False
 
     it "reports missing or invalid scaffold configs" $
       withTempTree [] (\root -> executeCommand (Scaffold (Just root)) >>= (`expectLeftContaining` "missing tnix.config.tnix"))
@@ -193,72 +197,129 @@ spec = do
           [("tnix.config.tnix", "{ builtins = 1; }")]
           (\root -> executeCommand (Scaffold (Just root)) >>= (`expectLeftContaining` "expected Bool for builtins"))
 
-    it "checks every discovered source file in a project" $
-      withTempTree
-        [ ( "tnix.config.tnix",
-            source
-              [ "{",
-                "  name = \"demo\";",
-                "  sourceDir = ./src;",
-                "  exclude = [ ./src/skip ];",
-                "}"
+    it "checks every discovered source file in a project"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"demo\";"
+              , "  sourceDir = ./src;"
+              , "  exclude = [ ./src/skip ];"
+              , "}"
               ]
-          ),
-          ("src/main.tnix", "1"),
-          ("src/lib/util.tnix", "\"ok\""),
-          ("src/skip/ignored.tnix", "missing")
+          )
+        , ("src/main.tnix", "1")
+        , ("src/lib/util.tnix", "\"ok\"")
+        , ("src/skip/ignored.tnix", "missing")
         ]
-        $ \root -> do
-          output <- executeCommand (CheckProject (Just root) TextFormat) >>= expectRight
-          Text.isInfixOf "src/main.tnix" output `shouldBe` True
-          Text.isInfixOf "src/lib/util.tnix" output `shouldBe` True
-          Text.isInfixOf "ignored.tnix" output `shouldBe` False
+      $ \root -> do
+        output <- executeCommand (CheckProject (Just root) TextFormat) >>= expectRight
+        Text.isInfixOf "src/main.tnix" output `shouldBe` True
+        Text.isInfixOf "src/lib/util.tnix" output `shouldBe` True
+        Text.isInfixOf "ignored.tnix" output `shouldBe` False
 
-    it "builds a project into compiled nix and generated declarations" $
-      withTempTree
-        [ ( "tnix.config.tnix",
-            source
-              [ "{",
-                "  name = \"demo\";",
-                "  sourceDir = ./src;",
-                "  buildDir = ./artifacts;",
-                "  generatedDeclarationDir = ./artifacts/types;",
-                "}"
+    it "builds a project into compiled nix and generated declarations"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"demo\";"
+              , "  sourceDir = ./src;"
+              , "  buildDir = ./artifacts;"
+              , "  generatedDeclarationDir = ./artifacts/types;"
+              , "}"
               ]
-          ),
-          ( "src/main.tnix",
-            source
-              [ "let",
-                "  value :: Int;",
-                "  value = 1;",
-                "in value"
+          )
+        ,
+          ( "src/main.tnix"
+          , source
+              [ "let"
+              , "  value :: Int;"
+              , "  value = 1;"
+              , "in value"
               ]
           )
         ]
-        $ \root -> do
-          output <- executeCommand (BuildProject (Just root) TextFormat) >>= expectRight
-          doesFileExist (root </> "artifacts/main.nix") `shouldReturn` True
-          doesFileExist (root </> "artifacts/types/main.d.tnix") `shouldReturn` True
-          declaration <- TextIO.readFile (root </> "artifacts/types/main.d.tnix")
-          Text.isInfixOf "declare \"../main.nix\"" declaration `shouldBe` True
-          Text.isInfixOf "artifacts/main.nix" output `shouldBe` True
+      $ \root -> do
+        output <- executeCommand (BuildProject (Just root) TextFormat) >>= expectRight
+        doesFileExist (root </> "artifacts/main.nix") `shouldReturn` True
+        doesFileExist (root </> "artifacts/types/main.d.tnix") `shouldReturn` True
+        declaration <- TextIO.readFile (root </> "artifacts/types/main.d.tnix")
+        Text.isInfixOf "declare \"../main.nix\"" declaration `shouldBe` True
+        Text.isInfixOf "artifacts/main.nix" output `shouldBe` True
 
-    it "emits project declarations as json" $
-      withTempTree
-        [ ( "tnix.config.tnix",
-            source
-              [ "{",
-                "  name = \"demo\";",
-                "  sourceDir = ./src;",
-                "}"
+    it "does not write project build outputs when any source fails"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"demo\";"
+              , "  sourceDir = ./src;"
+              , "  buildDir = ./artifacts;"
+              , "  generatedDeclarationDir = ./artifacts/types;"
+              , "}"
               ]
-          ),
-          ("src/main.tnix", "{ value = 1; }")
+          )
+        , ("src/a.tnix", "1")
+        , ("src/b.tnix", "missing")
         ]
-        $ \root -> do
-          output <- executeCommand (EmitProject (Just root) JsonFormat) >>= expectRight
-          Text.isInfixOf "\"action\":\"emit-project\"" output `shouldBe` True
-          Text.isInfixOf "\"success\":true" output `shouldBe` True
+      $ \root -> do
+        result <- executeCommand (BuildProject (Just root) TextFormat)
+        case result of
+          Left report -> do
+            Text.isInfixOf "- ok src/a.tnix" (Text.pack report) `shouldBe` True
+            Text.isInfixOf "- error src/b.tnix" (Text.pack report) `shouldBe` True
+          Right output -> expectationFailure ("expected build failure, got: " <> Text.unpack output)
+        doesFileExist (root </> "artifacts/a.nix") `shouldReturn` False
+        doesFileExist (root </> "artifacts/types/a.d.tnix") `shouldReturn` False
+        doesFileExist (root </> "artifacts/b.nix") `shouldReturn` False
+        doesFileExist (root </> "artifacts/types/b.d.tnix") `shouldReturn` False
+
+    it "does not write project declaration outputs when any source fails"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"demo\";"
+              , "  sourceDir = ./src;"
+              , "  generatedDeclarationDir = ./generated;"
+              , "}"
+              ]
+          )
+        , ("src/a.tnix", "{ value = 1; }")
+        , ("src/b.tnix", "missing")
+        ]
+      $ \root -> do
+        result <- executeCommand (EmitProject (Just root) TextFormat)
+        case result of
+          Left report -> do
+            Text.isInfixOf "- ok src/a.tnix" (Text.pack report) `shouldBe` True
+            Text.isInfixOf "- error src/b.tnix" (Text.pack report) `shouldBe` True
+          Right output -> expectationFailure ("expected emit-project failure, got: " <> Text.unpack output)
+        doesFileExist (root </> "generated/a.d.tnix") `shouldReturn` False
+        doesFileExist (root </> "generated/b.d.tnix") `shouldReturn` False
+
+    it "emits project declarations as json"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"demo\";"
+              , "  sourceDir = ./src;"
+              , "}"
+              ]
+          )
+        , ("src/main.tnix", "{ value = 1; }")
+        ]
+      $ \root -> do
+        output <- executeCommand (EmitProject (Just root) JsonFormat) >>= expectRight
+        Text.isInfixOf "\"action\":\"emit-project\"" output `shouldBe` True
+        Text.isInfixOf "\"success\":true" output `shouldBe` True
 
   describe "writeOutput" $
     it "creates parent directories before writing files" $
@@ -266,14 +327,14 @@ spec = do
         let path = root <> "/dist/nested/out.txt"
         writeOutput (Just path) "hello"
         doesFileExist path `shouldReturn` True
-  where
-    parserInfo = info commandParser mempty
-    parserPrefs :: ParserPrefs
-    parserPrefs = defaultPrefs
-    parse = getParseResult . execParserPure parserPrefs parserInfo
-    parserResult = execParserPure parserPrefs parserInfo
+ where
+  parserInfo = info commandParser mempty
+  parserPrefs :: ParserPrefs
+  parserPrefs = defaultPrefs
+  parse = getParseResult . execParserPure parserPrefs parserInfo
+  parserResult = execParserPure parserPrefs parserInfo
 
-expectRight :: Show e => Either e a -> IO a
+expectRight :: (Show e) => Either e a -> IO a
 expectRight (Right value) = pure value
 expectRight (Left err) = expectationFailure ("expected Right, got Left: " <> show err) >> fail "expected Right"
 
@@ -289,16 +350,16 @@ source = Text.unlines
 
 withTempTree :: [(FilePath, Text)] -> (FilePath -> IO a) -> IO a
 withTempTree files action = bracket createRoot removePathForcibly (\root -> writeTree root >> action root)
-  where
-    createRoot = do
-      tmp <- getTemporaryDirectory
-      (path, handle) <- openTempFile tmp "tnix-cli-spec"
-      hClose handle
-      removeFile path
-      createDirectory path
-      pure path
-    writeTree root =
-      forM_ files $ \(relative, content) -> do
-        let path = root </> relative
-        createDirectoryIfMissing True (takeDirectory path)
-        TextIO.writeFile path content
+ where
+  createRoot = do
+    tmp <- getTemporaryDirectory
+    (path, handle) <- openTempFile tmp "tnix-cli-spec"
+    hClose handle
+    removeFile path
+    createDirectory path
+    pure path
+  writeTree root =
+    forM_ files $ \(relative, content) -> do
+      let path = root </> relative
+      createDirectoryIfMissing True (takeDirectory path)
+      TextIO.writeFile path content
