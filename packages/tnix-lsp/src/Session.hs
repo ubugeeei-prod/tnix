@@ -475,14 +475,6 @@ workspaceDocumentsForTarget :: [WorkspaceDocument] -> ReferenceTarget -> [Worksp
 workspaceDocumentsForTarget workspace target =
   filter (\doc -> workspaceDocumentFile doc `elem` referenceTargetFiles target) workspace
 
-contentForFile :: FilePath -> FilePath -> Text -> [WorkspaceDocument] -> Text
-contentForFile targetFile currentFile currentContent workspace
-  | targetFile == currentFile = currentContent
-  | otherwise =
-      fromMaybe "" $
-        workspaceDocumentContent
-          <$> listToMaybe (filter (\doc -> workspaceDocumentFile doc == targetFile) workspace)
-
 workspaceIndexedSymbols :: [WorkspaceDocument] -> [IndexedSymbol]
 workspaceIndexedSymbols workspace =
   sortOn (\symbol -> (indexedSymbolName symbol, indexedSymbolFile symbol, indexedSymbolRange symbol)) $
@@ -895,29 +887,12 @@ textEdit lineNo startChar endChar newText =
     , "newText" .= newText
     ]
 
-textEditInContent :: Text -> Int -> Int -> Int -> Text -> Value
-textEditInContent content lineNo startChar endChar newText =
-  object
-    [ "range" .= rangeValueInContent content lineNo startChar endChar,
-      "newText" .= newText
-    ]
-
 rangeValue :: Int -> Int -> Int -> Value
 rangeValue lineNo startChar endChar =
   object
     [ "start" .= object ["line" .= lineNo, "character" .= startChar]
     , "end" .= object ["line" .= lineNo, "character" .= endChar]
     ]
-
-rangeValueInContent :: Text -> Int -> Int -> Int -> Value
-rangeValueInContent content lineNo startChar endChar =
-  case drop lineNo (Text.lines content) of
-    line : _ ->
-      rangeValue
-        lineNo
-        (textColumnToUtf16Column line startChar)
-        (textColumnToUtf16Column line endChar)
-    [] -> rangeValue lineNo startChar endChar
 
 workspaceEdit :: [(FilePath, [Value])] -> Value
 workspaceEdit edits =
@@ -1176,8 +1151,8 @@ encodeSemanticTokens tokens = snd (foldl step (Nothing, []) (sortOn (\token -> (
           ]
      in (Just token, acc <> encoded)
 
-locationFromRange :: FilePath -> Text -> (Int, Int, Int) -> Value
-locationFromRange file content (lineNo, startChar, endChar) = locationInContent file content lineNo startChar endChar
+locationFromRange :: FilePath -> (Int, Int, Int) -> Value
+locationFromRange file (lineNo, startChar, endChar) = location file lineNo startChar endChar
 
 lookupCachedDocument :: FilePath -> Documents -> Maybe CachedDocument
 lookupCachedDocument file (Documents docs) = Map.lookup (normalise file) docs

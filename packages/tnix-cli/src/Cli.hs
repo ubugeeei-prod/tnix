@@ -15,7 +15,6 @@ where
 
 import Data.Aeson (Value, encode, object, (.=))
 import Data.ByteString.Lazy qualified as LBS
-import Data.Foldable (traverse_)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text

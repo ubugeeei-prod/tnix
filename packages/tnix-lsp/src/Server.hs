@@ -42,7 +42,7 @@ import Data.Aeson.KeyMap qualified as KeyMap
 import Data.ByteString qualified as BS
 import Data.ByteString.Char8 qualified as B8
 import Data.ByteString.Lazy qualified as LBS
-import Data.Char (digitToInt, isAsciiLower, isAsciiUpper, isDigit, isHexDigit, ord, toLower, toUpper)
+import Data.Char (digitToInt, isAsciiLower, isAsciiUpper, isDigit, isHexDigit, toLower, toUpper)
 import Data.Foldable (toList)
 import Data.List (nub, sortOn, stripPrefix)
 import Data.Map.Strict qualified as Map
@@ -69,38 +69,6 @@ asText _ = Nothing
 asInt :: Value -> Int
 asInt (Number n) = floor n
 asInt _ = 0
-
-utf16Length :: Text -> Int
-utf16Length = T.foldl' (\total char -> total + utf16CodeUnits char) 0
-
-utf16CodeUnits :: Char -> Int
-utf16CodeUnits char
-  | ord char >= 0x10000 = 2
-  | otherwise = 1
-
-utf16ColumnToTextColumn :: Text -> Int -> Maybe Int
-utf16ColumnToTextColumn line target
-  | target < 0 = Nothing
-  | otherwise = go 0 0 (T.unpack line)
-  where
-    go textColumn utf16Column chars
-      | utf16Column == target = Just textColumn
-      | utf16Column > target = Nothing
-      | otherwise =
-          case chars of
-            [] -> Nothing
-            char : rest ->
-              let width = utf16CodeUnits char
-               in if utf16Column + width > target
-                    then Nothing
-                    else go (textColumn + 1) (utf16Column + width) rest
-
-textColumnToUtf16Column :: Text -> Int -> Int
-textColumnToUtf16Column line column =
-  utf16Length (T.take column line)
-
-lineAt :: Int -> Text -> Maybe Text
-lineAt lineNo content = listToMaybe (drop lineNo (T.lines content))
 
 clientCapabilities :: Value
 clientCapabilities =
@@ -229,17 +197,6 @@ location file lineNo startChar endChar =
           , "end" .= object ["line" .= lineNo, "character" .= endChar]
           ]
     ]
-
-locationInContent :: FilePath -> Text -> Int -> Int -> Int -> Value
-locationInContent file content lineNo startChar endChar =
-  case lineAt lineNo content of
-    Just line ->
-      location
-        file
-        lineNo
-        (textColumnToUtf16Column line startChar)
-        (textColumnToUtf16Column line endChar)
-    Nothing -> location file lineNo startChar endChar
 
 publishDiagnostics :: FilePath -> Either String Analysis -> Value
 publishDiagnostics file result =
