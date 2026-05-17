@@ -14,6 +14,7 @@ module Check
   )
 where
 
+import Alias
 import Control.Applicative ((<|>))
 import Control.Monad (foldM, forM, when, zipWithM)
 import Control.Monad.State.Strict
@@ -21,11 +22,10 @@ import Data.List (group, sort)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
-import System.FilePath ((</>), isAbsolute, joinPath, normalise, splitDirectories, takeDirectory)
-import Alias
 import Indexed
 import Subtyping
 import Syntax
+import System.FilePath (isAbsolute, joinPath, normalise, splitDirectories, takeDirectory, (</>))
 import Type
 
 -- | Inputs required to analyze one file.
@@ -137,13 +137,12 @@ inferExpr ctx env = \case
       else
         if resolvedFunTy == tAny
           then pure tAny
-          else
-            case resolvedFunTy of
-              TFun _ domTy outTy -> constrain ctx argTy domTy *> zonk outTy
-              _ -> do
-                outTy <- freshMeta
-                _ <- unify ctx funTy (TFun Many argTy outTy)
-                zonk outTy
+          else case resolvedFunTy of
+            TFun _ domTy outTy -> constrain ctx argTy domTy *> zonk outTy
+            _ -> do
+              outTy <- freshMeta
+              _ <- unify ctx funTy (TFun Many argTy outTy)
+              zonk outTy
   EAdd left right -> inferAddition ctx env left right
   ELet items body -> do
     (env', _) <- inferLet ctx env items
@@ -264,14 +263,16 @@ inferStaticSelect ctx ty field =
   zonk ty >>= \resolvedTy ->
     let base' = resolveType (checkAliases ctx) resolvedTy
      in if base' == tAny
-      then pure tAny
-      else
-        if base' == tDynamic || base' == tUnknown
-          then pure tDynamic
+          then pure tAny
           else
-            case lookupRecordField (checkAliases ctx) resolvedTy field of
-          Just fieldTy -> instantiate (schemeFromAnnotation fieldTy)
-          Nothing -> lift (Left ("missing field " <> show field))
+            if base' == tDynamic
+              then pure tDynamic
+              else
+                if base' == tUnknown
+                  then lift (Left ("cannot select field " <> show field <> " from unknown"))
+                  else case lookupRecordField (checkAliases ctx) resolvedTy field of
+                    Just fieldTy -> instantiate (schemeFromAnnotation fieldTy)
+                    Nothing -> lift (Left ("missing field " <> show field))
 
 inferDynamicSelect :: CheckContext -> Type -> Type -> InferM Type
 inferDynamicSelect ctx baseTy keyTy = do
@@ -283,20 +284,25 @@ inferDynamicSelect ctx baseTy keyTy = do
   if base' == tAny || key' == tAny
     then pure tAny
     else
-      if base' == tDynamic || key' == tDynamic || key' == tUnknown
+      if base' == tDynamic || key' == tDynamic
         then pure tDynamic
         else
-          case selectionKeyNames key' of
-            Just names ->
-              case traverse (lookupRecordField aliases base') names of
-                Just fieldTypes -> do
-                  instantiated <- traverse (instantiate . schemeFromAnnotation) fieldTypes
-                  pure (foldr1 (joinTypes aliases) instantiated)
-                Nothing -> lift $ Left ("missing field selected by dynamic key of type " <> show key')
-            Nothing ->
-              if isSubtype aliases key' tString || isConsistent aliases key' tString
-                then pure tDynamic
-                else lift $ Left ("dynamic field selection expects a string-like key, but got " <> show key')
+          if base' == tUnknown
+            then lift (Left "cannot select dynamic field from unknown")
+            else
+              if key' == tUnknown
+                then lift (Left "dynamic field selection expects a string-like key, but got unknown")
+                else case selectionKeyNames key' of
+                  Just names ->
+                    case traverse (lookupRecordField aliases base') names of
+                      Just fieldTypes -> do
+                        instantiated <- traverse (instantiate . schemeFromAnnotation) fieldTypes
+                        pure (foldr1 (joinTypes aliases) instantiated)
+                      Nothing -> lift $ Left ("missing field selected by dynamic key of type " <> show key')
+                  Nothing ->
+                    if isSubtype aliases key' tString || isConsistent aliases key' tString
+                      then pure tDynamic
+                      else lift $ Left ("dynamic field selection expects a string-like key, but got " <> show key')
 
 selectionKeyNames :: Type -> Maybe [Name]
 selectionKeyNames = \case
@@ -584,7 +590,7 @@ collapseParentSegments = joinPath . foldl step [] . splitDirectories . normalise
     step acc part = acc <> [part]
     isAbsoluteRoot part = part == "/"
 
-duplicateNames :: Ord a => [a] -> [a]
+duplicateNames :: (Ord a) => [a] -> [a]
 duplicateNames = foldr step [] . group . sort
   where
     step xs acc =

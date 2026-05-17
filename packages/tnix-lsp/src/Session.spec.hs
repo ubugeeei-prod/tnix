@@ -16,10 +16,10 @@ import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Driver (Analysis (..), parseText)
 import Session
-import System.Directory (createDirectory, createDirectoryIfMissing, getTemporaryDirectory, removeFile, removePathForcibly)
-import System.FilePath ((</>), takeDirectory)
-import System.IO (hClose, openTempFile)
 import Syntax
+import System.Directory (createDirectory, createDirectoryIfMissing, getTemporaryDirectory, removeFile, removePathForcibly)
+import System.FilePath (takeDirectory, (</>))
+import System.IO (hClose, openTempFile)
 import Test.Hspec
 import Type
 
@@ -170,6 +170,12 @@ spec = do
       let content = Text.unlines ["type Box = String;", "let", "  value = \"tnix\";", "in value"]
       tokens <- semanticTokensDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (documentSymbolMessage "/tmp/main.tnix")
       semanticTokenPayload tokens `shouldSatisfy` (not . null)
+
+  describe "semanticTokensDocument unicode positions" $
+    it "emits semantic token starts as UTF-16 code units" $ do
+      let content = "\128512 value"
+      tokens <- semanticTokensDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (documentSymbolMessage "/tmp/main.tnix")
+      take 5 (semanticTokenPayload tokens) `shouldBe` [0, 3, 5, 3, 0]
   where
     readNever _ = expectationFailure "unexpected file read" >> fail "unexpected file read"
     readFileStub = fmap Right . TextIO.readFile
@@ -216,11 +222,11 @@ inferredBindings :: Text -> Program -> Map.Map Text Scheme
 inferredBindings content program =
   Map.fromList
     [ (name, schemeForName name)
-      | name <- nub (letBindingNames program <> textHints)
+    | name <- nub (letBindingNames program <> textHints)
     ]
   where
     textHints =
-      [ "box" | "box" `Text.isInfixOf` content ]
+      ["box" | "box" `Text.isInfixOf` content]
         <> ["missing" | "mising" `Text.isInfixOf` content]
 
 schemeForName :: Text -> Scheme
@@ -241,7 +247,7 @@ letBindingNames program =
   case programExpr program of
     Just (Marked _ (ELet items _)) ->
       [ name
-        | Marked _ (LetBinding name _) <- items
+      | Marked _ (LetBinding name _) <- items
       ]
     _ -> []
 
@@ -423,8 +429,8 @@ completionLabels value =
       case KeyMap.lookup "items" obj of
         Just (Array items) ->
           [ label
-            | Object item <- toList items,
-              Just (String label) <- [KeyMap.lookup "label" item]
+          | Object item <- toList items,
+            Just (String label) <- [KeyMap.lookup "label" item]
           ]
         _ -> []
     _ -> []
@@ -455,18 +461,18 @@ renameEdits value =
         Just (Object changes) ->
           [ ( Text.unpack (Text.drop 7 uri),
               [ (floor lineNo, floor startChar, floor endChar, newText)
-                | Object edit <- toList edits,
-                  Just (Object range) <- [KeyMap.lookup "range" edit],
-                  Just (Object start) <- [KeyMap.lookup "start" range],
-                  Just (Object ending) <- [KeyMap.lookup "end" range],
-                  Just (Number lineNo) <- [KeyMap.lookup "line" start],
-                  Just (Number startChar) <- [KeyMap.lookup "character" start],
-                  Just (Number endChar) <- [KeyMap.lookup "character" ending],
-                  Just (String newText) <- [KeyMap.lookup "newText" edit]
+              | Object edit <- toList edits,
+                Just (Object range) <- [KeyMap.lookup "range" edit],
+                Just (Object start) <- [KeyMap.lookup "start" range],
+                Just (Object ending) <- [KeyMap.lookup "end" range],
+                Just (Number lineNo) <- [KeyMap.lookup "line" start],
+                Just (Number startChar) <- [KeyMap.lookup "character" start],
+                Just (Number endChar) <- [KeyMap.lookup "character" ending],
+                Just (String newText) <- [KeyMap.lookup "newText" edit]
               ]
             )
-            | (key, Array edits) <- KeyMap.toList changes,
-              let uri = Key.toText key
+          | (key, Array edits) <- KeyMap.toList changes,
+            let uri = Key.toText key
           ]
         _ -> []
     _ -> []
@@ -476,8 +482,8 @@ symbolNames value =
   case value of
     Array items ->
       [ name
-        | Object item <- toList items,
-          Just (String name) <- [KeyMap.lookup "name" item]
+      | Object item <- toList items,
+        Just (String name) <- [KeyMap.lookup "name" item]
       ]
     _ -> []
 
@@ -486,8 +492,8 @@ codeActionTitles value =
   case value of
     Array items ->
       [ title
-        | Object item <- toList items,
-          Just (String title) <- [KeyMap.lookup "title" item]
+      | Object item <- toList items,
+        Just (String title) <- [KeyMap.lookup "title" item]
       ]
     _ -> []
 
@@ -498,7 +504,7 @@ semanticTokenPayload value =
       case KeyMap.lookup "data" obj of
         Just (Array items) ->
           [ floor number
-            | Number number <- toList items
+          | Number number <- toList items
           ]
         _ -> []
     _ -> []
@@ -515,8 +521,9 @@ withTempTree files action = bracket createRoot removePathForcibly (\root -> writ
       pure path
     writeTree root =
       mapM_
-        (\(relative, content) -> do
-           let path = root </> relative
-           createDirectoryIfMissing True (takeDirectory path)
-           TextIO.writeFile path content)
+        ( \(relative, content) -> do
+            let path = root </> relative
+            createDirectoryIfMissing True (takeDirectory path)
+            TextIO.writeFile path content
+        )
         files

@@ -5,11 +5,11 @@ module Main (main) where
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
+import Driver (Analysis (..), analyzeFile, analyzeText, compileFile, emitFile)
+import Pretty (renderScheme)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import Test.Hspec
-import Driver (Analysis (..), analyzeFile, analyzeText, compileFile, emitFile)
-import Pretty (renderScheme)
 import TestSupport (expectLeftContaining, expectRight, source, withTempTree)
 import Type
 
@@ -29,12 +29,11 @@ spec = describe "analysis" $ do
   it "infers int addition inside legacy nix lambdas" $ do
     analysis <- analyzeText "math.nix" "{ inc = x: x + 1; }" >>= expectRight
     analysisRoot analysis
-      `shouldBe`
-        Just
-          ( Scheme
-              []
-              (TRecord (Map.fromList [("inc", TFun One tInt tInt)]))
-          )
+      `shouldBe` Just
+        ( Scheme
+            []
+            (TRecord (Map.fromList [("inc", TFun One tInt tInt)]))
+        )
 
   it "preserves declared binding schemes while allowing gradual root inference" $ do
     analysis <-
@@ -169,18 +168,17 @@ spec = describe "analysis" $ do
       ( \root -> do
           analysis <- analyzeFile (root <> "/app/main.tnix") >>= expectRight
           analysisRoot analysis
-            `shouldBe`
-              Just
-                ( Scheme
-                    []
-                    ( TRecord
-                        ( Map.fromList
-                            [ ("first", TUnion [TLit (LInt 1), TLit (LInt 2)]),
-                              ("sum", tInt)
-                            ]
-                        )
-                    )
-                )
+            `shouldBe` Just
+              ( Scheme
+                  []
+                  ( TRecord
+                      ( Map.fromList
+                          [ ("first", TUnion [TLit (LInt 1), TLit (LInt 2)]),
+                            ("sum", tInt)
+                          ]
+                      )
+                  )
+              )
       )
 
   it "supports higher-kinded aliases in ambient declarations and signatures" $ do
@@ -215,12 +213,11 @@ spec = describe "analysis" $ do
     fmap renderScheme (analysisRoot vectorAnalysis) `shouldBe` Just "Vec 3 Int"
     fmap renderScheme (analysisRoot matrixAnalysis) `shouldBe` Just "Matrix 2 2 Int"
     analysisRoot tensorAnalysis
-      `shouldBe`
-        Just
-          ( Scheme
-              []
-              (TApp (TApp (TCon "Tensor") (TTypeList [TLit (LInt 2), TLit (LInt 2), TLit (LInt 1)])) tInt)
-          )
+      `shouldBe` Just
+        ( Scheme
+            []
+            (TApp (TApp (TCon "Tensor") (TTypeList [TLit (LInt 2), TLit (LInt 2), TLit (LInt 1)])) tInt)
+        )
 
   it "accepts dependent-ish numeric length constraints for vectors" $ do
     analysis <-
@@ -380,6 +377,41 @@ spec = describe "analysis" $ do
           ]
       )
       >>= (`expectLeftContaining` "type mismatch")
+
+  it "rejects field selection on unknown instead of widening to dynamic" $ do
+    analyzeText
+      "main.tnix"
+      ( source
+          [ "let",
+            "  value :: unknown;",
+            "  value = { nested = 1; };",
+            "in value.missing"
+          ]
+      )
+      >>= (`expectLeftContaining` "cannot select field")
+    analyzeText
+      "main.tnix"
+      ( source
+          [ "let",
+            "  value :: unknown;",
+            "  value = { nested = 1; };",
+            "  key :: \"nested\";",
+            "  key = \"nested\";",
+            "in value.${key}"
+          ]
+      )
+      >>= (`expectLeftContaining` "cannot select dynamic field from unknown")
+    analyzeText
+      "main.tnix"
+      ( source
+          [ "let",
+            "  value = { nested = 1; };",
+            "  key :: unknown;",
+            "  key = \"nested\";",
+            "in value.${key}"
+          ]
+      )
+      >>= (`expectLeftContaining` "string-like key")
 
   it "supports widening, narrowing, and gradual as-casts" $ do
     widenAnalysis <- analyzeText "main.tnix" "1 as Number" >>= expectRight

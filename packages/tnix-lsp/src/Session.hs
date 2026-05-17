@@ -46,15 +46,17 @@ import Server
     findDefinitionRange,
     findFieldRange,
     hoverResult,
-    location,
+    locationInContent,
     pathUri,
+    textColumnToUtf16Column,
     uriPath,
+    utf16Length,
     wordAt,
   )
 import Subtyping (resolveType)
-import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
-import System.FilePath ((</>), normalise, takeDirectory)
 import Syntax
+import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
+import System.FilePath (normalise, takeDirectory, (</>))
 import Type
 
 data CachedDocument = CachedDocument
@@ -103,6 +105,7 @@ data IndexedSymbol = IndexedSymbol
   { indexedSymbolName :: Text,
     indexedSymbolKind :: Int,
     indexedSymbolFile :: FilePath,
+    indexedSymbolContent :: Text,
     indexedSymbolRange :: (Int, Int, Int),
     indexedSymbolContainer :: Maybe Text
   }
@@ -226,8 +229,11 @@ definitionDocument readDocument analyze docs msg = do
       workspace <- loadWorkspaceDocuments readDocument analyze docs file
       builtinsFile <- findBuiltinsFile file
       pure $
-        maybe Null
-          (\(targetFile, targetLine, startChar, endChar) -> location targetFile targetLine startChar endChar)
+        maybe
+          Null
+          ( \(targetFile, targetLine, startChar, endChar) ->
+              locationInContent targetFile (contentForFile targetFile file content workspace) targetLine startChar endChar
+          )
           (resolveDefinitionLocation file content workspace builtinsFile result lineNo charNo)
 
 -- | Compute references for the selected symbol.
@@ -252,10 +258,10 @@ referencesDocument readDocument analyze docs msg = do
         case resolveReferenceTarget file content workspace builtinsFile result lineNo charNo of
           Nothing -> []
           Just target ->
-            [ location path foundLine startChar endChar
-              | doc <- workspaceDocumentsForTarget workspace target,
-                let path = workspaceDocumentFile doc,
-                (foundLine, startChar, endChar) <- symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target)
+            [ locationInContent path (workspaceDocumentContent doc) foundLine startChar endChar
+            | doc <- workspaceDocumentsForTarget workspace target,
+              let path = workspaceDocumentFile doc,
+              (foundLine, startChar, endChar) <- symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target)
             ]
 
 -- | Produce a workspace edit that renames the selected symbol.
@@ -282,11 +288,11 @@ renameDocument readDocument analyze docs msg = do
               Nothing -> Null
               Just target ->
                 let edits =
-                      [ (path, map (\(foundLine, startChar, endChar) -> textEdit foundLine startChar endChar newName) ranges)
-                        | doc <- workspaceDocumentsForTarget workspace target,
-                          let path = workspaceDocumentFile doc,
-                          let ranges = symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target),
-                          not (null ranges)
+                      [ (path, map (\(foundLine, startChar, endChar) -> textEditInContent (workspaceDocumentContent doc) foundLine startChar endChar newName) ranges)
+                      | doc <- workspaceDocumentsForTarget workspace target,
+                        let path = workspaceDocumentFile doc,
+                        let ranges = symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target),
+                        not (null ranges)
                       ]
                  in workspaceEdit edits
     _ -> pure Null
@@ -464,6 +470,14 @@ workspaceDocumentsForTarget :: [WorkspaceDocument] -> ReferenceTarget -> [Worksp
 workspaceDocumentsForTarget workspace target =
   filter (\doc -> workspaceDocumentFile doc `elem` referenceTargetFiles target) workspace
 
+contentForFile :: FilePath -> FilePath -> Text -> [WorkspaceDocument] -> Text
+contentForFile targetFile currentFile currentContent workspace
+  | targetFile == currentFile = currentContent
+  | otherwise =
+      fromMaybe "" $
+        workspaceDocumentContent
+          <$> listToMaybe (filter (\doc -> workspaceDocumentFile doc == targetFile) workspace)
+
 workspaceIndexedSymbols :: [WorkspaceDocument] -> [IndexedSymbol]
 workspaceIndexedSymbols workspace =
   sortOn (\symbol -> (indexedSymbolName symbol, indexedSymbolFile symbol, indexedSymbolRange symbol)) $
@@ -574,6 +588,7 @@ documentIndexedSymbols file content result =
                 { indexedSymbolName = typeAliasName alias,
                   indexedSymbolKind = 23,
                   indexedSymbolFile = file,
+                  indexedSymbolContent = content,
                   indexedSymbolRange = range,
                   indexedSymbolContainer = Just "type"
                 }
@@ -589,6 +604,7 @@ documentIndexedSymbols file content result =
                 { indexedSymbolName = Text.pack (ambientPath decl),
                   indexedSymbolKind = 2,
                   indexedSymbolFile = file,
+                  indexedSymbolContent = content,
                   indexedSymbolRange = range,
                   indexedSymbolContainer = Nothing
                 }
@@ -606,6 +622,7 @@ documentIndexedSymbols file content result =
                       { indexedSymbolName = ambientEntryName entry,
                         indexedSymbolKind = kindForType (ambientEntryType entry),
                         indexedSymbolFile = file,
+                        indexedSymbolContent = content,
                         indexedSymbolRange = range,
                         indexedSymbolContainer = Just (Text.pack (ambientPath decl))
                       }
@@ -623,6 +640,7 @@ documentIndexedSymbols file content result =
                 { indexedSymbolName = name,
                   indexedSymbolKind = kindForType (schemeType scheme),
                   indexedSymbolFile = file,
+                  indexedSymbolContent = content,
                   indexedSymbolRange = range,
                   indexedSymbolContainer = Just "let"
                 }
@@ -643,6 +661,7 @@ documentIndexedSymbols file content result =
                         { indexedSymbolName = name,
                           indexedSymbolKind = kindForType fieldTy,
                           indexedSymbolFile = file,
+                          indexedSymbolContent = content,
                           indexedSymbolRange = range,
                           indexedSymbolContainer = Just "default"
                         }
@@ -655,7 +674,7 @@ indexedSymbolInformation symbol =
   object $
     [ "name" .= indexedSymbolName symbol,
       "kind" .= indexedSymbolKind symbol,
-      "location" .= locationFromRange (indexedSymbolFile symbol) (indexedSymbolRange symbol)
+      "location" .= locationFromRange (indexedSymbolFile symbol) (indexedSymbolContent symbol) (indexedSymbolRange symbol)
     ]
       <> maybe [] (\container -> ["containerName" .= container]) (indexedSymbolContainer symbol)
 
@@ -782,16 +801,16 @@ definitionSpans line symbol =
         ]
    in nub
         [ (indent + startChar, indent + startChar + Text.length symbol)
-          | candidate <- candidates,
-            let (prefix, suffix) = Text.breakOn candidate stripped,
-            not (Text.null suffix),
-            let startChar = Text.length prefix + if "type " `Text.isPrefixOf` candidate then 5 else 0
+        | candidate <- candidates,
+          let (prefix, suffix) = Text.breakOn candidate stripped,
+          not (Text.null suffix),
+          let startChar = Text.length prefix + if "type " `Text.isPrefixOf` candidate then 5 else 0
         ]
 
 fieldSpans :: Text -> Text -> [Int]
 fieldSpans line symbol =
   [ Text.length prefix + 1
-    | (prefix, _) <- Text.breakOnAll ("." <> symbol) line
+  | (prefix, _) <- Text.breakOnAll ("." <> symbol) line
   ]
 
 wordSpans :: Text -> Text -> [Int]
@@ -828,10 +847,10 @@ findDeclareRange content path =
                 ]
            in listToMaybe
                 [ (lineNo, startChar + 8, startChar + 8 + Text.length (Text.pack path))
-                  | needle <- needles,
-                    (prefix, suffix) <- Text.breakOnAll needle line,
-                    not (Text.null suffix),
-                    let startChar = Text.length prefix
+                | needle <- needles,
+                  (prefix, suffix) <- Text.breakOnAll needle line,
+                  not (Text.null suffix),
+                  let startChar = Text.length prefix
                 ]
       )
       (zip [0 ..] (Text.lines content))
@@ -854,12 +873,29 @@ textEdit lineNo startChar endChar newText =
       "newText" .= newText
     ]
 
+textEditInContent :: Text -> Int -> Int -> Int -> Text -> Value
+textEditInContent content lineNo startChar endChar newText =
+  object
+    [ "range" .= rangeValueInContent content lineNo startChar endChar,
+      "newText" .= newText
+    ]
+
 rangeValue :: Int -> Int -> Int -> Value
 rangeValue lineNo startChar endChar =
   object
     [ "start" .= object ["line" .= lineNo, "character" .= startChar],
       "end" .= object ["line" .= lineNo, "character" .= endChar]
     ]
+
+rangeValueInContent :: Text -> Int -> Int -> Int -> Value
+rangeValueInContent content lineNo startChar endChar =
+  case drop lineNo (Text.lines content) of
+    line : _ ->
+      rangeValue
+        lineNo
+        (textColumnToUtf16Column line startChar)
+        (textColumnToUtf16Column line endChar)
+    [] -> rangeValue lineNo startChar endChar
 
 workspaceEdit :: [(FilePath, [Value])] -> Value
 workspaceEdit edits =
@@ -868,7 +904,7 @@ workspaceEdit edits =
         .= Object
           ( KeyMap.fromList
               [ (Key.fromText (pathUri file), toJSON fileEdits)
-                | (file, fileEdits) <- edits
+              | (file, fileEdits) <- edits
               ]
           )
     ]
@@ -961,10 +997,10 @@ semanticTokensFor content result =
         Left _ -> []
         Right analysis ->
           [ name
-            | (name, scheme) <- Map.toList (analysisBindings analysis),
-              case schemeType scheme of
-                TFun {} -> True
-                _ -> False
+          | (name, scheme) <- Map.toList (analysisBindings analysis),
+            case schemeType scheme of
+              TFun {} -> True
+              _ -> False
           ]
       typeNames = case result of
         Left _ -> []
@@ -983,15 +1019,23 @@ semanticTokensFor content result =
 semanticTokensForLine :: [Text] -> [Text] -> [Text] -> Int -> Text -> [SemanticToken]
 semanticTokensForLine functionNames typeNames rootFieldNames lineNo line = go 0 []
   where
+    emitToken token =
+      token
+        { semanticTokenLine = lineNo,
+          semanticTokenStart = textColumnToUtf16Column line (semanticTokenStart token),
+          semanticTokenLength = utf16TokenLength token
+        }
+    utf16TokenLength token =
+      utf16Length (Text.take (semanticTokenLength token) (Text.drop (semanticTokenStart token) line))
     go index acc
       | index >= Text.length line = reverse acc
       | "#" `Text.isPrefixOf` Text.drop index line = reverse acc
       | otherwise =
           case Text.drop index line of
             rest
-              | Just token <- annotate (stringToken index rest) -> go (index + semanticTokenLength token) (token : acc)
-              | Just token <- annotate (numberToken index rest) -> go (index + semanticTokenLength token) (token : acc)
-              | Just token <- annotate (operatorToken index rest) -> go (index + semanticTokenLength token) (token : acc)
+              | Just token <- stringToken index rest -> go (index + semanticTokenLength token) (emitToken token : acc)
+              | Just token <- numberToken index rest -> go (index + semanticTokenLength token) (emitToken token : acc)
+              | Just token <- operatorToken index rest -> go (index + semanticTokenLength token) (emitToken token : acc)
               | Just (tokenText, width) <- identifierToken rest ->
                   let token =
                         SemanticToken
@@ -1000,9 +1044,8 @@ semanticTokensForLine functionNames typeNames rootFieldNames lineNo line = go 0 
                             semanticTokenLength = width,
                             semanticTokenType = classifyIdentifier functionNames typeNames rootFieldNames line index tokenText
                           }
-                   in go (index + width) (token : acc)
+                   in go (index + width) (emitToken token : acc)
               | otherwise -> go (index + 1) acc
-    annotate = fmap (\token -> token {semanticTokenLine = lineNo})
 
 stringToken :: Int -> Text -> Maybe SemanticToken
 stringToken index rest = do
@@ -1029,8 +1072,8 @@ operatorToken :: Int -> Text -> Maybe SemanticToken
 operatorToken index rest =
   listToMaybe
     [ SemanticToken {semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = Text.length operator, semanticTokenType = 7}
-      | operator <- ["::", "->", "%1", ".", "=", "+", "|", "?", ":"],
-        operator `Text.isPrefixOf` rest
+    | operator <- ["::", "->", "%1", ".", "=", "+", "|", "?", ":"],
+      operator `Text.isPrefixOf` rest
     ]
 
 identifierToken :: Text -> Maybe (Text, Int)
@@ -1062,8 +1105,8 @@ previousNonSpace :: Text -> Int -> Maybe Char
 previousNonSpace line index =
   listToMaybe
     [ char
-      | char <- reverse (Text.unpack (Text.take index line)),
-        not (char `elem` [' ', '\t'])
+    | char <- reverse (Text.unpack (Text.take index line)),
+      not (char `elem` [' ', '\t'])
     ]
 
 nextOperator :: Text -> Int -> Maybe Text
@@ -1071,8 +1114,8 @@ nextOperator line index =
   let suffix = Text.dropWhile (`elem` [' ', '\t']) (Text.drop index line)
    in listToMaybe
         [ operator
-          | operator <- ["::", "=", ":"],
-            operator `Text.isPrefixOf` suffix
+        | operator <- ["::", "=", ":"],
+          operator `Text.isPrefixOf` suffix
         ]
 
 lineStartsWithType :: Text -> Bool
@@ -1108,8 +1151,8 @@ encodeSemanticTokens tokens = snd (foldl step (Nothing, []) (sortOn (\token -> (
             ]
        in (Just token, acc <> encoded)
 
-locationFromRange :: FilePath -> (Int, Int, Int) -> Value
-locationFromRange file (lineNo, startChar, endChar) = location file lineNo startChar endChar
+locationFromRange :: FilePath -> Text -> (Int, Int, Int) -> Value
+locationFromRange file content (lineNo, startChar, endChar) = locationInContent file content lineNo startChar endChar
 
 lookupCachedDocument :: FilePath -> Documents -> Maybe CachedDocument
 lookupCachedDocument file (Documents docs) = Map.lookup (normalise file) docs

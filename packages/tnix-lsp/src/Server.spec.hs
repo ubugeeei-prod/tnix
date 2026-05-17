@@ -131,6 +131,26 @@ spec = do
         )
         `shouldBe` Right "let result = 2;\n"
 
+    it "interprets incremental edit positions as UTF-16 code units" $
+      applyContentChanges
+        "\128512x"
+        ( Just
+            ( object
+                [ "contentChanges"
+                    .= [ object
+                           [ "range"
+                               .= object
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (2 :: Int)],
+                                   "end" .= object ["line" .= (0 :: Int), "character" .= (3 :: Int)]
+                                 ],
+                             "text" .= ("y" :: String)
+                           ]
+                       ]
+                ]
+            )
+        )
+        `shouldBe` Right "\128512y"
+
     it "rejects invalid incremental ranges" $
       applyContentChanges
         "x"
@@ -174,6 +194,10 @@ spec = do
       diagnosticSpan (publishDiagnosticsWithContent "/tmp/main.tnix" "missing" (Left "unbound name: \"missing\""))
         `shouldBe` Just (0, 0, 7)
 
+    it "emits diagnostic ranges as UTF-16 code units" $
+      diagnosticSpan (publishDiagnosticsWithContent "/tmp/main.tnix" "\128512 missing" (Left "unbound name: \"missing\""))
+        `shouldBe` Just (0, 3, 10)
+
     it "uses parser coordinates when a parse error includes line and column data" $
       diagnosticSpan
         ( publishDiagnosticsWithContent
@@ -193,8 +217,7 @@ spec = do
               .= object
                 [ "kind" .= ("markdown" :: String),
                   "value"
-                    .= ( "```tnix\n{\n  map :: Int -> String;\n}\n```" :: String
-                       )
+                    .= ("```tnix\n{\n  map :: Int -> String;\n}\n```" :: String)
                 ]
           ]
       hoverResult (Right builtinsAnalysis) "builtins.map" 0 10
@@ -374,8 +397,8 @@ completionLabels value =
       case KeyMap.lookup "items" obj of
         Just (Array items) ->
           [ label
-            | Object item <- toList items,
-              Just (String label) <- [KeyMap.lookup "label" item]
+          | Object item <- toList items,
+            Just (String label) <- [KeyMap.lookup "label" item]
           ]
         _ -> []
     _ -> []

@@ -15,6 +15,7 @@ where
 
 import Data.Aeson (Value, encode, object, (.=))
 import Data.ByteString.Lazy qualified as LBS
+import Data.Foldable (traverse_)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -146,8 +147,13 @@ executeProjectBuild target format = do
       if null sources
         then pure (renderedFailure format (projectErrorJson "build" (Just config) "no project source files discovered") "no project source files discovered")
         else do
-          entries <- traverse (buildOne config) sources
-          pure (renderProjectBuild format config entries)
+          entries <- traverse (prepareBuildOne config) sources
+          let reportEntries = map buildReportEntry entries
+          case firstBuildFailure entries of
+            Just _ -> pure (renderProjectBuild format config reportEntries)
+            Nothing -> do
+              traverse_ writePreparedBuild entries
+              pure (renderProjectBuild format config reportEntries)
 
 executeProjectEmit :: Maybe FilePath -> OutputFormat -> IO (Either String Text)
 executeProjectEmit target format = do
@@ -159,8 +165,13 @@ executeProjectEmit target format = do
       if null sources
         then pure (renderedFailure format (projectErrorJson "emit-project" (Just config) "no project source files discovered") "no project source files discovered")
         else do
-          entries <- traverse (emitOne config) sources
-          pure (renderProjectEmit format config entries)
+          entries <- traverse (prepareEmitOne config) sources
+          let reportEntries = map emitReportEntry entries
+          case firstEmitFailure entries of
+            Just _ -> pure (renderProjectEmit format config reportEntries)
+            Nothing -> do
+              traverse_ writePreparedEmit entries
+              pure (renderProjectEmit format config reportEntries)
 
 renderSingleCheck :: FilePath -> OutputFormat -> Either String Analysis -> Either String Text
 renderSingleCheck input format result =
@@ -228,30 +239,92 @@ renderProjectCheck format config entries =
           "error" .= either Just (const Nothing) result
         ]
 
-buildOne :: ProjectConfig -> ProjectSource -> IO (ProjectSource, FilePath, FilePath, Either String ())
-buildOne config source = do
+data PreparedBuild = PreparedBuild
+  { preparedBuildSource :: ProjectSource,
+    preparedBuildRuntimeOutput :: FilePath,
+    preparedBuildDeclarationOutput :: FilePath,
+    preparedBuildResult :: Either String (Text, Text)
+  }
+
+data PreparedEmit = PreparedEmit
+  { preparedEmitSource :: ProjectSource,
+    preparedEmitRuntimeOutput :: FilePath,
+    preparedEmitDeclarationOutput :: FilePath,
+    preparedEmitResult :: Either String Text
+  }
+
+prepareBuildOne :: ProjectConfig -> ProjectSource -> IO PreparedBuild
+prepareBuildOne config source = do
   let runtimeOutput = projectBuildOutputPath config source
       declarationOutput = projectDeclarationOutputPath config source
   compileResult <- compileFile (projectSourcePath source)
   emitResult <- emitFileAs (projectSourcePath source) runtimeOutput declarationOutput
-  case (compileResult, emitResult) of
-    (Right compiled, Right declaration) -> do
-      writeTextFile runtimeOutput compiled
-      writeTextFile declarationOutput declaration
-      pure (source, runtimeOutput, declarationOutput, Right ())
-    (Left err, _) -> pure (source, runtimeOutput, declarationOutput, Left err)
-    (_, Left err) -> pure (source, runtimeOutput, declarationOutput, Left err)
+  pure
+    PreparedBuild
+      { preparedBuildSource = source,
+        preparedBuildRuntimeOutput = runtimeOutput,
+        preparedBuildDeclarationOutput = declarationOutput,
+        preparedBuildResult =
+          case (compileResult, emitResult) of
+            (Right compiled, Right declaration) -> Right (compiled, declaration)
+            (Left err, _) -> Left err
+            (_, Left err) -> Left err
+      }
 
-emitOne :: ProjectConfig -> ProjectSource -> IO (ProjectSource, FilePath, FilePath, Either String ())
-emitOne config source = do
+prepareEmitOne :: ProjectConfig -> ProjectSource -> IO PreparedEmit
+prepareEmitOne config source = do
   let runtimeOutput = projectBuildOutputPath config source
       declarationOutput = projectDeclarationOutputPath config source
   result <- emitFileAs (projectSourcePath source) runtimeOutput declarationOutput
-  case result of
-    Left err -> pure (source, runtimeOutput, declarationOutput, Left err)
-    Right declaration -> do
-      writeTextFile declarationOutput declaration
-      pure (source, runtimeOutput, declarationOutput, Right ())
+  pure
+    PreparedEmit
+      { preparedEmitSource = source,
+        preparedEmitRuntimeOutput = runtimeOutput,
+        preparedEmitDeclarationOutput = declarationOutput,
+        preparedEmitResult = result
+      }
+
+buildReportEntry :: PreparedBuild -> (ProjectSource, FilePath, FilePath, Either String ())
+buildReportEntry prepared =
+  ( preparedBuildSource prepared,
+    preparedBuildRuntimeOutput prepared,
+    preparedBuildDeclarationOutput prepared,
+    () <$ preparedBuildResult prepared
+  )
+
+emitReportEntry :: PreparedEmit -> (ProjectSource, FilePath, FilePath, Either String ())
+emitReportEntry prepared =
+  ( preparedEmitSource prepared,
+    preparedEmitRuntimeOutput prepared,
+    preparedEmitDeclarationOutput prepared,
+    () <$ preparedEmitResult prepared
+  )
+
+firstBuildFailure :: [PreparedBuild] -> Maybe String
+firstBuildFailure = firstLeft . map preparedBuildResult
+
+firstEmitFailure :: [PreparedEmit] -> Maybe String
+firstEmitFailure = firstLeft . map preparedEmitResult
+
+firstLeft :: [Either a b] -> Maybe a
+firstLeft = foldr step Nothing
+  where
+    step (Left err) _ = Just err
+    step (Right _) acc = acc
+
+writePreparedBuild :: PreparedBuild -> IO ()
+writePreparedBuild prepared =
+  case preparedBuildResult prepared of
+    Left _ -> pure ()
+    Right (compiled, declaration) -> do
+      writeTextFile (preparedBuildRuntimeOutput prepared) compiled
+      writeTextFile (preparedBuildDeclarationOutput prepared) declaration
+
+writePreparedEmit :: PreparedEmit -> IO ()
+writePreparedEmit prepared =
+  case preparedEmitResult prepared of
+    Left _ -> pure ()
+    Right declaration -> writeTextFile (preparedEmitDeclarationOutput prepared) declaration
 
 renderProjectBuild :: OutputFormat -> ProjectConfig -> [(ProjectSource, FilePath, FilePath, Either String ())] -> Either String Text
 renderProjectBuild format config entries =
