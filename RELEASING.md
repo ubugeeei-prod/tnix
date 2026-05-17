@@ -38,11 +38,21 @@ git tag v0.2.1
 git push origin v0.2.1
 ```
 
+To validate a release archive checksum locally, keep the archive next to its
+`.sha256` file and run:
+
+```bash
+node --experimental-strip-types ./scripts/package-release.ts verify-checksum tnix-v0.2.1-linux-x64.sha256
+```
+
 ## Notes
 
 - `nix flake check` is the canonical release-grade validation entrypoint for
   the flake itself. It now covers version metadata sync, packaged binary smoke
   tests, Haskell package test suites, and dogfood/example fixture checks.
+- The release workflow verifies each generated checksum with Node before
+  uploading the archive and checksum file, so the check is portable across
+  Linux and macOS runners.
 - CI now primes the Cabal package index explicitly so clean runners can resolve Haskell dependencies reliably.
 - The release workflow always creates a GitHub Release. Marketplace publishing is layered on top and only runs when the corresponding repository secrets are present.
 - Configure `VSCE_PAT` with a Visual Studio Marketplace publisher token and `OVSX_PAT` with an Open VSX token to enable automatic extension publishing on tag pushes.
