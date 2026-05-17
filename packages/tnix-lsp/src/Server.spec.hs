@@ -30,34 +30,34 @@ spec = do
         `shouldBe` object
           [ "capabilities"
               .= object
-                [ "hoverProvider" .= True,
-                  "completionProvider" .= object ["triggerCharacters" .= ["." :: String]],
-                  "definitionProvider" .= True,
-                  "declarationProvider" .= True,
-                  "referencesProvider" .= True,
-                  "renameProvider" .= True,
-                  "documentSymbolProvider" .= True,
-                  "workspaceSymbolProvider" .= True,
-                  "codeActionProvider" .= True,
-                  "semanticTokensProvider"
+                [ "hoverProvider" .= True
+                , "completionProvider" .= object ["triggerCharacters" .= ["." :: String]]
+                , "definitionProvider" .= True
+                , "declarationProvider" .= True
+                , "referencesProvider" .= True
+                , "renameProvider" .= True
+                , "documentSymbolProvider" .= True
+                , "workspaceSymbolProvider" .= True
+                , "codeActionProvider" .= True
+                , "semanticTokensProvider"
                     .= object
                       [ "legend"
                           .= object
                             [ "tokenTypes"
-                                .= [ "keyword" :: String,
-                                     "type",
-                                     "function",
-                                     "variable",
-                                     "property",
-                                     "string",
-                                     "number",
-                                     "operator"
-                                   ],
-                              "tokenModifiers" .= ([] :: [String])
-                            ],
-                        "full" .= True
-                      ],
-                  "textDocumentSync" .= object ["openClose" .= True, "change" .= (2 :: Int)]
+                                .= [ "keyword" :: String
+                                   , "type"
+                                   , "function"
+                                   , "variable"
+                                   , "property"
+                                   , "string"
+                                   , "number"
+                                   , "operator"
+                                   ]
+                            , "tokenModifiers" .= ([] :: [String])
+                            ]
+                      , "full" .= True
+                      ]
+                , "textDocumentSync" .= object ["openClose" .= True, "change" .= (2 :: Int)]
                 ]
           ]
 
@@ -112,24 +112,44 @@ spec = do
                     .= [ object
                            [ "range"
                                .= object
-                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (4 :: Int)],
-                                   "end" .= object ["line" .= (0 :: Int), "character" .= (9 :: Int)]
-                                 ],
-                             "text" .= ("result" :: String)
-                           ],
-                         object
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (4 :: Int)]
+                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (9 :: Int)]
+                                 ]
+                           , "text" .= ("result" :: String)
+                           ]
+                       , object
                            [ "range"
                                .= object
-                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (13 :: Int)],
-                                   "end" .= object ["line" .= (0 :: Int), "character" .= (14 :: Int)]
-                                 ],
-                             "text" .= ("2" :: String)
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (13 :: Int)]
+                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (14 :: Int)]
+                                 ]
+                           , "text" .= ("2" :: String)
                            ]
                        ]
                 ]
             )
         )
         `shouldBe` Right "let result = 2;\n"
+
+    it "applies incremental edits using UTF-16 character offsets" $
+      applyContentChanges
+        "\x1f600 abc"
+        ( Just
+            ( object
+                [ "contentChanges"
+                    .= [ object
+                           [ "range"
+                               .= object
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (3 :: Int)]
+                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (6 :: Int)]
+                                 ]
+                           , "text" .= ("xyz" :: String)
+                           ]
+                       ]
+                ]
+            )
+        )
+        `shouldBe` Right "\x1f600 xyz"
 
     it "rejects invalid incremental ranges" $
       applyContentChanges
@@ -140,10 +160,30 @@ spec = do
                     .= [ object
                            [ "range"
                                .= object
-                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (2 :: Int)],
-                                   "end" .= object ["line" .= (0 :: Int), "character" .= (3 :: Int)]
-                                 ],
-                             "text" .= ("y" :: String)
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (2 :: Int)]
+                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (3 :: Int)]
+                                 ]
+                           , "text" .= ("y" :: String)
+                           ]
+                       ]
+                ]
+            )
+        )
+        `shouldBe` Left "content change character is out of bounds"
+
+    it "rejects incremental edits inside a UTF-16 surrogate pair" $
+      applyContentChanges
+        "\x1f600 x"
+        ( Just
+            ( object
+                [ "contentChanges"
+                    .= [ object
+                           [ "range"
+                               .= object
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (1 :: Int)]
+                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (1 :: Int)]
+                                 ]
+                           , "text" .= ("!" :: String)
                            ]
                        ]
                 ]
@@ -155,6 +195,7 @@ spec = do
     it "extracts identifiers around the cursor including punctuation used by nix names" $ do
       wordAt 0 4 "lib.attr-set" `shouldBe` "lib.attr-set"
       wordAt 1 0 "x\ny" `shouldBe` "y"
+      wordAt 0 4 "\x1f600 b more" `shouldBe` "b"
 
   describe "publishDiagnostics" $ do
     it "emits an empty diagnostics list on success and an error diagnostic on failure" $ do
@@ -174,6 +215,10 @@ spec = do
       diagnosticSpan (publishDiagnosticsWithContent "/tmp/main.tnix" "missing" (Left "unbound name: \"missing\""))
         `shouldBe` Just (0, 0, 7)
 
+    it "reports token ranges using UTF-16 columns after non-BMP text" $
+      diagnosticSpan (publishDiagnosticsWithContent "/tmp/main.tnix" "\x1f600 missing" (Left "unbound name: \"missing\""))
+        `shouldBe` Just (0, 3, 10)
+
     it "uses parser coordinates when a parse error includes line and column data" $
       diagnosticSpan
         ( publishDiagnosticsWithContent
@@ -183,6 +228,12 @@ spec = do
         )
         `shouldBe` Just (1, 2, 8)
 
+  describe "range helpers" $
+    it "returns UTF-16 columns for symbols after non-BMP text" $ do
+      findWordRange "\x1f600 missing" "missing" `shouldBe` Just (0, 3, 10)
+      findFieldRange "\x1f600 box.alpha" "alpha" `shouldBe` Just (0, 7, 12)
+      findDefinitionRange "\x1f600 value = 1" "value" `shouldBe` Just (0, 3, 8)
+
   describe "hoverResult" $
     it "prefers the hovered symbol type and falls back to the root type" $ do
       hoverResult (Right successAnalysis) "box" 0 1
@@ -191,10 +242,9 @@ spec = do
         `shouldBe` object
           [ "contents"
               .= object
-                [ "kind" .= ("markdown" :: String),
-                  "value"
-                    .= ( "```tnix\n{\n  map :: Int -> String;\n}\n```" :: String
-                       )
+                [ "kind" .= ("markdown" :: String)
+                , "value"
+                    .= ("```tnix\n{\n  map :: Int -> String;\n}\n```" :: String)
                 ]
           ]
       hoverResult (Right builtinsAnalysis) "builtins.map" 0 10
@@ -212,6 +262,10 @@ spec = do
     it "offers root attribute-set fields as top-level completions" $
       completionLabels (completionResult (Right rootFieldCompletionAnalysis) "in" 0 2)
         `shouldBe` ["inc"]
+
+    it "interprets completion positions as UTF-16 character offsets" $
+      completionLabels (completionResult (Right completionAnalysis) "\x1f600 b more" 0 4)
+        `shouldBe` ["box", "builtins"]
 
     it "offers record fields after a dotted access and filters by prefix" $ do
       completionLabels (completionResult (Right completionAnalysis) "box." 0 4)
@@ -246,34 +300,35 @@ spec = do
 successAnalysis :: Analysis
 successAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests",
-      analysisRoot = Just (Scheme [] tInt),
-      analysisBindings = Map.fromList [("box", Scheme [] tString)],
-      analysisAliases = mempty,
-      analysisAmbient = mempty
+    { analysisProgram = error "unused in server tests"
+    , analysisRoot = Just (Scheme [] tInt)
+    , analysisBindings = Map.fromList [("box", Scheme [] tString)]
+    , analysisAliases = mempty
+    , analysisAmbient = mempty
     }
 
 rootOnlyAnalysis :: Analysis
 rootOnlyAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests",
-      analysisRoot = Just (Scheme [] tInt),
-      analysisBindings = Map.empty,
-      analysisAliases = mempty,
-      analysisAmbient = mempty
+    { analysisProgram = error "unused in server tests"
+    , analysisRoot = Just (Scheme [] tInt)
+    , analysisBindings = Map.empty
+    , analysisAliases = mempty
+    , analysisAmbient = mempty
     }
 
 builtinsAnalysis :: Analysis
 builtinsAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests",
-      analysisRoot = Just (Scheme [] (tList tString)),
-      analysisBindings = Map.empty,
-      analysisAliases = mempty,
-      analysisAmbient =
+    { analysisProgram = error "unused in server tests"
+    , analysisRoot = Just (Scheme [] (tList tString))
+    , analysisBindings = Map.empty
+    , analysisAliases = mempty
+    , analysisAmbient =
         Map.fromList
-          [ ( "builtins",
-              Scheme
+          [
+            ( "builtins"
+            , Scheme
                 []
                 ( TRecord
                     ( Map.fromList
@@ -288,32 +343,35 @@ builtinsAnalysis =
 completionAnalysis :: Analysis
 completionAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests",
-      analysisRoot = Just (Scheme [] tInt),
-      analysisBindings =
+    { analysisProgram = error "unused in server tests"
+    , analysisRoot = Just (Scheme [] tInt)
+    , analysisBindings =
         Map.fromList
-          [ ( "box",
-              Scheme
+          [
+            ( "box"
+            , Scheme
                 []
                 ( TRecord
                     ( Map.fromList
-                        [ ("alpha", tInt),
-                          ("beta", tString)
+                        [ ("alpha", tInt)
+                        , ("beta", tString)
                         ]
                     )
                 )
             )
-          ],
-      analysisAliases = mempty,
-      analysisAmbient =
+          ]
+    , analysisAliases = mempty
+    , analysisAmbient =
         Map.fromList
-          [ ( "builtins",
-              Scheme
+          [
+            ( "builtins"
+            , Scheme
                 []
                 ( TRecord
                     ( Map.fromList
-                        [ ( "map",
-                            TForall
+                        [
+                          ( "map"
+                          , TForall
                               ["a", "b"]
                               (TFun Many (TFun Many (TVar "a") (TVar "b")) (TFun Many (tList (TVar "a")) (tList (TVar "b"))))
                           )
@@ -327,22 +385,22 @@ completionAnalysis =
 rootFieldCompletionAnalysis :: Analysis
 rootFieldCompletionAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests",
-      analysisRoot =
+    { analysisProgram = error "unused in server tests"
+    , analysisRoot =
         Just
           ( Scheme
               []
               ( TRecord
                   ( Map.fromList
-                      [ ("inc", TFun Many tInt tInt),
-                        ("twice", TFun Many tInt tInt)
+                      [ ("inc", TFun Many tInt tInt)
+                      , ("twice", TFun Many tInt tInt)
                       ]
                   )
               )
-          ),
-      analysisBindings = Map.empty,
-      analysisAliases = mempty,
-      analysisAmbient = mempty
+          )
+    , analysisBindings = Map.empty
+    , analysisAliases = mempty
+    , analysisAmbient = mempty
     }
 
 withTempHandle :: (Handle -> IO a) -> IO a
@@ -357,15 +415,15 @@ withTempHandle action = do
 withPipeHandles :: (Handle -> Handle -> IO a) -> IO a
 withPipeHandles action =
   bracket open close (uncurry action)
-  where
-    open = do
-      (readFd, writeFd) <- createPipe
-      readHandle <- fdToHandle readFd
-      writeHandle <- fdToHandle writeFd
-      hSetBinaryMode readHandle True
-      hSetBinaryMode writeHandle True
-      pure (readHandle, writeHandle)
-    close (readHandle, writeHandle) = hClose readHandle >> hClose writeHandle
+ where
+  open = do
+    (readFd, writeFd) <- createPipe
+    readHandle <- fdToHandle readFd
+    writeHandle <- fdToHandle writeFd
+    hSetBinaryMode readHandle True
+    hSetBinaryMode writeHandle True
+    pure (readHandle, writeHandle)
+  close (readHandle, writeHandle) = hClose readHandle >> hClose writeHandle
 
 completionLabels :: Value -> [Text]
 completionLabels value =
@@ -374,8 +432,8 @@ completionLabels value =
       case KeyMap.lookup "items" obj of
         Just (Array items) ->
           [ label
-            | Object item <- toList items,
-              Just (String label) <- [KeyMap.lookup "label" item]
+          | Object item <- toList items
+          , Just (String label) <- [KeyMap.lookup "label" item]
           ]
         _ -> []
     _ -> []

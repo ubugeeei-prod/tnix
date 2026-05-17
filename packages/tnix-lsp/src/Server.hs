@@ -2,34 +2,36 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Testable JSON-RPC/LSP helpers for tnix.
-module Server
-  ( applyContentChanges,
-    asInt,
-    asText,
-    clearDiagnostics,
-    clientCapabilities,
-    completionResult,
-    contentLengthFromHeaders,
-    contentChanges,
-    diag,
-    documentPath,
-    field,
-    findDefinitionRange,
-    findFieldRange,
-    findWordRange,
-    firstChange,
-    hoverResult,
-    location,
-    notify,
-    pathUri,
-    publishDiagnostics,
-    publishDiagnosticsWithContent,
-    readMessage,
-    respond,
-    send,
-    uriPath,
-    wordAt,
-  )
+module Server (
+  applyContentChanges,
+  asInt,
+  asText,
+  clearDiagnostics,
+  clientCapabilities,
+  completionResult,
+  contentLengthFromHeaders,
+  contentChanges,
+  diag,
+  documentPath,
+  field,
+  findDefinitionRange,
+  findFieldRange,
+  findWordRange,
+  firstChange,
+  hoverResult,
+  location,
+  notify,
+  pathUri,
+  publishDiagnostics,
+  publishDiagnosticsWithContent,
+  readMessage,
+  respond,
+  send,
+  textOffsetToUtf16Column,
+  textRangeToUtf16Columns,
+  uriPath,
+  wordAt,
+)
 where
 
 import Control.Applicative ((<|>))
@@ -73,34 +75,34 @@ clientCapabilities =
   object
     [ "capabilities"
         .= object
-          [ "hoverProvider" .= True,
-            "completionProvider" .= object ["triggerCharacters" .= ["." :: Text]],
-            "definitionProvider" .= True,
-            "declarationProvider" .= True,
-            "referencesProvider" .= True,
-            "renameProvider" .= True,
-            "documentSymbolProvider" .= True,
-            "workspaceSymbolProvider" .= True,
-            "codeActionProvider" .= True,
-            "semanticTokensProvider"
+          [ "hoverProvider" .= True
+          , "completionProvider" .= object ["triggerCharacters" .= ["." :: Text]]
+          , "definitionProvider" .= True
+          , "declarationProvider" .= True
+          , "referencesProvider" .= True
+          , "renameProvider" .= True
+          , "documentSymbolProvider" .= True
+          , "workspaceSymbolProvider" .= True
+          , "codeActionProvider" .= True
+          , "semanticTokensProvider"
               .= object
                 [ "legend"
                     .= object
                       [ "tokenTypes"
-                          .= [ "keyword" :: Text,
-                               "type",
-                               "function",
-                               "variable",
-                               "property",
-                               "string",
-                               "number",
-                               "operator"
-                             ],
-                        "tokenModifiers" .= ([] :: [Text])
-                      ],
-                  "full" .= True
-                ],
-            "textDocumentSync" .= object ["openClose" .= True, "change" .= (2 :: Int)]
+                          .= [ "keyword" :: Text
+                             , "type"
+                             , "function"
+                             , "variable"
+                             , "property"
+                             , "string"
+                             , "number"
+                             , "operator"
+                             ]
+                      , "tokenModifiers" .= ([] :: [Text])
+                      ]
+                , "full" .= True
+                ]
+          , "textDocumentSync" .= object ["openClose" .= True, "change" .= (2 :: Int)]
           ]
     ]
 
@@ -130,47 +132,77 @@ applyContentChange content change = do
       if start > end
         then Left "content change range is inverted"
         else Right (T.take start content <> replacement <> T.drop end content)
-  where
-    rangePos :: Text -> Value -> Either String (Int, Int)
-    rangePos key range = do
-      pos <- maybe (Left ("content change range is missing " <> T.unpack key)) Right (field key range)
-      lineNo <- maybe (Left ("content change range is missing " <> T.unpack key <> ".line")) Right (field "line" pos)
-      charNo <- maybe (Left ("content change range is missing " <> T.unpack key <> ".character")) Right (field "character" pos)
-      Right (asInt lineNo, asInt charNo)
+ where
+  rangePos :: Text -> Value -> Either String (Int, Int)
+  rangePos key range = do
+    pos <- maybe (Left ("content change range is missing " <> T.unpack key)) Right (field key range)
+    lineNo <- maybe (Left ("content change range is missing " <> T.unpack key <> ".line")) Right (field "line" pos)
+    charNo <- maybe (Left ("content change range is missing " <> T.unpack key <> ".character")) Right (field "character" pos)
+    Right (asInt lineNo, asInt charNo)
 
 positionOffset :: Text -> (Int, Int) -> Either String Int
-positionOffset content (lineNo, charNo) =
-  go 0 lineNo (T.splitOn "\n" content)
-  where
-    go offset 0 (line : _) =
-      if charNo <= T.length line
-        then Right (offset + charNo)
-        else Left "content change character is out of bounds"
-    go offset n (line : rest) =
-      go (offset + T.length line + 1) (n - 1) rest
-    go _ _ [] = Left "content change line is out of bounds"
+positionOffset content (lineNo, charNo)
+  | lineNo < 0 = Left "content change line is out of bounds"
+  | charNo < 0 = Left "content change character is out of bounds"
+  | otherwise =
+      go 0 lineNo (T.splitOn "\n" content)
+ where
+  go offset 0 (line : _) =
+    case utf16ColumnToTextOffset line charNo of
+      Just lineOffset -> Right (offset + lineOffset)
+      Nothing -> Left "content change character is out of bounds"
+  go offset n (line : rest) =
+    go (offset + T.length line + 1) (n - 1) rest
+  go _ _ [] = Left "content change line is out of bounds"
+
+utf16ColumnToTextOffset :: Text -> Int -> Maybe Int
+utf16ColumnToTextOffset line target
+  | target < 0 = Nothing
+  | otherwise = go 0 0 (T.unpack line)
+ where
+  go textOffset utf16Offset [] =
+    if target == utf16Offset then Just textOffset else Nothing
+  go textOffset utf16Offset (char : rest)
+    | target == utf16Offset = Just textOffset
+    | target < nextUtf16Offset = Nothing
+    | otherwise = go (textOffset + 1) nextUtf16Offset rest
+   where
+    nextUtf16Offset = utf16Offset + utf16CharWidth char
+
+textOffsetToUtf16Column :: Text -> Int -> Int
+textOffsetToUtf16Column line offset =
+  T.foldl' (\column char -> column + utf16CharWidth char) 0 (T.take offset line)
+
+textRangeToUtf16Columns :: Text -> Int -> Int -> (Int, Int)
+textRangeToUtf16Columns line startOffset endOffset =
+  (textOffsetToUtf16Column line startOffset, textOffsetToUtf16Column line endOffset)
+
+utf16CharWidth :: Char -> Int
+utf16CharWidth char
+  | fromEnum char > 0xffff = 2
+  | otherwise = 1
 
 diag :: String -> Value
 diag err = object ["range" .= object ["start" .= pos, "end" .= pos], "severity" .= (1 :: Int), "message" .= err]
-  where
-    pos = object ["line" .= (0 :: Int), "character" .= (0 :: Int)]
+ where
+  pos = object ["line" .= (0 :: Int), "character" .= (0 :: Int)]
 
 location :: FilePath -> Int -> Int -> Int -> Value
 location file lineNo startChar endChar =
   object
-    [ "uri" .= pathUri file,
-      "range"
+    [ "uri" .= pathUri file
+    , "range"
         .= object
-          [ "start" .= object ["line" .= lineNo, "character" .= startChar],
-            "end" .= object ["line" .= lineNo, "character" .= endChar]
+          [ "start" .= object ["line" .= lineNo, "character" .= startChar]
+          , "end" .= object ["line" .= lineNo, "character" .= endChar]
           ]
     ]
 
 publishDiagnostics :: FilePath -> Either String Analysis -> Value
 publishDiagnostics file result =
   object
-    [ "uri" .= pathUri file,
-      "diagnostics"
+    [ "uri" .= pathUri file
+    , "diagnostics"
         .= either
           (\err -> [diag err])
           (const ([] :: [Value]))
@@ -180,8 +212,8 @@ publishDiagnostics file result =
 publishDiagnosticsWithContent :: FilePath -> Text -> Either String Analysis -> Value
 publishDiagnosticsWithContent file content result =
   object
-    [ "uri" .= pathUri file,
-      "diagnostics"
+    [ "uri" .= pathUri file
+    , "diagnostics"
         .= either
           (\err -> [diagnosticWithContent content err])
           (const ([] :: [Value]))
@@ -191,8 +223,8 @@ publishDiagnosticsWithContent file content result =
 completionResult :: Either String Analysis -> Text -> Int -> Int -> Value
 completionResult result content lineNo charNo =
   object
-    [ "isIncomplete" .= False,
-      "items"
+    [ "isIncomplete" .= False
+    , "items"
         .= case result of
           Left _ -> ([] :: [Value])
           Right analysis -> map completionItem (completionCandidates analysis content lineNo charNo)
@@ -203,19 +235,19 @@ hoverResult result content lineNo charNo =
   object
     [ "contents"
         .= object
-          [ "kind" .= ("markdown" :: Text),
-            "value" .= ("```tnix\n" <> rendered <> "\n```" :: Text)
+          [ "kind" .= ("markdown" :: Text)
+          , "value" .= ("```tnix\n" <> rendered <> "\n```" :: Text)
           ]
     ]
-  where
-    rendered =
-      case result of
-        Left err -> T.pack err
-        Right analysis ->
-          maybe
-            (maybe "No type information." renderScheme (analysisRoot analysis))
-            renderScheme
-            (hoveredSchemeAt analysis lineNo charNo content)
+ where
+  rendered =
+    case result of
+      Left err -> T.pack err
+      Right analysis ->
+        maybe
+          (maybe "No type information." renderScheme (analysisRoot analysis))
+          renderScheme
+          (hoveredSchemeAt analysis lineNo charNo content)
 
 hoveredSchemeAt :: Analysis -> Int -> Int -> Text -> Maybe Scheme
 hoveredSchemeAt analysis lineNo charNo content =
@@ -228,13 +260,16 @@ hoveredPathAt :: Int -> Int -> Text -> [Text]
 hoveredPathAt lineNo charNo content =
   case drop lineNo (T.lines content) of
     line : _ ->
-      let (beforeCursor, afterCursor) = T.splitAt charNo line
-          prefix = T.reverse (T.takeWhile completionChar (T.reverse beforeCursor))
-          suffix = T.takeWhile completionChar afterCursor
-          fragment = prefix <> suffix
-          parts = filter (not . T.null) (T.splitOn "." fragment)
-          segmentCount = min (length parts) (T.count "." prefix + 1)
-       in take segmentCount parts
+      case utf16ColumnToTextOffset line charNo of
+        Just charOffset ->
+          let (beforeCursor, afterCursor) = T.splitAt charOffset line
+              prefix = T.reverse (T.takeWhile completionChar (T.reverse beforeCursor))
+              suffix = T.takeWhile completionChar afterCursor
+              fragment = prefix <> suffix
+              parts = filter (not . T.null) (T.splitOn "." fragment)
+              segmentCount = min (length parts) (T.count "." prefix + 1)
+           in take segmentCount parts
+        Nothing -> []
     _ -> []
 
 diagnosticWithContent :: Text -> String -> Value
@@ -244,11 +279,11 @@ diagnosticWithContent content err =
       object
         [ "range"
             .= object
-              [ "start" .= object ["line" .= lineNo, "character" .= startChar],
-                "end" .= object ["line" .= lineNo, "character" .= endChar]
-              ],
-          "severity" .= (1 :: Int),
-          "message" .= err
+              [ "start" .= object ["line" .= lineNo, "character" .= startChar]
+              , "end" .= object ["line" .= lineNo, "character" .= endChar]
+              ]
+        , "severity" .= (1 :: Int)
+        , "message" .= err
         ]
     Nothing -> diag err
 
@@ -265,13 +300,19 @@ parserRange content err = do
     colNo : lineNo : _ ->
       let lineIx = max 0 (lineNo - 1)
           charIx = max 0 (colNo - 1)
-       in Just (lineIx, charIx, charIx + tokenWidthAt content lineIx charIx)
+       in Just $
+            case drop lineIx (T.lines content) of
+              line : _ ->
+                let endIx = charIx + tokenWidthAt content lineIx charIx
+                    (startChar, endChar) = textRangeToUtf16Columns line charIx endIx
+                 in (lineIx, startChar, endChar)
+              [] -> (lineIx, charIx, charIx + 1)
     _ -> Nothing
-  where
-    parseDecimal chunk =
-      case TextRead.decimal chunk of
-        Right (n, "") -> Just n
-        _ -> Nothing
+ where
+  parseDecimal chunk =
+    case TextRead.decimal chunk of
+      Right (n, "") -> Just n
+      _ -> Nothing
 
 semanticRange :: Text -> Text -> Maybe (Int, Int, Int)
 semanticRange content err = do
@@ -289,10 +330,10 @@ firstQuoted text = do
   let rest = T.drop 1 suffix
       (quoted, trailing) = T.breakOn "\"" rest
   if T.null trailing then Nothing else Just quoted
-  where
-    guardBreak pair@(_, suffix)
-      | T.null suffix = Nothing
-      | otherwise = Just pair
+ where
+  guardBreak pair@(_, suffix)
+    | T.null suffix = Nothing
+    | otherwise = Just pair
 
 completionCandidates :: Analysis -> Text -> Int -> Int -> [(Text, Scheme)]
 completionCandidates analysis content lineNo charNo =
@@ -314,7 +355,10 @@ completionContext lineNo charNo content =
 completionFragment :: Int -> Int -> Text -> Text
 completionFragment lineNo charNo content =
   case drop lineNo (T.lines content) of
-    line : _ -> T.takeWhileEnd completionChar (T.take charNo line)
+    line : _ ->
+      case utf16ColumnToTextOffset line charNo of
+        Just charOffset -> T.takeWhileEnd completionChar (T.take charOffset line)
+        Nothing -> ""
     _ -> ""
 
 completionChar :: Char -> Bool
@@ -339,26 +383,26 @@ topLevelCandidates analysis =
       <> defaultCandidate
       <> importCandidate
       <> Map.toList (analysisBindings analysis)
-  where
-    builtinsCandidate = maybe [] (\scheme -> [("builtins", scheme)]) (Map.lookup "builtins" (analysisAmbient analysis))
-    rootFieldCandidates =
-      case analysisRoot analysis of
-        Just scheme ->
-          case resolveType (analysisAliases analysis) (schemeType scheme) of
-            TRecord fields ->
-              [ (name, schemeFromAnnotation fieldTy)
-                | (name, fieldTy) <- Map.toList fields
-              ]
-            _ -> []
-        Nothing -> []
-    defaultCandidate = maybe [] (\scheme -> [("default", scheme)]) (analysisRoot analysis)
-    importCandidate = [("import", Scheme [] (TFun Many tPath tDynamic))]
+ where
+  builtinsCandidate = maybe [] (\scheme -> [("builtins", scheme)]) (Map.lookup "builtins" (analysisAmbient analysis))
+  rootFieldCandidates =
+    case analysisRoot analysis of
+      Just scheme ->
+        case resolveType (analysisAliases analysis) (schemeType scheme) of
+          TRecord fields ->
+            [ (name, schemeFromAnnotation fieldTy)
+            | (name, fieldTy) <- Map.toList fields
+            ]
+          _ -> []
+      Nothing -> []
+  defaultCandidate = maybe [] (\scheme -> [("default", scheme)]) (analysisRoot analysis)
+  importCandidate = [("import", Scheme [] (TFun Many tPath tDynamic))]
 
 recordFieldCandidates :: Map.Map Name TypeAlias -> Type -> [(Text, Scheme)]
 recordFieldCandidates aliases ty =
   sortOn fst $
     [ (name, schemeFromAnnotation fieldTy)
-      | (name, fieldTy) <- accessibleFields aliases ty
+    | (name, fieldTy) <- accessibleFields aliases ty
     ]
 
 accessibleFields :: Map.Map Name TypeAlias -> Type -> [(Text, Type)]
@@ -393,21 +437,28 @@ dedupeByLabel =
 completionItem :: (Text, Scheme) -> Value
 completionItem (label, scheme) =
   object
-    [ "label" .= label,
-      "kind" .= completionKind (schemeType scheme),
-      "detail" .= renderScheme scheme
+    [ "label" .= label
+    , "kind" .= completionKind (schemeType scheme)
+    , "detail" .= renderScheme scheme
     ]
-  where
-    completionKind ty =
-      case ty of
-        TFun {} -> (3 :: Int)
-        _ -> (6 :: Int)
+ where
+  completionKind ty =
+    case ty of
+      TFun{} -> (3 :: Int)
+      _ -> (6 :: Int)
 
 findDefinitionRange :: Text -> Text -> Maybe (Int, Int, Int)
 findDefinitionRange content symbol =
   listToMaybe $
     mapMaybe
-      (\(lineNo, line) -> fmap (\(startChar, endChar) -> (lineNo, startChar, endChar)) (definitionSpan line symbol))
+      ( \(lineNo, line) ->
+          fmap
+            ( \(startOffset, endOffset) ->
+                let (startChar, endChar) = textRangeToUtf16Columns line startOffset endOffset
+                 in (lineNo, startChar, endChar)
+            )
+            (definitionSpan line symbol)
+      )
       (zip [0 ..] (T.lines content))
 
 definitionSpan :: Text -> Text -> Maybe (Int, Int)
@@ -415,25 +466,32 @@ definitionSpan line symbol =
   let stripped = T.stripStart line
       indent = T.length line - T.length stripped
       candidates =
-        [ "type " <> symbol,
-          symbol <> "::",
-          symbol <> " ::",
-          symbol <> "=",
-          symbol <> " ="
+        [ "type " <> symbol
+        , symbol <> "::"
+        , symbol <> " ::"
+        , symbol <> "="
+        , symbol <> " ="
         ]
    in listToMaybe
         [ (indent + startChar, indent + startChar + T.length symbol)
-          | candidate <- candidates,
-            let (prefix, suffix) = T.breakOn candidate stripped,
-            not (T.null suffix),
-            let startChar = T.length prefix + if "type " `T.isPrefixOf` candidate then 5 else 0
+        | candidate <- candidates
+        , let (prefix, suffix) = T.breakOn candidate stripped
+        , not (T.null suffix)
+        , let startChar = T.length prefix + if "type " `T.isPrefixOf` candidate then 5 else 0
         ]
 
 findFieldRange :: Text -> Text -> Maybe (Int, Int, Int)
 findFieldRange content symbol =
   listToMaybe $
     mapMaybe
-      (\(lineNo, line) -> fmap (\startChar -> (lineNo, startChar, startChar + T.length symbol)) (fieldSpan line symbol))
+      ( \(lineNo, line) ->
+          fmap
+            ( \startOffset ->
+                let (startChar, endChar) = textRangeToUtf16Columns line startOffset (startOffset + T.length symbol)
+                 in (lineNo, startChar, endChar)
+            )
+            (fieldSpan line symbol)
+      )
       (zip [0 ..] (T.lines content))
 
 fieldSpan :: Text -> Text -> Maybe Int
@@ -445,23 +503,30 @@ findWordRange :: Text -> Text -> Maybe (Int, Int, Int)
 findWordRange content symbol =
   listToMaybe $
     mapMaybe
-      (\(lineNo, line) -> fmap (\startChar -> (lineNo, startChar, startChar + T.length symbol)) (wordSpan line symbol))
+      ( \(lineNo, line) ->
+          fmap
+            ( \startOffset ->
+                let (startChar, endChar) = textRangeToUtf16Columns line startOffset (startOffset + T.length symbol)
+                 in (lineNo, startChar, endChar)
+            )
+            (wordSpan line symbol)
+      )
       (zip [0 ..] (T.lines content))
 
 wordSpan :: Text -> Text -> Maybe Int
 wordSpan line symbol =
   listToMaybe $
     mapMaybe validOffset offsets
-  where
-    offsets = map (T.length . fst) (T.breakOnAll symbol line)
-    validOffset startChar =
-      if boundary (startChar - 1) && boundary (startChar + T.length symbol)
-        then Just startChar
-        else Nothing
-    boundary ix
-      | ix < 0 = True
-      | ix >= T.length line = True
-      | otherwise = not (wordChar (T.index line ix))
+ where
+  offsets = map (T.length . fst) (T.breakOnAll symbol line)
+  validOffset startChar =
+    if boundary (startChar - 1) && boundary (startChar + T.length symbol)
+      then Just startChar
+      else Nothing
+  boundary ix
+    | ix < 0 = True
+    | ix >= T.length line = True
+    | otherwise = not (wordChar (T.index line ix))
 
 tokenWidthAt :: Text -> Int -> Int -> Int
 tokenWidthAt content lineNo charNo =
@@ -474,12 +539,15 @@ tokenWidthAt content lineNo charNo =
 wordAt :: Int -> Int -> Text -> Text
 wordAt lineNo charNo content =
   case drop lineNo (T.lines content) of
-    line : _ -> let (a, b) = T.splitAt charNo line in takeWordEnd a <> takeWordStart b
+    line : _ ->
+      case utf16ColumnToTextOffset line charNo of
+        Just charOffset -> let (a, b) = T.splitAt charOffset line in takeWordEnd a <> takeWordStart b
+        Nothing -> "default"
     _ -> "default"
-  where
-    ok c = completionChar c
-    takeWordEnd = T.reverse . T.takeWhile ok . T.reverse
-    takeWordStart = T.takeWhile ok
+ where
+  ok c = completionChar c
+  takeWordEnd = T.reverse . T.takeWhile ok . T.reverse
+  takeWordStart = T.takeWhile ok
 
 pathUri :: FilePath -> Text
 pathUri file = "file://" <> percentEncode (T.pack file)
@@ -500,14 +568,14 @@ contentLengthFromHeaders :: [BS.ByteString] -> Maybe Int
 contentLengthFromHeaders headers =
   listToMaybe $
     mapMaybe parseHeader headers
-  where
-    parseHeader header = do
-      value <- stripPrefixCI "content-length:" (B8.unpack header)
-      case reads (dropWhile (== ' ') value) of
-        [(len, "")] -> Just len
-        _ -> Nothing
-    stripPrefixCI needle haystack =
-      stripPrefix (map toLower needle) (map toLower haystack)
+ where
+  parseHeader header = do
+    value <- stripPrefixCI "content-length:" (B8.unpack header)
+    case reads (dropWhile (== ' ') value) of
+      [(len, "")] -> Just len
+      _ -> Nothing
+  stripPrefixCI needle haystack =
+    stripPrefix (map toLower needle) (map toLower haystack)
 
 readMessage :: Handle -> IO (Maybe Value)
 readMessage handle = do
@@ -538,38 +606,38 @@ notify handle method params = send handle (object ["jsonrpc" .= ("2.0" :: Text),
 
 readHeaders :: Handle -> IO [BS.ByteString]
 readHeaders handle = go []
-  where
-    go acc = do
-      line <- B8.hGetLine handle
-      let trimmed = B8.filter (/= '\r') line
-      if BS.null trimmed
-        then pure (reverse acc)
-        else go (trimmed : acc)
+ where
+  go acc = do
+    line <- B8.hGetLine handle
+    let trimmed = B8.filter (/= '\r') line
+    if BS.null trimmed
+      then pure (reverse acc)
+      else go (trimmed : acc)
 
 percentEncode :: Text -> Text
 percentEncode =
   T.concatMap encodeChar
-  where
-    encodeChar char
-      | isUnreserved char || char == '/' = T.singleton char
-      | otherwise = T.concat (map encodeByte (BS.unpack (TextEncoding.encodeUtf8 (T.singleton char))))
-    encodeByte byte =
-      let hex = showHex byte ""
-       in T.pack ['%', toUpper (pad hex !! 0), toUpper (pad hex !! 1)]
-    pad [digit] = ['0', digit]
-    pad digits = digits
-    isUnreserved char = isAsciiLower char || isAsciiUpper char || isDigit char || char `elem` ['-', '.', '_', '~']
+ where
+  encodeChar char
+    | isUnreserved char || char == '/' = T.singleton char
+    | otherwise = T.concat (map encodeByte (BS.unpack (TextEncoding.encodeUtf8 (T.singleton char))))
+  encodeByte byte =
+    let hex = showHex byte ""
+     in T.pack ['%', toUpper (pad hex !! 0), toUpper (pad hex !! 1)]
+  pad [digit] = ['0', digit]
+  pad digits = digits
+  isUnreserved char = isAsciiLower char || isAsciiUpper char || isDigit char || char `elem` ['-', '.', '_', '~']
 
 percentDecode :: Text -> Text
 percentDecode text =
   case TextEncoding.decodeUtf8' (BS.pack (decodeBytes (T.unpack text))) of
     Left _ -> text
     Right decoded -> decoded
-  where
-    decodeBytes ('%' : a : b : rest)
-      | isHexDigit a && isHexDigit b = fromIntegral (digitToInt a * 16 + digitToInt b) : decodeBytes rest
-    decodeBytes (char : rest) = BS.unpack (TextEncoding.encodeUtf8 (T.singleton char)) <> decodeBytes rest
-    decodeBytes [] = []
+ where
+  decodeBytes ('%' : a : b : rest)
+    | isHexDigit a && isHexDigit b = fromIntegral (digitToInt a * 16 + digitToInt b) : decodeBytes rest
+  decodeBytes (char : rest) = BS.unpack (TextEncoding.encodeUtf8 (T.singleton char)) <> decodeBytes rest
+  decodeBytes [] = []
 
 stripAuthority :: Text -> Text
 stripAuthority path =
