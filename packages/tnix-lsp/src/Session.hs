@@ -1,26 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Testable document-session helpers for the tnix language server.
---
--- The executable keeps only the stdio loop and an 'IORef' cache. All document
--- lifecycle behavior lives here so specs can exercise the same update/hover
--- logic that the real server uses.
-module Session
-  ( Documents,
-    closeDocuments,
-    codeActionsDocument,
-    completionDocument,
-    definitionDocument,
-    documentsFromList,
-    documentSymbolsDocument,
-    hoverDocument,
-    lookupDocumentText,
-    referencesDocument,
-    renameDocument,
-    semanticTokensDocument,
-    updateDocuments,
-    workspaceSymbolsDocument,
-  )
+{- | Testable document-session helpers for the tnix language server.
+
+The executable keeps only the stdio loop and an 'IORef' cache. All document
+lifecycle behavior lives here so specs can exercise the same update/hover
+logic that the real server uses.
+-}
+module Session (
+  Documents,
+  closeDocuments,
+  codeActionsDocument,
+  completionDocument,
+  definitionDocument,
+  documentsFromList,
+  documentSymbolsDocument,
+  hoverDocument,
+  lookupDocumentText,
+  referencesDocument,
+  renameDocument,
+  semanticTokensDocument,
+  updateDocuments,
+  workspaceSymbolsDocument,
+)
 where
 
 import Control.Applicative ((<|>))
@@ -36,23 +37,23 @@ import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Driver (Analysis (..))
-import Server
-  ( applyContentChanges,
-    asInt,
-    asText,
-    completionResult,
-    documentPath,
-    field,
-    findDefinitionRange,
-    findFieldRange,
-    hoverResult,
-    locationInContent,
-    pathUri,
-    textColumnToUtf16Column,
-    uriPath,
-    utf16Length,
-    wordAt,
-  )
+import Server (
+  applyContentChanges,
+  asInt,
+  asText,
+  completionResult,
+  documentPath,
+  field,
+  findDefinitionRange,
+  findFieldRange,
+  hoverResult,
+  location,
+  pathUri,
+  textOffsetToUtf16Column,
+  textRangeToUtf16Columns,
+  uriPath,
+  wordAt,
+ )
 import Subtyping (resolveType)
 import Syntax
 import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
@@ -60,9 +61,9 @@ import System.FilePath (normalise, takeDirectory, (</>))
 import Type
 
 data CachedDocument = CachedDocument
-  { cachedDocumentText :: Text,
-    cachedDocumentAnalysis :: Maybe (Either String Analysis),
-    cachedDocumentLastGoodAnalysis :: Maybe Analysis
+  { cachedDocumentText :: Text
+  , cachedDocumentAnalysis :: Maybe (Either String Analysis)
+  , cachedDocumentLastGoodAnalysis :: Maybe Analysis
   }
   deriving (Eq, Show)
 
@@ -82,11 +83,11 @@ documentsFromList =
     . Map.fromList
     . map
       ( \(file, text) ->
-          ( normalise file,
-            CachedDocument
-              { cachedDocumentText = text,
-                cachedDocumentAnalysis = Nothing,
-                cachedDocumentLastGoodAnalysis = Nothing
+          ( normalise file
+          , CachedDocument
+              { cachedDocumentText = text
+              , cachedDocumentAnalysis = Nothing
+              , cachedDocumentLastGoodAnalysis = Nothing
               }
           )
       )
@@ -96,18 +97,17 @@ lookupDocumentText file (Documents docs) =
   cachedDocumentText <$> Map.lookup (normalise file) docs
 
 data WorkspaceDocument = WorkspaceDocument
-  { workspaceDocumentFile :: FilePath,
-    workspaceDocumentContent :: Text,
-    workspaceDocumentAnalysis :: Either String Analysis
+  { workspaceDocumentFile :: FilePath
+  , workspaceDocumentContent :: Text
+  , workspaceDocumentAnalysis :: Either String Analysis
   }
 
 data IndexedSymbol = IndexedSymbol
-  { indexedSymbolName :: Text,
-    indexedSymbolKind :: Int,
-    indexedSymbolFile :: FilePath,
-    indexedSymbolContent :: Text,
-    indexedSymbolRange :: (Int, Int, Int),
-    indexedSymbolContainer :: Maybe Text
+  { indexedSymbolName :: Text
+  , indexedSymbolKind :: Int
+  , indexedSymbolFile :: FilePath
+  , indexedSymbolRange :: (Int, Int, Int)
+  , indexedSymbolContainer :: Maybe Text
   }
 
 data MatchMode
@@ -115,23 +115,24 @@ data MatchMode
   | FieldWordMatch
 
 data ReferenceTarget = ReferenceTarget
-  { referenceTargetFiles :: [FilePath],
-    referenceTargetNeedle :: Text,
-    referenceTargetMode :: MatchMode
+  { referenceTargetFiles :: [FilePath]
+  , referenceTargetNeedle :: Text
+  , referenceTargetMode :: MatchMode
   }
 
 data SemanticToken = SemanticToken
-  { semanticTokenLine :: Int,
-    semanticTokenStart :: Int,
-    semanticTokenLength :: Int,
-    semanticTokenType :: Int
+  { semanticTokenLine :: Int
+  , semanticTokenStart :: Int
+  , semanticTokenLength :: Int
+  , semanticTokenType :: Int
   }
 
--- | Update or open one document and re-run semantic analysis.
---
--- Full-text updates replace the cached content directly. Incremental changes
--- reuse the cached buffer when possible and fall back to reading from disk only
--- when the editor has not opened the file yet.
+{- | Update or open one document and re-run semantic analysis.
+
+Full-text updates replace the cached content directly. Incremental changes
+reuse the cached buffer when possible and fall back to reading from disk only
+when the editor has not opened the file yet.
+-}
 updateDocuments ::
   (FilePath -> IO (Either String Text)) ->
   (FilePath -> Text -> IO (Either String Analysis)) ->
@@ -163,11 +164,12 @@ closeDocuments docs msg =
     Just file -> (deleteDocument file docs, Just file)
     Nothing -> (docs, Nothing)
 
--- | Compute hover information for the requested position.
---
--- Hover prefers the cached document text so editors see immediate results after
--- unsaved edits. When the file is not cached yet, the helper falls back to
--- disk and renders a readable error when loading fails.
+{- | Compute hover information for the requested position.
+
+Hover prefers the cached document text so editors see immediate results after
+unsaved edits. When the file is not cached yet, the helper falls back to
+disk and renders a readable error when loading fails.
+-}
 hoverDocument ::
   (FilePath -> IO (Either String Text)) ->
   (FilePath -> Text -> IO (Either String Analysis)) ->
@@ -188,12 +190,13 @@ hoverDocument readDocument analyze docs msg = do
       result <- loadDocumentAnalysis readDocument analyze docs file
       pure (hoverResult result content lineNo charNo)
 
--- | Compute completion items for the requested position.
---
--- Completion analyzes the latest cached text so editor suggestions can follow
--- unsaved changes. The payload is still useful when analysis fails because the
--- helper returns an empty, well-formed completion list instead of crashing the
--- protocol exchange.
+{- | Compute completion items for the requested position.
+
+Completion analyzes the latest cached text so editor suggestions can follow
+unsaved changes. The payload is still useful when analysis fails because the
+helper returns an empty, well-formed completion list instead of crashing the
+protocol exchange.
+-}
 completionDocument ::
   (FilePath -> IO (Either String Text)) ->
   (FilePath -> Text -> IO (Either String Analysis)) ->
@@ -208,12 +211,13 @@ completionDocument readDocument analyze docs msg = do
       result <- loadDocumentAnalysis readDocument analyze docs file
       pure (completionResult result content lineNo charNo)
 
--- | Resolve a definition/declaration jump for the requested position.
---
--- Top-level names resolve in the current buffer first and then fall back to a
--- workspace-wide symbol index. Dotted selections additionally search field
--- declarations so ambient APIs such as `builtins.map` and local attrset fields
--- behave like editor users expect.
+{- | Resolve a definition/declaration jump for the requested position.
+
+Top-level names resolve in the current buffer first and then fall back to a
+workspace-wide symbol index. Dotted selections additionally search field
+declarations so ambient APIs such as `builtins.map` and local attrset fields
+behave like editor users expect.
+-}
 definitionDocument ::
   (FilePath -> IO (Either String Text)) ->
   (FilePath -> Text -> IO (Either String Analysis)) ->
@@ -231,15 +235,14 @@ definitionDocument readDocument analyze docs msg = do
       pure $
         maybe
           Null
-          ( \(targetFile, targetLine, startChar, endChar) ->
-              locationInContent targetFile (contentForFile targetFile file content workspace) targetLine startChar endChar
-          )
+          (\(targetFile, targetLine, startChar, endChar) -> location targetFile targetLine startChar endChar)
           (resolveDefinitionLocation file content workspace builtinsFile result lineNo charNo)
 
--- | Compute references for the selected symbol.
---
--- Local names stay scoped to the active buffer, while dotted members search the
--- workspace so shared ambient surfaces and record-field APIs are discoverable.
+{- | Compute references for the selected symbol.
+
+Local names stay scoped to the active buffer, while dotted members search the
+workspace so shared ambient surfaces and record-field APIs are discoverable.
+-}
 referencesDocument ::
   (FilePath -> IO (Either String Text)) ->
   (FilePath -> Text -> IO (Either String Analysis)) ->
@@ -258,17 +261,18 @@ referencesDocument readDocument analyze docs msg = do
         case resolveReferenceTarget file content workspace builtinsFile result lineNo charNo of
           Nothing -> []
           Just target ->
-            [ locationInContent path (workspaceDocumentContent doc) foundLine startChar endChar
-            | doc <- workspaceDocumentsForTarget workspace target,
-              let path = workspaceDocumentFile doc,
-              (foundLine, startChar, endChar) <- symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target)
+            [ location path foundLine startChar endChar
+            | doc <- workspaceDocumentsForTarget workspace target
+            , let path = workspaceDocumentFile doc
+            , (foundLine, startChar, endChar) <- symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target)
             ]
 
--- | Produce a workspace edit that renames the selected symbol.
---
--- The rename strategy mirrors 'referencesDocument': plain local names stay in
--- one file, while member-style names update dotted usages plus declaration
--- sites across the workspace.
+{- | Produce a workspace edit that renames the selected symbol.
+
+The rename strategy mirrors 'referencesDocument': plain local names stay in
+one file, while member-style names update dotted usages plus declaration
+sites across the workspace.
+-}
 renameDocument ::
   (FilePath -> IO (Either String Text)) ->
   (FilePath -> Text -> IO (Either String Analysis)) ->
@@ -288,11 +292,11 @@ renameDocument readDocument analyze docs msg = do
               Nothing -> Null
               Just target ->
                 let edits =
-                      [ (path, map (\(foundLine, startChar, endChar) -> textEditInContent (workspaceDocumentContent doc) foundLine startChar endChar newName) ranges)
-                      | doc <- workspaceDocumentsForTarget workspace target,
-                        let path = workspaceDocumentFile doc,
-                        let ranges = symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target),
-                        not (null ranges)
+                      [ (path, map (\(foundLine, startChar, endChar) -> textEdit foundLine startChar endChar newName) ranges)
+                      | doc <- workspaceDocumentsForTarget workspace target
+                      , let path = workspaceDocumentFile doc
+                      , let ranges = symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target)
+                      , not (null ranges)
                       ]
                  in workspaceEdit edits
     _ -> pure Null
@@ -332,11 +336,12 @@ workspaceSymbolsDocument readDocument analyze docs msg =
           symbols = take 200 (filter matches (workspaceIndexedSymbols workspace))
       pure (toJSON (map indexedSymbolInformation symbols))
 
--- | Offer quick fixes for current diagnostics.
---
--- The server surfaces lightweight escape hatches (`@tnix-ignore`,
--- `@tnix-expected`) and, for obvious misspellings, a rename replacement based
--- on nearby in-scope symbol names.
+{- | Offer quick fixes for current diagnostics.
+
+The server surfaces lightweight escape hatches (`@tnix-ignore`,
+`@tnix-expected`) and, for obvious misspellings, a rename replacement based
+on nearby in-scope symbol names.
+-}
 codeActionsDocument ::
   (FilePath -> IO (Either String Text)) ->
   (FilePath -> Text -> IO (Either String Analysis)) ->
@@ -443,9 +448,9 @@ loadWorkspaceDocuments readDocument analyze docs currentFile = do
             Nothing -> analyze path (cachedDocumentText cached)
         pure
           WorkspaceDocument
-            { workspaceDocumentFile = path,
-              workspaceDocumentContent = cachedDocumentText cached,
-              workspaceDocumentAnalysis = result
+            { workspaceDocumentFile = path
+            , workspaceDocumentContent = cachedDocumentText cached
+            , workspaceDocumentAnalysis = result
             }
       Nothing -> do
         contentResult <- readDocument path
@@ -453,17 +458,17 @@ loadWorkspaceDocuments readDocument analyze docs currentFile = do
           Left err ->
             pure
               WorkspaceDocument
-                { workspaceDocumentFile = path,
-                  workspaceDocumentContent = "",
-                  workspaceDocumentAnalysis = Left err
+                { workspaceDocumentFile = path
+                , workspaceDocumentContent = ""
+                , workspaceDocumentAnalysis = Left err
                 }
           Right content -> do
             result <- analyze path content
             pure
               WorkspaceDocument
-                { workspaceDocumentFile = path,
-                  workspaceDocumentContent = content,
-                  workspaceDocumentAnalysis = result
+                { workspaceDocumentFile = path
+                , workspaceDocumentContent = content
+                , workspaceDocumentAnalysis = result
                 }
 
 workspaceDocumentsForTarget :: [WorkspaceDocument] -> ReferenceTarget -> [WorkspaceDocument]
@@ -542,13 +547,13 @@ resolveReferenceTarget file content workspace builtinsFile result lineNo charNo 
       currentSymbols = documentIndexedSymbols file content result
       workspaceSymbols = workspaceIndexedSymbols workspace
       currentFileOnly name =
-        Just ReferenceTarget {referenceTargetFiles = [file], referenceTargetNeedle = name, referenceTargetMode = WholeWordMatch}
+        Just ReferenceTarget{referenceTargetFiles = [file], referenceTargetNeedle = name, referenceTargetMode = WholeWordMatch}
       workspaceField name =
         Just
           ReferenceTarget
-            { referenceTargetFiles = map workspaceDocumentFile workspace,
-              referenceTargetNeedle = name,
-              referenceTargetMode = FieldWordMatch
+            { referenceTargetFiles = map workspaceDocumentFile workspace
+            , referenceTargetNeedle = name
+            , referenceTargetMode = FieldWordMatch
             }
       uniqueWorkspace name =
         case filter (\entry -> indexedSymbolName entry == name) workspaceSymbols of
@@ -578,103 +583,98 @@ documentIndexedSymbols file content result =
           <> ambientEntrySymbols analysis
           <> bindingSymbols analysis
           <> rootExportSymbols analysis
-  where
-    aliasSymbols analysis =
-      mapMaybe
-        ( \alias -> do
-            range <- findDefinitionRange content (typeAliasName alias)
-            pure
-              IndexedSymbol
-                { indexedSymbolName = typeAliasName alias,
-                  indexedSymbolKind = 23,
-                  indexedSymbolFile = file,
-                  indexedSymbolContent = content,
-                  indexedSymbolRange = range,
-                  indexedSymbolContainer = Just "type"
-                }
-        )
-        (programAliases (analysisProgram analysis))
+ where
+  aliasSymbols analysis =
+    mapMaybe
+      ( \alias -> do
+          range <- findDefinitionRange content (typeAliasName alias)
+          pure
+            IndexedSymbol
+              { indexedSymbolName = typeAliasName alias
+              , indexedSymbolKind = 23
+              , indexedSymbolFile = file
+              , indexedSymbolRange = range
+              , indexedSymbolContainer = Just "type"
+              }
+      )
+      (programAliases (analysisProgram analysis))
 
-    ambientModuleSymbols analysis =
-      mapMaybe
-        ( \decl -> do
-            range <- findDeclareRange content (ambientPath decl)
-            pure
-              IndexedSymbol
-                { indexedSymbolName = Text.pack (ambientPath decl),
-                  indexedSymbolKind = 2,
-                  indexedSymbolFile = file,
-                  indexedSymbolContent = content,
-                  indexedSymbolRange = range,
-                  indexedSymbolContainer = Nothing
-                }
-        )
-        (programAmbient (analysisProgram analysis))
+  ambientModuleSymbols analysis =
+    mapMaybe
+      ( \decl -> do
+          range <- findDeclareRange content (ambientPath decl)
+          pure
+            IndexedSymbol
+              { indexedSymbolName = Text.pack (ambientPath decl)
+              , indexedSymbolKind = 2
+              , indexedSymbolFile = file
+              , indexedSymbolRange = range
+              , indexedSymbolContainer = Nothing
+              }
+      )
+      (programAmbient (analysisProgram analysis))
 
-    ambientEntrySymbols analysis =
-      concatMap
-        ( \decl ->
+  ambientEntrySymbols analysis =
+    concatMap
+      ( \decl ->
+          mapMaybe
+            ( \entry -> do
+                range <- findDefinitionRange content (ambientEntryName entry)
+                pure
+                  IndexedSymbol
+                    { indexedSymbolName = ambientEntryName entry
+                    , indexedSymbolKind = kindForType (ambientEntryType entry)
+                    , indexedSymbolFile = file
+                    , indexedSymbolRange = range
+                    , indexedSymbolContainer = Just (Text.pack (ambientPath decl))
+                    }
+            )
+            (ambientEntries decl)
+      )
+      (programAmbient (analysisProgram analysis))
+
+  bindingSymbols analysis =
+    mapMaybe
+      ( \(name, scheme) -> do
+          range <- findDefinitionRange content name
+          pure
+            IndexedSymbol
+              { indexedSymbolName = name
+              , indexedSymbolKind = kindForType (schemeType scheme)
+              , indexedSymbolFile = file
+              , indexedSymbolRange = range
+              , indexedSymbolContainer = Just "let"
+              }
+      )
+      (Map.toList (analysisBindings analysis))
+
+  rootExportSymbols analysis =
+    case analysisRoot analysis of
+      Nothing -> []
+      Just scheme ->
+        case resolveType (analysisAliases analysis) (schemeType scheme) of
+          TRecord fields ->
             mapMaybe
-              ( \entry -> do
-                  range <- findDefinitionRange content (ambientEntryName entry)
+              ( \(name, fieldTy) -> do
+                  range <- findFieldRange content name <|> findDefinitionRange content name
                   pure
                     IndexedSymbol
-                      { indexedSymbolName = ambientEntryName entry,
-                        indexedSymbolKind = kindForType (ambientEntryType entry),
-                        indexedSymbolFile = file,
-                        indexedSymbolContent = content,
-                        indexedSymbolRange = range,
-                        indexedSymbolContainer = Just (Text.pack (ambientPath decl))
+                      { indexedSymbolName = name
+                      , indexedSymbolKind = kindForType fieldTy
+                      , indexedSymbolFile = file
+                      , indexedSymbolRange = range
+                      , indexedSymbolContainer = Just "default"
                       }
               )
-              (ambientEntries decl)
-        )
-        (programAmbient (analysisProgram analysis))
-
-    bindingSymbols analysis =
-      mapMaybe
-        ( \(name, scheme) -> do
-            range <- findDefinitionRange content name
-            pure
-              IndexedSymbol
-                { indexedSymbolName = name,
-                  indexedSymbolKind = kindForType (schemeType scheme),
-                  indexedSymbolFile = file,
-                  indexedSymbolContent = content,
-                  indexedSymbolRange = range,
-                  indexedSymbolContainer = Just "let"
-                }
-        )
-        (Map.toList (analysisBindings analysis))
-
-    rootExportSymbols analysis =
-      case analysisRoot analysis of
-        Nothing -> []
-        Just scheme ->
-          case resolveType (analysisAliases analysis) (schemeType scheme) of
-            TRecord fields ->
-              mapMaybe
-                ( \(name, fieldTy) -> do
-                    range <- findFieldRange content name <|> findDefinitionRange content name
-                    pure
-                      IndexedSymbol
-                        { indexedSymbolName = name,
-                          indexedSymbolKind = kindForType fieldTy,
-                          indexedSymbolFile = file,
-                          indexedSymbolContent = content,
-                          indexedSymbolRange = range,
-                          indexedSymbolContainer = Just "default"
-                        }
-                )
-                (Map.toList fields)
-            _ -> []
+              (Map.toList fields)
+          _ -> []
 
 indexedSymbolInformation :: IndexedSymbol -> Value
 indexedSymbolInformation symbol =
   object $
-    [ "name" .= indexedSymbolName symbol,
-      "kind" .= indexedSymbolKind symbol,
-      "location" .= locationFromRange (indexedSymbolFile symbol) (indexedSymbolContent symbol) (indexedSymbolRange symbol)
+    [ "name" .= indexedSymbolName symbol
+    , "kind" .= indexedSymbolKind symbol
+    , "location" .= locationFromRange (indexedSymbolFile symbol) (indexedSymbolRange symbol)
     ]
       <> maybe [] (\container -> ["containerName" .= container]) (indexedSymbolContainer symbol)
 
@@ -700,60 +700,60 @@ workspaceFilesFor file
       if marked
         then sortOn id . nub <$> go root
         else pure [normalise file]
-  where
-    go dir = do
-      names <- sortOn id <$> listDirectory dir
-      fmap concat . forM names $ \name -> do
-        let path = normalise (dir </> name)
-        isDir <- doesDirectoryExist path
-        if isDir
-          then
-            if ignoredDirectory name
-              then pure []
-              else go path
-          else
-            if isSourceFile name
-              then pure [path]
-              else pure []
+ where
+  go dir = do
+    names <- sortOn id <$> listDirectory dir
+    fmap concat . forM names $ \name -> do
+      let path = normalise (dir </> name)
+      isDir <- doesDirectoryExist path
+      if isDir
+        then
+          if ignoredDirectory name
+            then pure []
+            else go path
+        else
+          if isSourceFile name
+            then pure [path]
+            else pure []
 
 findWorkspaceRoot :: FilePath -> IO FilePath
 findWorkspaceRoot path = go start
-  where
-    start = normalise (takeDirectory path)
-    go dir = do
-      marked <- hasWorkspaceMarker dir
-      let parent = normalise (takeDirectory dir)
-      if marked
-        then pure dir
-        else
-          if parent == dir
-            then pure start
-            else go parent
+ where
+  start = normalise (takeDirectory path)
+  go dir = do
+    marked <- hasWorkspaceMarker dir
+    let parent = normalise (takeDirectory dir)
+    if marked
+      then pure dir
+      else
+        if parent == dir
+          then pure start
+          else go parent
 
 hasWorkspaceMarker :: FilePath -> IO Bool
 hasWorkspaceMarker dir =
   or
     <$> sequence
-      [ doesFileExist (dir </> "flake.nix"),
-        doesFileExist (dir </> "cabal.project"),
-        doesFileExist (dir </> "pnpm-workspace.yaml"),
-        doesFileExist (dir </> "tnix.config.tnix"),
-        doesDirectoryExist (dir </> ".git")
+      [ doesFileExist (dir </> "flake.nix")
+      , doesFileExist (dir </> "cabal.project")
+      , doesFileExist (dir </> "pnpm-workspace.yaml")
+      , doesFileExist (dir </> "tnix.config.tnix")
+      , doesDirectoryExist (dir </> ".git")
       ]
 
 findBuiltinsFile :: FilePath -> IO (Maybe FilePath)
 findBuiltinsFile file = go (normalise (takeDirectory file))
-  where
-    go dir = do
-      let candidate = dir </> "builtins.d.tnix"
-          parent = normalise (takeDirectory dir)
-      exists <- doesFileExist candidate
-      if exists
-        then pure (Just candidate)
-        else
-          if parent == dir
-            then pure Nothing
-            else go parent
+ where
+  go dir = do
+    let candidate = dir </> "builtins.d.tnix"
+        parent = normalise (takeDirectory dir)
+    exists <- doesFileExist candidate
+    if exists
+      then pure (Just candidate)
+      else
+        if parent == dir
+          then pure Nothing
+          else go parent
 
 ignoredDirectory :: FilePath -> Bool
 ignoredDirectory name =
@@ -773,19 +773,40 @@ symbolRanges content symbol mode =
 allDefinitionRanges :: Text -> Text -> [(Int, Int, Int)]
 allDefinitionRanges content symbol =
   concatMap
-    (\(lineNo, line) -> map (\(startChar, endChar) -> (lineNo, startChar, endChar)) (definitionSpans line symbol))
+    ( \(lineNo, line) ->
+        map
+          ( \(startOffset, endOffset) ->
+              let (startChar, endChar) = textRangeToUtf16Columns line startOffset endOffset
+               in (lineNo, startChar, endChar)
+          )
+          (definitionSpans line symbol)
+    )
     (zip [0 ..] (Text.lines content))
 
 allFieldRanges :: Text -> Text -> [(Int, Int, Int)]
 allFieldRanges content symbol =
   concatMap
-    (\(lineNo, line) -> map (\startChar -> (lineNo, startChar, startChar + Text.length symbol)) (fieldSpans line symbol))
+    ( \(lineNo, line) ->
+        map
+          ( \startOffset ->
+              let (startChar, endChar) = textRangeToUtf16Columns line startOffset (startOffset + Text.length symbol)
+               in (lineNo, startChar, endChar)
+          )
+          (fieldSpans line symbol)
+    )
     (zip [0 ..] (Text.lines content))
 
 allWordRanges :: Text -> Text -> [(Int, Int, Int)]
 allWordRanges content symbol =
   concatMap
-    (\(lineNo, line) -> map (\startChar -> (lineNo, startChar, startChar + Text.length symbol)) (wordSpans line symbol))
+    ( \(lineNo, line) ->
+        map
+          ( \startOffset ->
+              let (startChar, endChar) = textRangeToUtf16Columns line startOffset (startOffset + Text.length symbol)
+               in (lineNo, startChar, endChar)
+          )
+          (wordSpans line symbol)
+    )
     (zip [0 ..] (Text.lines content))
 
 definitionSpans :: Text -> Text -> [(Int, Int)]
@@ -793,18 +814,18 @@ definitionSpans line symbol =
   let stripped = Text.stripStart line
       indent = Text.length line - Text.length stripped
       candidates =
-        [ "type " <> symbol,
-          symbol <> "::",
-          symbol <> " ::",
-          symbol <> "=",
-          symbol <> " ="
+        [ "type " <> symbol
+        , symbol <> "::"
+        , symbol <> " ::"
+        , symbol <> "="
+        , symbol <> " ="
         ]
    in nub
         [ (indent + startChar, indent + startChar + Text.length symbol)
-        | candidate <- candidates,
-          let (prefix, suffix) = Text.breakOn candidate stripped,
-          not (Text.null suffix),
-          let startChar = Text.length prefix + if "type " `Text.isPrefixOf` candidate then 5 else 0
+        | candidate <- candidates
+        , let (prefix, suffix) = Text.breakOn candidate stripped
+        , not (Text.null suffix)
+        , let startChar = Text.length prefix + if "type " `Text.isPrefixOf` candidate then 5 else 0
         ]
 
 fieldSpans :: Text -> Text -> [Int]
@@ -816,16 +837,16 @@ fieldSpans line symbol =
 wordSpans :: Text -> Text -> [Int]
 wordSpans line symbol =
   mapMaybe validOffset offsets
-  where
-    offsets = map (Text.length . fst) (Text.breakOnAll symbol line)
-    validOffset startChar =
-      if boundary (startChar - 1) && boundary (startChar + Text.length symbol)
-        then Just startChar
-        else Nothing
-    boundary ix
-      | ix < 0 = True
-      | ix >= Text.length line = True
-      | otherwise = not (wordChar (Text.index line ix))
+ where
+  offsets = map (Text.length . fst) (Text.breakOnAll symbol line)
+  validOffset startChar =
+    if boundary (startChar - 1) && boundary (startChar + Text.length symbol)
+      then Just startChar
+      else Nothing
+  boundary ix
+    | ix < 0 = True
+    | ix >= Text.length line = True
+    | otherwise = not (wordChar (Text.index line ix))
 
 wordChar :: Char -> Bool
 wordChar char =
@@ -842,15 +863,16 @@ findDeclareRange content path =
     mapMaybe
       ( \(lineNo, line) ->
           let needles =
-                [ "declare \"" <> Text.pack path <> "\"",
-                  "declare " <> Text.pack path
+                [ "declare \"" <> Text.pack path <> "\""
+                , "declare " <> Text.pack path
                 ]
            in listToMaybe
-                [ (lineNo, startChar + 8, startChar + 8 + Text.length (Text.pack path))
-                | needle <- needles,
-                  (prefix, suffix) <- Text.breakOnAll needle line,
-                  not (Text.null suffix),
-                  let startChar = Text.length prefix
+                [ let (startColumn, endColumn) = textRangeToUtf16Columns line (startOffset + 8) (startOffset + 8 + Text.length (Text.pack path))
+                   in (lineNo, startColumn, endColumn)
+                | needle <- needles
+                , (prefix, suffix) <- Text.breakOnAll needle line
+                , not (Text.null suffix)
+                , let startOffset = Text.length prefix
                 ]
       )
       (zip [0 ..] (Text.lines content))
@@ -858,8 +880,8 @@ findDeclareRange content path =
 kindForType :: Type -> Int
 kindForType ty =
   case ty of
-    TFun {} -> 12
-    TRecord {} -> 19
+    TFun{} -> 12
+    TRecord{} -> 19
     TLit (LString _) -> 15
     TLit (LInt _) -> 16
     TLit (LFloat _) -> 16
@@ -869,8 +891,8 @@ kindForType ty =
 textEdit :: Int -> Int -> Int -> Text -> Value
 textEdit lineNo startChar endChar newText =
   object
-    [ "range" .= rangeValue lineNo startChar endChar,
-      "newText" .= newText
+    [ "range" .= rangeValue lineNo startChar endChar
+    , "newText" .= newText
     ]
 
 textEditInContent :: Text -> Int -> Int -> Int -> Text -> Value
@@ -883,8 +905,8 @@ textEditInContent content lineNo startChar endChar newText =
 rangeValue :: Int -> Int -> Int -> Value
 rangeValue lineNo startChar endChar =
   object
-    [ "start" .= object ["line" .= lineNo, "character" .= startChar],
-      "end" .= object ["line" .= lineNo, "character" .= endChar]
+    [ "start" .= object ["line" .= lineNo, "character" .= startChar]
+    , "end" .= object ["line" .= lineNo, "character" .= endChar]
     ]
 
 rangeValueInContent :: Text -> Int -> Int -> Int -> Value
@@ -914,8 +936,8 @@ diagnosticPayloads msg =
   case field "params" msg >>= field "context" >>= field "diagnostics" of
     Just (Array diagnostics) -> toList diagnostics
     _ -> []
-  where
-    toList = foldr (:) []
+ where
+  toList = foldr (:) []
 
 diagnosticRange :: Value -> Maybe (Int, Int, Int)
 diagnosticRange diagnostic = do
@@ -939,8 +961,8 @@ directiveActions file content diagnostic =
   case diagnosticRange diagnostic of
     Just (lineNo, _, _)
       | not (lineHasDirective "# @tnix-ignore" lineNo content) ->
-          [ quickFixAction "Add `# @tnix-ignore`" file [insertLineEdit lineNo "# @tnix-ignore\n"],
-            quickFixAction "Add `# @tnix-expected`" file [insertLineEdit lineNo "# @tnix-expected\n"]
+          [ quickFixAction "Add `# @tnix-ignore`" file [insertLineEdit lineNo "# @tnix-ignore\n"]
+          , quickFixAction "Add `# @tnix-expected`" file [insertLineEdit lineNo "# @tnix-expected\n"]
           ]
       | otherwise -> []
     Nothing -> []
@@ -950,10 +972,10 @@ insertLineEdit lineNo newText =
   object
     [ "range"
         .= object
-          [ "start" .= object ["line" .= lineNo, "character" .= (0 :: Int)],
-            "end" .= object ["line" .= lineNo, "character" .= (0 :: Int)]
-          ],
-      "newText" .= newText
+          [ "start" .= object ["line" .= lineNo, "character" .= (0 :: Int)]
+          , "end" .= object ["line" .= lineNo, "character" .= (0 :: Int)]
+          ]
+    , "newText" .= newText
     ]
 
 lineHasDirective :: Text -> Int -> Text -> Bool
@@ -965,9 +987,9 @@ lineHasDirective directive lineNo content =
 quickFixAction :: Text -> FilePath -> [Value] -> Value
 quickFixAction title file edits =
   object
-    [ "title" .= title,
-      "kind" .= ("quickfix" :: Text),
-      "edit" .= workspaceEdit [(file, edits)]
+    [ "title" .= title
+    , "kind" .= ("quickfix" :: Text)
+    , "edit" .= workspaceEdit [(file, edits)]
     ]
 
 closestCandidate :: [Text] -> Text -> Maybe Text
@@ -979,17 +1001,17 @@ closestCandidate candidates needle =
 
 nameDistance :: Text -> Text -> Int
 nameDistance left right = last (foldl' step [0 .. length rightChars] (zip [1 ..] leftChars))
-  where
-    leftChars = map toLower (Text.unpack left)
-    rightChars = map toLower (Text.unpack right)
-    step previousRow (rowIndex, leftChar) =
-      scanl
-        (\leftCost (columnIndex, rightChar) -> minimum [leftCost + 1, previousRow !! columnIndex + 1, previousRow !! (columnIndex - 1) + substitutionCost leftChar rightChar])
-        rowIndex
-        (zip [1 ..] rightChars)
-    substitutionCost leftChar rightChar
-      | leftChar == rightChar = 0
-      | otherwise = 1
+ where
+  leftChars = map toLower (Text.unpack left)
+  rightChars = map toLower (Text.unpack right)
+  step previousRow (rowIndex, leftChar) =
+    scanl
+      (\leftCost (columnIndex, rightChar) -> minimum [leftCost + 1, previousRow !! columnIndex + 1, previousRow !! (columnIndex - 1) + substitutionCost leftChar rightChar])
+      rowIndex
+      (zip [1 ..] rightChars)
+  substitutionCost leftChar rightChar
+    | leftChar == rightChar = 0
+    | otherwise = 1
 
 semanticTokensFor :: Text -> Either String Analysis -> [SemanticToken]
 semanticTokensFor content result =
@@ -997,9 +1019,9 @@ semanticTokensFor content result =
         Left _ -> []
         Right analysis ->
           [ name
-          | (name, scheme) <- Map.toList (analysisBindings analysis),
-            case schemeType scheme of
-              TFun {} -> True
+          | (name, scheme) <- Map.toList (analysisBindings analysis)
+          , case schemeType scheme of
+              TFun{} -> True
               _ -> False
           ]
       typeNames = case result of
@@ -1018,34 +1040,37 @@ semanticTokensFor content result =
 
 semanticTokensForLine :: [Text] -> [Text] -> [Text] -> Int -> Text -> [SemanticToken]
 semanticTokensForLine functionNames typeNames rootFieldNames lineNo line = go 0 []
-  where
-    emitToken token =
-      token
-        { semanticTokenLine = lineNo,
-          semanticTokenStart = textColumnToUtf16Column line (semanticTokenStart token),
-          semanticTokenLength = utf16TokenLength token
-        }
-    utf16TokenLength token =
-      utf16Length (Text.take (semanticTokenLength token) (Text.drop (semanticTokenStart token) line))
-    go index acc
-      | index >= Text.length line = reverse acc
-      | "#" `Text.isPrefixOf` Text.drop index line = reverse acc
-      | otherwise =
-          case Text.drop index line of
-            rest
-              | Just token <- stringToken index rest -> go (index + semanticTokenLength token) (emitToken token : acc)
-              | Just token <- numberToken index rest -> go (index + semanticTokenLength token) (emitToken token : acc)
-              | Just token <- operatorToken index rest -> go (index + semanticTokenLength token) (emitToken token : acc)
-              | Just (tokenText, width) <- identifierToken rest ->
-                  let token =
-                        SemanticToken
-                          { semanticTokenLine = lineNo,
-                            semanticTokenStart = index,
-                            semanticTokenLength = width,
-                            semanticTokenType = classifyIdentifier functionNames typeNames rootFieldNames line index tokenText
-                          }
-                   in go (index + width) (emitToken token : acc)
-              | otherwise -> go (index + 1) acc
+ where
+  go index acc
+    | index >= Text.length line = reverse acc
+    | "#" `Text.isPrefixOf` Text.drop index line = reverse acc
+    | otherwise =
+        case Text.drop index line of
+          rest
+            | Just token <- stringToken index rest ->
+                go (index + semanticTokenLength token) (clientToken token : acc)
+            | Just token <- numberToken index rest ->
+                go (index + semanticTokenLength token) (clientToken token : acc)
+            | Just token <- operatorToken index rest ->
+                go (index + semanticTokenLength token) (clientToken token : acc)
+            | Just (tokenText, width) <- identifierToken rest ->
+                let token =
+                      SemanticToken
+                        { semanticTokenLine = lineNo
+                        , semanticTokenStart = index
+                        , semanticTokenLength = width
+                        , semanticTokenType = classifyIdentifier functionNames typeNames rootFieldNames line index tokenText
+                        }
+                 in go (index + width) (clientToken token : acc)
+            | otherwise -> go (index + 1) acc
+  clientToken token =
+    let startColumn = textOffsetToUtf16Column line (semanticTokenStart token)
+        endColumn = textOffsetToUtf16Column line (semanticTokenStart token + semanticTokenLength token)
+     in token
+          { semanticTokenLine = lineNo
+          , semanticTokenStart = startColumn
+          , semanticTokenLength = endColumn - startColumn
+          }
 
 stringToken :: Int -> Text -> Maybe SemanticToken
 stringToken index rest = do
@@ -1055,7 +1080,7 @@ stringToken index rest = do
         case Text.findIndex (== '"') body of
           Just endIx -> endIx + 2
           Nothing -> Text.length rest
-  pure SemanticToken {semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = len, semanticTokenType = 5}
+  pure SemanticToken{semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = len, semanticTokenType = 5}
 
 numberToken :: Int -> Text -> Maybe SemanticToken
 numberToken index rest = do
@@ -1063,17 +1088,17 @@ numberToken index rest = do
   if isDigit char
     then
       let width = Text.length (Text.takeWhile numberChar rest)
-       in Just SemanticToken {semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = width, semanticTokenType = 6}
+       in Just SemanticToken{semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = width, semanticTokenType = 6}
     else Nothing
-  where
-    numberChar c = isDigit c || c `elem` (".eE+-" :: String)
+ where
+  numberChar c = isDigit c || c `elem` (".eE+-" :: String)
 
 operatorToken :: Int -> Text -> Maybe SemanticToken
 operatorToken index rest =
   listToMaybe
-    [ SemanticToken {semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = Text.length operator, semanticTokenType = 7}
-    | operator <- ["::", "->", "%1", ".", "=", "+", "|", "?", ":"],
-      operator `Text.isPrefixOf` rest
+    [ SemanticToken{semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = Text.length operator, semanticTokenType = 7}
+    | operator <- ["::", "->", "%1", ".", "=", "+", "|", "?", ":"]
+    , operator `Text.isPrefixOf` rest
     ]
 
 identifierToken :: Text -> Maybe (Text, Int)
@@ -1105,8 +1130,8 @@ previousNonSpace :: Text -> Int -> Maybe Char
 previousNonSpace line index =
   listToMaybe
     [ char
-    | char <- reverse (Text.unpack (Text.take index line)),
-      not (char `elem` [' ', '\t'])
+    | char <- reverse (Text.unpack (Text.take index line))
+    , not (char `elem` [' ', '\t'])
     ]
 
 nextOperator :: Text -> Int -> Maybe Text
@@ -1114,8 +1139,8 @@ nextOperator line index =
   let suffix = Text.dropWhile (`elem` [' ', '\t']) (Text.drop index line)
    in listToMaybe
         [ operator
-        | operator <- ["::", "=", ":"],
-          operator `Text.isPrefixOf` suffix
+        | operator <- ["::", "=", ":"]
+        , operator `Text.isPrefixOf` suffix
         ]
 
 lineStartsWithType :: Text -> Bool
@@ -1133,23 +1158,23 @@ reservedWords =
 
 encodeSemanticTokens :: [SemanticToken] -> [Int]
 encodeSemanticTokens tokens = snd (foldl step (Nothing, []) (sortOn (\token -> (semanticTokenLine token, semanticTokenStart token)) tokens))
-  where
-    step (previous, acc) token =
-      let deltaLine = maybe (semanticTokenLine token) (\prev -> semanticTokenLine token - semanticTokenLine prev) previous
-          deltaStart =
-            case previous of
-              Just prev
-                | semanticTokenLine prev == semanticTokenLine token ->
-                    semanticTokenStart token - semanticTokenStart prev
-              _ -> semanticTokenStart token
-          encoded =
-            [ deltaLine,
-              deltaStart,
-              semanticTokenLength token,
-              semanticTokenType token,
-              0
-            ]
-       in (Just token, acc <> encoded)
+ where
+  step (previous, acc) token =
+    let deltaLine = maybe (semanticTokenLine token) (\prev -> semanticTokenLine token - semanticTokenLine prev) previous
+        deltaStart =
+          case previous of
+            Just prev
+              | semanticTokenLine prev == semanticTokenLine token ->
+                  semanticTokenStart token - semanticTokenStart prev
+            _ -> semanticTokenStart token
+        encoded =
+          [ deltaLine
+          , deltaStart
+          , semanticTokenLength token
+          , semanticTokenType token
+          , 0
+          ]
+     in (Just token, acc <> encoded)
 
 locationFromRange :: FilePath -> Text -> (Int, Int, Int) -> Value
 locationFromRange file content (lineNo, startChar, endChar) = locationInContent file content lineNo startChar endChar
@@ -1163,19 +1188,19 @@ insertDocument file content analysis (Documents docs) =
     ( Map.insert
         normalizedFile
         CachedDocument
-          { cachedDocumentText = content,
-            cachedDocumentAnalysis = analysis,
-            cachedDocumentLastGoodAnalysis = newLastGood
+          { cachedDocumentText = content
+          , cachedDocumentAnalysis = analysis
+          , cachedDocumentLastGoodAnalysis = newLastGood
           }
         docs
     )
-  where
-    normalizedFile = normalise file
-    previousLastGood = cachedDocumentLastGoodAnalysis =<< Map.lookup normalizedFile docs
-    newLastGood =
-      case analysis of
-        Just (Right result) -> Just result
-        _ -> previousLastGood
+ where
+  normalizedFile = normalise file
+  previousLastGood = cachedDocumentLastGoodAnalysis =<< Map.lookup normalizedFile docs
+  newLastGood =
+    case analysis of
+      Just (Right result) -> Just result
+      _ -> previousLastGood
 
 effectiveCachedAnalysis :: CachedDocument -> Maybe (Either String Analysis)
 effectiveCachedAnalysis cached =

@@ -118,8 +118,8 @@ spec = do
 
     it "jumps builtins members into the nearest ambient declaration file" $
       withTempTree
-        [ ("builtins.d.tnix", Text.unlines ["declare \"builtins\" {", "  map :: Int -> Int;", "};"]),
-          ("app/main.tnix", "builtins.map")
+        [ ("builtins.d.tnix", Text.unlines ["declare \"builtins\" {", "  map :: Int -> Int;", "};"])
+        , ("app/main.tnix", "builtins.map")
         ]
         ( \root -> do
             let file = root </> "app/main.tnix"
@@ -127,11 +127,16 @@ spec = do
             definitionLocation definition `shouldBe` Just (root </> "builtins.d.tnix", 1, 2, 5)
         )
 
-  describe "referencesDocument" $
+  describe "referencesDocument" $ do
     it "returns all local references for a binding in the active buffer" $ do
       let content = Text.unlines ["let", "  value = 1;", "in value value"]
       references <- referencesDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (definitionMessage "/tmp/main.tnix" 2 6)
       referenceLocations references `shouldBe` [("/tmp/main.tnix", 1, 2, 7), ("/tmp/main.tnix", 2, 3, 8), ("/tmp/main.tnix", 2, 9, 14)]
+
+    it "returns UTF-16 reference ranges after non-BMP text" $ do
+      let content = Text.unlines ["let", "  label = \"\x1f600\"; value = 1;", "in value"]
+      references <- referencesDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (definitionMessage "/tmp/main.tnix" 2 6)
+      referenceLocations references `shouldBe` [("/tmp/main.tnix", 1, 16, 21), ("/tmp/main.tnix", 2, 3, 8)]
 
   describe "renameDocument" $
     it "builds workspace edits for local references" $ do
@@ -148,9 +153,9 @@ spec = do
   describe "workspaceSymbolsDocument" $
     it "searches symbols across workspace files" $
       withTempTree
-        [ ("tnix.config.tnix", Text.unlines ["{", "  name = \"demo\";", "  entry = \"./pkg/a.tnix\";", "}"]),
-          ("pkg/a.tnix", Text.unlines ["type Box = { value :: Int; };", "1"]),
-          ("pkg/b.tnix", Text.unlines ["let", "  widget = 1;", "in widget"])
+        [ ("tnix.config.tnix", Text.unlines ["{", "  name = \"demo\";", "  entry = \"./pkg/a.tnix\";", "}"])
+        , ("pkg/a.tnix", Text.unlines ["type Box = { value :: Int; };", "1"])
+        , ("pkg/b.tnix", Text.unlines ["let", "  widget = 1;", "in widget"])
         ]
         ( \root -> do
             let docs = documentsFromList [(root </> "pkg/a.tnix", Text.unlines ["type Box = { value :: Int; };", "1"])]
@@ -165,39 +170,38 @@ spec = do
       actions <- codeActionsDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (codeActionMessage "/tmp/main.tnix" [diagnostic])
       codeActionTitles actions `shouldBe` ["Add `# @tnix-ignore`", "Add `# @tnix-expected`", "Replace with `missing`"]
 
-  describe "semanticTokensDocument" $
+  describe "semanticTokensDocument" $ do
     it "returns encoded semantic tokens for keywords, types, and strings" $ do
       let content = Text.unlines ["type Box = String;", "let", "  value = \"tnix\";", "in value"]
       tokens <- semanticTokensDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (documentSymbolMessage "/tmp/main.tnix")
       semanticTokenPayload tokens `shouldSatisfy` (not . null)
 
-  describe "semanticTokensDocument unicode positions" $
-    it "emits semantic token starts as UTF-16 code units" $ do
-      let content = "\128512 value"
+    it "encodes semantic token offsets in UTF-16 columns" $ do
+      let content = "\x1f600 value"
       tokens <- semanticTokensDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (documentSymbolMessage "/tmp/main.tnix")
       take 5 (semanticTokenPayload tokens) `shouldBe` [0, 3, 5, 3, 0]
-  where
-    readNever _ = expectationFailure "unexpected file read" >> fail "unexpected file read"
-    readFileStub = fmap Right . TextIO.readFile
-    analyzeStub file content
-      | content == "1" = pure (attachProgramFallback file content intAnalysis)
-      | content == "box" = pure (attachProgramFallback file content stringBindingAnalysis)
-      | otherwise = pure (attachProgramFallback file content defaultAnalysis)
-    analyzeCompletion file content = pure (dynamicAnalysis file content)
-    analyzeStrictCompletion file content = pure (strictDynamicAnalysis file content)
-    analyzeFailing _ content = pure (Left ("analysis failed for " <> showText content))
-    showText = Text.unpack
+ where
+  readNever _ = expectationFailure "unexpected file read" >> fail "unexpected file read"
+  readFileStub = fmap Right . TextIO.readFile
+  analyzeStub file content
+    | content == "1" = pure (attachProgramFallback file content intAnalysis)
+    | content == "box" = pure (attachProgramFallback file content stringBindingAnalysis)
+    | otherwise = pure (attachProgramFallback file content defaultAnalysis)
+  analyzeCompletion file content = pure (dynamicAnalysis file content)
+  analyzeStrictCompletion file content = pure (strictDynamicAnalysis file content)
+  analyzeFailing _ content = pure (Left ("analysis failed for " <> showText content))
+  showText = Text.unpack
 
 attachProgram :: FilePath -> Text -> Analysis -> Either String Analysis
 attachProgram file content analysis = do
   program <- parseText file content
-  pure analysis {analysisProgram = program}
+  pure analysis{analysisProgram = program}
 
 attachProgramFallback :: FilePath -> Text -> Analysis -> Either String Analysis
 attachProgramFallback file content analysis =
   either
     (const (attachProgram file "1" analysis))
-    (\program -> Right analysis {analysisProgram = program})
+    (\program -> Right analysis{analysisProgram = program})
     (parseText file content)
 
 dynamicAnalysis :: FilePath -> Text -> Either String Analysis
@@ -205,8 +209,8 @@ dynamicAnalysis file content = do
   program <- either (const (parseText file "1")) Right (parseText file content)
   pure
     completionAnalysis
-      { analysisProgram = program,
-        analysisBindings = inferredBindings content program
+      { analysisProgram = program
+      , analysisBindings = inferredBindings content program
       }
 
 strictDynamicAnalysis :: FilePath -> Text -> Either String Analysis
@@ -214,8 +218,8 @@ strictDynamicAnalysis file content = do
   program <- parseText file content
   pure
     completionAnalysis
-      { analysisProgram = program,
-        analysisBindings = inferredBindings content program
+      { analysisProgram = program
+      , analysisBindings = inferredBindings content program
       }
 
 inferredBindings :: Text -> Program -> Map.Map Text Scheme
@@ -224,10 +228,10 @@ inferredBindings content program =
     [ (name, schemeForName name)
     | name <- nub (letBindingNames program <> textHints)
     ]
-  where
-    textHints =
-      ["box" | "box" `Text.isInfixOf` content]
-        <> ["missing" | "mising" `Text.isInfixOf` content]
+ where
+  textHints =
+    ["box" | "box" `Text.isInfixOf` content]
+      <> ["missing" | "mising" `Text.isInfixOf` content]
 
 schemeForName :: Text -> Scheme
 schemeForName "box" =
@@ -235,8 +239,8 @@ schemeForName "box" =
     []
     ( TRecord
         ( Map.fromList
-            [ ("alpha", tInt),
-              ("beta", tString)
+            [ ("alpha", tInt)
+            , ("beta", tString)
             ]
         )
     )
@@ -254,55 +258,56 @@ letBindingNames program =
 intAnalysis :: Analysis
 intAnalysis =
   Analysis
-    { analysisProgram = error "unused in session tests",
-      analysisRoot = Just (Scheme [] tInt),
-      analysisBindings = Map.empty,
-      analysisAliases = mempty,
-      analysisAmbient = mempty
+    { analysisProgram = error "unused in session tests"
+    , analysisRoot = Just (Scheme [] tInt)
+    , analysisBindings = Map.empty
+    , analysisAliases = mempty
+    , analysisAmbient = mempty
     }
 
 defaultAnalysis :: Analysis
 defaultAnalysis =
   Analysis
-    { analysisProgram = error "unused in session tests",
-      analysisRoot = Just (Scheme [] tInt),
-      analysisBindings = Map.fromList [("result", Scheme [] tInt)],
-      analysisAliases = mempty,
-      analysisAmbient = mempty
+    { analysisProgram = error "unused in session tests"
+    , analysisRoot = Just (Scheme [] tInt)
+    , analysisBindings = Map.fromList [("result", Scheme [] tInt)]
+    , analysisAliases = mempty
+    , analysisAmbient = mempty
     }
 
 stringBindingAnalysis :: Analysis
 stringBindingAnalysis =
   Analysis
-    { analysisProgram = error "unused in session tests",
-      analysisRoot = Just (Scheme [] tInt),
-      analysisBindings = Map.fromList [("box", Scheme [] tString)],
-      analysisAliases = mempty,
-      analysisAmbient = mempty
+    { analysisProgram = error "unused in session tests"
+    , analysisRoot = Just (Scheme [] tInt)
+    , analysisBindings = Map.fromList [("box", Scheme [] tString)]
+    , analysisAliases = mempty
+    , analysisAmbient = mempty
     }
 
 completionAnalysis :: Analysis
 completionAnalysis =
   Analysis
-    { analysisProgram = error "unused in session tests",
-      analysisRoot = Just (Scheme [] tInt),
-      analysisBindings =
+    { analysisProgram = error "unused in session tests"
+    , analysisRoot = Just (Scheme [] tInt)
+    , analysisBindings =
         Map.fromList
-          [ ( "box",
-              Scheme
+          [
+            ( "box"
+            , Scheme
                 []
                 ( TRecord
                     ( Map.fromList
-                        [ ("alpha", tInt),
-                          ("beta", tString)
+                        [ ("alpha", tInt)
+                        , ("beta", tString)
                         ]
                     )
                 )
-            ),
-            ("value", Scheme [] tInt)
-          ],
-      analysisAliases = mempty,
-      analysisAmbient = mempty
+            )
+          , ("value", Scheme [] tInt)
+          ]
+    , analysisAliases = mempty
+    , analysisAmbient = mempty
     }
 
 openMessage :: FilePath -> Text -> Value
@@ -312,8 +317,8 @@ openMessage file text =
         .= object
           [ "textDocument"
               .= object
-                [ "uri" .= ("file://" <> file),
-                  "text" .= text
+                [ "uri" .= ("file://" <> file)
+                , "text" .= text
                 ]
           ]
     ]
@@ -323,8 +328,8 @@ changeMessage file changes =
   object
     [ "params"
         .= object
-          [ "textDocument" .= object ["uri" .= ("file://" <> file)],
-            "contentChanges" .= changes
+          [ "textDocument" .= object ["uri" .= ("file://" <> file)]
+          , "contentChanges" .= changes
           ]
     ]
 
@@ -342,8 +347,8 @@ hoverMessage file lineNo charNo =
   object
     [ "params"
         .= object
-          [ "textDocument" .= object ["uri" .= ("file://" <> file)],
-            "position" .= object ["line" .= lineNo, "character" .= charNo]
+          [ "textDocument" .= object ["uri" .= ("file://" <> file)]
+          , "position" .= object ["line" .= lineNo, "character" .= charNo]
           ]
     ]
 
@@ -367,9 +372,9 @@ renameMessage file lineNo charNo newName =
   object
     [ "params"
         .= object
-          [ "textDocument" .= object ["uri" .= ("file://" <> file)],
-            "position" .= object ["line" .= lineNo, "character" .= charNo],
-            "newName" .= newName
+          [ "textDocument" .= object ["uri" .= ("file://" <> file)]
+          , "position" .= object ["line" .= lineNo, "character" .= charNo]
+          , "newName" .= newName
           ]
     ]
 
@@ -387,8 +392,8 @@ codeActionMessage file diagnostics =
   object
     [ "params"
         .= object
-          [ "textDocument" .= object ["uri" .= ("file://" <> file)],
-            "context" .= object ["diagnostics" .= diagnostics]
+          [ "textDocument" .= object ["uri" .= ("file://" <> file)]
+          , "context" .= object ["diagnostics" .= diagnostics]
           ]
     ]
 
@@ -397,17 +402,17 @@ replaceRange startLine startChar endLine endChar text =
   object
     [ "range"
         .= object
-          [ "start" .= object ["line" .= startLine, "character" .= startChar],
-            "end" .= object ["line" .= endLine, "character" .= endChar]
-          ],
-      "text" .= text
+          [ "start" .= object ["line" .= startLine, "character" .= startChar]
+          , "end" .= object ["line" .= endLine, "character" .= endChar]
+          ]
+    , "text" .= text
     ]
 
 rangeObject :: Int -> Int -> Int -> Int -> Value
 rangeObject startLine startChar endLine endChar =
   object
-    [ "start" .= object ["line" .= startLine, "character" .= startChar],
-      "end" .= object ["line" .= endLine, "character" .= endChar]
+    [ "start" .= object ["line" .= startLine, "character" .= startChar]
+    , "end" .= object ["line" .= endLine, "character" .= endChar]
     ]
 
 hoverText :: Value -> Text
@@ -429,8 +434,8 @@ completionLabels value =
       case KeyMap.lookup "items" obj of
         Just (Array items) ->
           [ label
-          | Object item <- toList items,
-            Just (String label) <- [KeyMap.lookup "label" item]
+          | Object item <- toList items
+          , Just (String label) <- [KeyMap.lookup "label" item]
           ]
         _ -> []
     _ -> []
@@ -459,20 +464,20 @@ renameEdits value =
     Object obj ->
       case KeyMap.lookup "changes" obj of
         Just (Object changes) ->
-          [ ( Text.unpack (Text.drop 7 uri),
-              [ (floor lineNo, floor startChar, floor endChar, newText)
-              | Object edit <- toList edits,
-                Just (Object range) <- [KeyMap.lookup "range" edit],
-                Just (Object start) <- [KeyMap.lookup "start" range],
-                Just (Object ending) <- [KeyMap.lookup "end" range],
-                Just (Number lineNo) <- [KeyMap.lookup "line" start],
-                Just (Number startChar) <- [KeyMap.lookup "character" start],
-                Just (Number endChar) <- [KeyMap.lookup "character" ending],
-                Just (String newText) <- [KeyMap.lookup "newText" edit]
+          [ ( Text.unpack (Text.drop 7 uri)
+            , [ (floor lineNo, floor startChar, floor endChar, newText)
+              | Object edit <- toList edits
+              , Just (Object range) <- [KeyMap.lookup "range" edit]
+              , Just (Object start) <- [KeyMap.lookup "start" range]
+              , Just (Object ending) <- [KeyMap.lookup "end" range]
+              , Just (Number lineNo) <- [KeyMap.lookup "line" start]
+              , Just (Number startChar) <- [KeyMap.lookup "character" start]
+              , Just (Number endChar) <- [KeyMap.lookup "character" ending]
+              , Just (String newText) <- [KeyMap.lookup "newText" edit]
               ]
             )
-          | (key, Array edits) <- KeyMap.toList changes,
-            let uri = Key.toText key
+          | (key, Array edits) <- KeyMap.toList changes
+          , let uri = Key.toText key
           ]
         _ -> []
     _ -> []
@@ -482,8 +487,8 @@ symbolNames value =
   case value of
     Array items ->
       [ name
-      | Object item <- toList items,
-        Just (String name) <- [KeyMap.lookup "name" item]
+      | Object item <- toList items
+      , Just (String name) <- [KeyMap.lookup "name" item]
       ]
     _ -> []
 
@@ -492,8 +497,8 @@ codeActionTitles value =
   case value of
     Array items ->
       [ title
-      | Object item <- toList items,
-        Just (String title) <- [KeyMap.lookup "title" item]
+      | Object item <- toList items
+      , Just (String title) <- [KeyMap.lookup "title" item]
       ]
     _ -> []
 
@@ -511,19 +516,19 @@ semanticTokenPayload value =
 
 withTempTree :: [(FilePath, Text)] -> (FilePath -> IO a) -> IO a
 withTempTree files action = bracket createRoot removePathForcibly (\root -> writeTree root >> action root)
-  where
-    createRoot = do
-      tmp <- getTemporaryDirectory
-      (path, handle) <- openTempFile tmp "tnix-lsp-session"
-      hClose handle
-      removeFile path
-      createDirectory path
-      pure path
-    writeTree root =
-      mapM_
-        ( \(relative, content) -> do
-            let path = root </> relative
-            createDirectoryIfMissing True (takeDirectory path)
-            TextIO.writeFile path content
-        )
-        files
+ where
+  createRoot = do
+    tmp <- getTemporaryDirectory
+    (path, handle) <- openTempFile tmp "tnix-lsp-session"
+    hClose handle
+    removeFile path
+    createDirectory path
+    pure path
+  writeTree root =
+    mapM_
+      ( \(relative, content) -> do
+          let path = root </> relative
+          createDirectoryIfMissing True (takeDirectory path)
+          TextIO.writeFile path content
+      )
+      files
