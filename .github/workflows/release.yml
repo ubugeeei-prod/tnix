@@ -58,6 +58,9 @@ jobs:
           "$archive_root/bin/tnix" --version
           "$archive_root/bin/tnix-lsp" --version
 
+      - name: Verify release checksum
+        run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/package-release.ts verify-checksum "${{ matrix.sha }}"
+
       - name: Upload release assets
         uses: actions/upload-artifact@v4
         with:
