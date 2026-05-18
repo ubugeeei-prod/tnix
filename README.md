@@ -64,6 +64,7 @@ After compilation, type information is erased and only ordinary Nix code remains
 - [Security Policy](./SECURITY.md)
 - [Support Matrix](./docs/support-matrix.md)
 - [CI/CD Hardening](./docs/ci-cd.md)
+- [Diagnostic Codes](./docs/diagnostics.md)
 
 ## Current Status
 

@@ -24,6 +24,7 @@ import Data.Set qualified as Set
 import Data.Text qualified as T
 import System.FilePath ((</>), isAbsolute, joinPath, normalise, splitDirectories, takeDirectory)
 import Alias
+import Diagnostics (DiagnosticCode (..), withCode)
 import Indexed
 import Pretty (renderType)
 import Subtyping
@@ -117,7 +118,7 @@ checkProgram ctx program =
 -- @
 inferExpr :: CheckContext -> TypeEnv -> Expr -> InferM Type
 inferExpr ctx env = \case
-  EVar name -> maybe (lift (Left ("unbound name: " <> quoteName name))) instantiate (Map.lookup name env)
+  EVar name -> maybe (lift (Left (withCode TC0001UnboundName ("unbound name: " <> quoteName name)))) instantiate (Map.lookup name env)
   EString text -> pure (TLit (LString (stringLiteralText text)))
   EFloat n -> pure (TLit (LFloat n))
   EInt n -> pure (TLit (LInt n))
@@ -153,7 +154,7 @@ inferExpr ctx env = \case
   EAttrSet items -> do
     fields <- concat <$> traverse inferAttr items
     case duplicateNames (map fst fields) of
-      dup : _ -> lift (Left ("duplicate attribute: " <> quoteName dup))
+      dup : _ -> lift (Left (withCode TC0002DuplicateAttribute ("duplicate attribute: " <> quoteName dup)))
       [] -> pure (TRecord (Map.fromList fields))
     where
       inferAttr = \case
@@ -222,9 +223,9 @@ inferLet ctx env items = do
       placeholder name = do
         scheme <- maybe (Scheme [] <$> freshMeta) pure (Map.lookup name sigs)
         pure (name, scheme)
-  when (not (null duplicateSigs)) (lift (Left ("duplicate signatures: " <> quoteNames duplicateSigs)))
-  when (not (null duplicateBinds)) (lift (Left ("duplicate bindings: " <> quoteNames duplicateBinds)))
-  when (not (null missing)) (lift (Left ("missing bindings for signatures: " <> quoteNames missing)))
+  when (not (null duplicateSigs)) (lift (Left (withCode TC0003DuplicateSignature ("duplicate signatures: " <> quoteNames duplicateSigs))))
+  when (not (null duplicateBinds)) (lift (Left (withCode TC0004DuplicateBinding ("duplicate bindings: " <> quoteNames duplicateBinds))))
+  when (not (null missing)) (lift (Left (withCode TC0005MissingBindingForSignature ("missing bindings for signatures: " <> quoteNames missing))))
   placeholders <- Map.fromList <$> traverse placeholder bindNames
   let recursiveEnv = placeholders <> env
   inferred <- forM binds $ \(name, expr, inlineDirective) -> do
@@ -247,7 +248,7 @@ inferLet ctx env items = do
         (Just TnixIgnore, Left _) -> recoverSuppressedType ctx expected
         (Just TnixExpected, Left _) -> recoverSuppressedType ctx expected
         (Just TnixExpected, Right _) ->
-          lift (Left ("unused @tnix-expected directive on binding " <> quoteName name))
+          lift (Left (withCode TC0006UnusedExpectedDirective ("unused @tnix-expected directive on binding " <> quoteName name)))
     pure (name, maybe (closeMetas resolved) id (Map.lookup name sigs))
   let finals = Map.fromList inferred
   pure (finals <> env, finals)
@@ -259,7 +260,7 @@ inferPatternBindings = \case
     pure (argTy, Map.singleton name (Scheme [] argTy))
   PAttrSet names _ -> do
     let dups = duplicateNames names
-    when (not (null dups)) (lift (Left ("duplicate pattern bindings: " <> quoteNames dups)))
+    when (not (null dups)) (lift (Left (withCode TC0007DuplicatePatternBinding ("duplicate pattern bindings: " <> quoteNames dups))))
     fieldTys <- traverse (const freshMeta) names
     let fields = Map.fromList (zip names fieldTys)
         env = Map.fromList (zip names (map (Scheme []) fieldTys))
@@ -276,11 +277,11 @@ inferStaticSelect ctx ty field =
               then pure tDynamic
               else
                 if base' == tUnknown
-                  then lift (Left ("cannot select field " <> quoteName field <> " from unknown"))
+                  then lift (Left (withCode TC0008SelectOnUnknown ("cannot select field " <> quoteName field <> " from unknown")))
                   else
                     case lookupRecordField (checkAliases ctx) resolvedTy field of
                       Just fieldTy -> instantiate (schemeFromAnnotation fieldTy)
-                      Nothing -> lift (Left ("missing field " <> quoteName field <> " on " <> showType resolvedTy))
+                      Nothing -> lift (Left (withCode TC0009MissingField ("missing field " <> quoteName field <> " on " <> showType resolvedTy)))
 
 inferDynamicSelect :: CheckContext -> Type -> Type -> InferM Type
 inferDynamicSelect ctx baseTy keyTy = do
@@ -296,10 +297,10 @@ inferDynamicSelect ctx baseTy keyTy = do
         then pure tDynamic
         else
           if base' == tUnknown
-            then lift (Left "cannot select dynamic field from unknown")
+            then lift (Left (withCode TC0008SelectOnUnknown "cannot select dynamic field from unknown"))
             else
               if key' == tUnknown
-                then lift (Left "dynamic field selection expects a string-like key, but got unknown")
+                then lift (Left (withCode TC0011DynamicKeyTypeMismatch "dynamic field selection expects a string-like key, but got unknown"))
                 else
                   case selectionKeyNames key' of
                     Just names ->
@@ -309,11 +310,11 @@ inferDynamicSelect ctx baseTy keyTy = do
                           case instantiated of
                             x : xs -> pure (foldRight1 (joinTypes aliases) x xs)
                             [] -> pure tDynamic
-                        Nothing -> lift $ Left ("missing field selected by dynamic key of type " <> showType key')
+                        Nothing -> lift $ Left (withCode TC0010DynamicKeyMissingField ("missing field selected by dynamic key of type " <> showType key'))
                     Nothing ->
                       if isSubtype aliases key' tString || isConsistent aliases key' tString
                         then pure tDynamic
-                        else lift $ Left ("dynamic field selection expects a string-like key, but got " <> showType key')
+                        else lift $ Left (withCode TC0012DynamicKeyNotStringLike ("dynamic field selection expects a string-like key, but got " <> showType key'))
 
 selectionKeyNames :: Type -> Maybe [Name]
 selectionKeyNames = \case
@@ -424,7 +425,7 @@ constrain ctx actual expected = do
     _ | isSubtype (checkAliases ctx) actual' expected' -> pure expected'
     _ | allowsGradualConsistency actual' expected' && isConsistent (checkAliases ctx) actual' expected' -> pure expected'
     _ | hasUnresolvedMetas actual' expected' -> unify ctx actual' expected'
-    _ -> lift (Left ("type mismatch: " <> showType actual' <> " vs " <> showType expected'))
+    _ -> lift (Left (withCode TC0013TypeMismatch ("type mismatch: " <> showType actual' <> " vs " <> showType expected')))
 
 -- | Symmetric structural unification used while solving metas.
 --
@@ -471,7 +472,7 @@ unify ctx left right = do
     _ | isSubtype (checkAliases ctx) left' right' -> pure right'
     _ | isSubtype (checkAliases ctx) right' left' -> pure left'
     _ | allowsGradualConsistency left' right' && isConsistent (checkAliases ctx) left' right' -> pure (joinTypes (checkAliases ctx) left' right')
-    _ -> lift (Left ("type mismatch: " <> showType left' <> " vs " <> showType right'))
+    _ -> lift (Left (withCode TC0013TypeMismatch ("type mismatch: " <> showType left' <> " vs " <> showType right')))
   where
     unifyRecord a b
       | Map.keysSet b `Set.isSubsetOf` Map.keysSet a =
@@ -480,13 +481,13 @@ unify ctx left right = do
       | Map.keysSet a `Set.isSubsetOf` Map.keysSet b =
           Map.traverseWithKey (\name aTy -> maybe (pure aTy) (\bTy -> unify ctx aTy bTy) (Map.lookup name b)) a
             >>= pure . TRecord
-      | otherwise = lift (Left ("record mismatch: " <> showRecord a <> " vs " <> showRecord b))
+      | otherwise = lift (Left (withCode TC0014RecordMismatch ("record mismatch: " <> showRecord a <> " vs " <> showRecord b)))
 
 -- | Bind one inference meta to a solved type, performing the occurs check.
 bindMeta :: Int -> Type -> InferM Type
 bindMeta n ty = do
   resolved <- zonk ty
-  when (resolved == TMeta n || n `Set.member` freeMetas resolved) (lift (Left "occurs check failed"))
+  when (resolved == TMeta n || n `Set.member` freeMetas resolved) (lift (Left (withCode TC0016OccursCheckFailed "occurs check failed")))
   modify' (\st -> st {substitutions = Map.insert n resolved (substitutions st)})
   pure resolved
 
@@ -522,7 +523,7 @@ checkCast ctx actual expected = do
         || isSubtype aliases expected' actual'
         || isConsistent aliases actual' expected'
         then pure expected
-        else lift (Left ("invalid cast: " <> showType actual' <> " as " <> showType expected'))
+        else lift (Left (withCode TC0015InvalidCast ("invalid cast: " <> showType actual' <> " as " <> showType expected')))
 
 inferAddition :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
 inferAddition ctx env left right = do

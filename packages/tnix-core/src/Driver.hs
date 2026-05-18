@@ -38,6 +38,7 @@ import System.FilePath ((</>), isAbsolute, joinPath, normalise, replaceExtension
 import Alias
 import Check
 import Compile
+import Diagnostics (DiagnosticCode (..), withCode)
 import Emit
 import Indexed
 import Kind
@@ -106,7 +107,7 @@ emitText path input = do
   checked <- analyzeText path input
   pure $ do
     analysis <- checked
-    root <- maybe (Left "cannot emit declarations from a declaration-only file") Right (analysisRoot analysis)
+    root <- maybe (Left (withCode TD0008DeclarationOnlyEmit "cannot emit declarations from a declaration-only file")) Right (analysisRoot analysis)
     pure (emitDeclarationFile path (analysisProgram analysis) root)
 
 emitTextTo :: FilePath -> FilePath -> Text -> IO (Either String Text)
@@ -119,7 +120,7 @@ emitTextAs source runtimeTarget declarationPath input = do
   checked <- analyzeText source input
   pure $ do
     analysis <- checked
-    root <- maybe (Left "cannot emit declarations from a declaration-only file") Right (analysisRoot analysis)
+    root <- maybe (Left (withCode TD0008DeclarationOnlyEmit "cannot emit declarations from a declaration-only file")) Right (analysisRoot analysis)
     pure (emitDeclarationFileFor runtimeTarget declarationPath (analysisProgram analysis) root)
 
 -- | Emit a declaration file for a source file on disk.
@@ -200,7 +201,7 @@ loadConfiguredDeclarationFiles root = do
         Left err -> pure (Left err)
         Right input ->
           case parseText configPath input of
-            Left err -> pure (Left ("failed to parse " <> configPath <> ": " <> err))
+            Left err -> pure (Left (withCode TD0004ConfigDecodeError ("failed to parse " <> configPath <> ": " <> err)))
             Right program ->
               case configuredDeclarationPackPaths configPath program of
                 Left err -> pure (Left err)
@@ -210,7 +211,7 @@ loadConfiguredDeclarationFiles root = do
 
 configuredDeclarationPackPaths :: FilePath -> Program -> Either String [FilePath]
 configuredDeclarationPackPaths configPath program = do
-  expr <- maybe (Left ("tnix.config.tnix must contain a root attribute set: " <> configPath)) (Right . markedValue) (programExpr program)
+  expr <- maybe (Left (withCode TD0004ConfigDecodeError ("tnix.config.tnix must contain a root attribute set: " <> configPath))) (Right . markedValue) (programExpr program)
   decodeDeclarationPackField (takeDirectory configPath) expr
 
 decodeDeclarationPackField :: FilePath -> Expr -> Either String [FilePath]
@@ -225,12 +226,12 @@ decodeDeclarationPackField root = \case
 decodePathList :: FilePath -> Text -> Expr -> Either String [FilePath]
 decodePathList root label = \case
   EList items -> traverse decodeItem items
-  other -> Left ("expected list of path-like values for " <> Text.unpack label <> ", but got " <> Text.unpack (renderExpr other))
+  other -> Left (withCode TD0005ConfigBadList ("expected list of path-like values for " <> Text.unpack label <> ", but got " <> Text.unpack (renderExpr other)))
   where
     decodeItem = \case
       EPath path -> Right (resolveConfigPath root path)
       EString text -> Right (resolveConfigPath root (Text.unpack (stringLiteralText text)))
-      item -> Left ("expected path-like item in " <> Text.unpack label <> ", but got " <> Text.unpack (renderExpr item))
+      item -> Left (withCode TD0006ConfigBadItem ("expected path-like item in " <> Text.unpack label <> ", but got " <> Text.unpack (renderExpr item)))
 
 expandDeclarationPackPath :: FilePath -> FilePath -> IO (Either String [DeclarationSupportFile])
 expandDeclarationPackPath root path = do
@@ -246,8 +247,8 @@ expandDeclarationPackPath root path = do
         then
           if ".d.tnix" `isSuffixOf` normalized
             then pure (Right [mkDeclarationSupportFile root normalized])
-            else pure (Left ("declarationPacks entries must point to .d.tnix files or directories, but got " <> normalized))
-        else pure (Left ("declarationPacks entry does not exist: " <> normalized))
+            else pure (Left (withCode TD0006ConfigBadItem ("declarationPacks entries must point to .d.tnix files or directories, but got " <> normalized)))
+        else pure (Left (withCode TD0006ConfigBadItem ("declarationPacks entry does not exist: " <> normalized)))
 
 mkDeclarationSupportFile :: FilePath -> FilePath -> DeclarationSupportFile
 mkDeclarationSupportFile root loadPath =
@@ -288,7 +289,7 @@ loadDeclarationFile file = do
     input <- inputResult
     program <- firstError ("failed to load declaration file " <> path <> ": ") (parseText path input)
     case markedValue <$> programExpr program of
-      Just _ -> Left ("declaration files must not contain executable expressions: " <> path)
+      Just _ -> Left (withCode TD0007DeclarationOnlyCompile ("declaration files must not contain executable expressions: " <> path))
       Nothing -> do
         _ <- validateProgramKinds (programAliases program) program
         _ <- validateProgramIndexedTypes program
@@ -302,7 +303,7 @@ collectAmbientWithBase :: FilePath -> FilePath -> Program -> Either String (Map 
 collectAmbientWithBase file resolveBase program = do
   let duplicates = duplicateNames (map (resolvePath resolveBase . ambientPath) (programAmbient program))
   case duplicates of
-    dup : _ -> Left ("duplicate ambient declarations for target `" <> dup <> "` in " <> file)
+    dup : _ -> Left (withCode TD0002DuplicateAmbientDeclaration ("duplicate ambient declarations for target `" <> dup <> "` in " <> file))
     [] -> Map.fromList <$> traverse toPair (programAmbient program)
   where
     toPair decl = do
@@ -310,7 +311,7 @@ collectAmbientWithBase file resolveBase program = do
       pure (resolvePath resolveBase (ambientPath decl), scheme)
     schemeFromEntries entries =
       case duplicateNames (map ambientEntryName entries) of
-        dup : _ -> Left ("duplicate ambient entry `" <> Text.unpack dup <> "` in " <> file)
+        dup : _ -> Left (withCode TD0003DuplicateAmbientEntry ("duplicate ambient entry `" <> Text.unpack dup <> "` in " <> file))
         [] ->
           Right $
             case entries of
@@ -411,7 +412,7 @@ readTextFile path = do
   result <- try @IOException (Text.readFile path)
   pure $
     case result of
-      Left err -> Left ("failed to read " <> path <> ": " <> displayException err)
+      Left err -> Left (withCode TD0001ReadFailed ("failed to read " <> path <> ": " <> displayException err))
       Right input -> Right input
 
 collapseParentSegments :: FilePath -> FilePath

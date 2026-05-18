@@ -16,6 +16,7 @@ library
       Alias
     , Check
     , Compile
+    , Diagnostics
     , Driver
     , Emit
     , Indexed
@@ -49,6 +50,7 @@ common spec-defaults
       Alias
     , Check
     , Compile
+    , Diagnostics
     , Driver
     , Emit
     , Indexed
