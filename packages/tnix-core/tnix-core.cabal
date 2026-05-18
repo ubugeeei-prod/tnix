@@ -110,6 +110,16 @@ test-suite tnix-registry-spec
   type: exitcode-stdio-1.0
   main-is: Registry.spec.hs
 
+test-suite tnix-alias-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Alias.spec.hs
+
+test-suite tnix-emit-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Emit.spec.hs
+
 source-repository head
   type: git
   location: https://github.com/ubugeeei/tnix.git
