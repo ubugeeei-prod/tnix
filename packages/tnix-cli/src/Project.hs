@@ -348,7 +348,16 @@ matchesConfiguredPath candidate configured =
    in normalizedCandidate == normalizedConfigured || isPathPrefixOf normalizedConfigured normalizedCandidate
 
 quoted :: Text -> Text
-quoted text = "\"" <> text <> "\""
+quoted text = "\"" <> Text.concatMap escapeDoubleQuoted text <> "\""
+
+escapeDoubleQuoted :: Char -> Text
+escapeDoubleQuoted = \case
+  '"' -> "\\\""
+  '\\' -> "\\\\"
+  '\n' -> "\\n"
+  '\r' -> "\\r"
+  '\t' -> "\\t"
+  char -> Text.singleton char
 
 boolLiteral :: Bool -> Text
 boolLiteral True = "true"
