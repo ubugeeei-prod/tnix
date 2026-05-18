@@ -60,7 +60,9 @@ jobs:
 
       - name: Resolve pnpm store path
         id: pnpm-store
-        run: echo "path=$(nix develop --accept-flake-config --command pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        run: |
+          store_path="$(nix develop --accept-flake-config --command pnpm store path --silent | tail -n 1)"
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
@@ -136,7 +138,9 @@ jobs:
 
       - name: Resolve pnpm store path
         id: pnpm-store
-        run: echo "path=$(nix develop --accept-flake-config --command pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        run: |
+          store_path="$(nix develop --accept-flake-config --command pnpm store path --silent | tail -n 1)"
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
@@ -221,7 +225,9 @@ jobs:
 
       - name: Resolve pnpm store path
         id: pnpm-store
-        run: echo "path=$(nix develop --accept-flake-config --command pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        run: |
+          store_path="$(nix develop --accept-flake-config --command pnpm store path --silent | tail -n 1)"
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
