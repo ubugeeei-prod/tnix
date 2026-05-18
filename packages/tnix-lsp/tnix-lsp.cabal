@@ -15,6 +15,7 @@ library
   exposed-modules:
       Server
     , Session
+    , SessionDocuments
     , SessionReferences
     , SessionSymbols
     , SessionText
@@ -75,6 +76,7 @@ test-suite tnix-lsp-session-spec
   hs-source-dirs: src
   other-modules:
       Session
+    , SessionDocuments
     , SessionReferences
     , SessionSymbols
     , SessionText

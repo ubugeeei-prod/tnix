@@ -54,6 +54,19 @@ import Server (
   uriPath,
   wordAt,
  )
+import SessionDocuments
+  ( closeDocuments,
+    documentsFromList,
+    effectiveCachedAnalysis,
+    insertDocument,
+    loadDocumentAnalysis,
+    loadDocumentContent,
+    loadWorkspaceDocuments,
+    lookupCachedDocument,
+    lookupDocumentText,
+    updateDocuments,
+    workspaceSeedFile,
+  )
 import SessionReferences
   ( resolveDefinitionLocation,
     resolveReferenceTarget,
@@ -96,63 +109,11 @@ import Type
 -- data types live in 'SessionTypes'; this module re-imports them so existing
 -- call sites and tests keep importing them from 'Session'.
 
-documentsFromList :: [(FilePath, Text)] -> Documents
-documentsFromList =
-  Documents
-    . Map.fromList
-    . map
-      ( \(file, text) ->
-          ( normalise file
-          , CachedDocument
-              { cachedDocumentText = text
-              , cachedDocumentAnalysis = Nothing
-              , cachedDocumentLastGoodAnalysis = Nothing
-              }
-          )
-      )
-
-lookupDocumentText :: FilePath -> Documents -> Maybe Text
-lookupDocumentText file (Documents docs) =
-  cachedDocumentText <$> Map.lookup (normalise file) docs
+-- documentsFromList and lookupDocumentText live in 'SessionDocuments'.
 
 -- (Type definitions moved to 'SessionTypes'.)
 
-{- | Update or open one document and re-run semantic analysis.
-
-Full-text updates replace the cached content directly. Incremental changes
-reuse the cached buffer when possible and fall back to reading from disk only
-when the editor has not opened the file yet.
--}
-updateDocuments ::
-  (FilePath -> IO (Either String Text)) ->
-  (FilePath -> Text -> IO (Either String Analysis)) ->
-  Documents ->
-  Value ->
-  IO (Documents, FilePath, Either String Analysis)
-updateDocuments readDocument analyze docs msg = do
-  let params = field "params" msg
-      textDocument = params >>= field "textDocument"
-      file = maybe "" (normalise . uriPath) (textDocument >>= field "uri" >>= asText)
-      fullText = textDocument >>= field "text" >>= asText
-      current = lookupDocumentText file docs
-  contentResult <-
-    case fullText of
-      Just content -> pure (Right content)
-      Nothing -> do
-        base <- maybe (readDocument file) (pure . Right) current
-        pure (base >>= (`applyContentChanges` params))
-  case contentResult of
-    Left err -> pure (docs, file, Left err)
-    Right content -> do
-      result <- analyze file content
-      pure (insertDocument file content (Just result) docs, file, result)
-
--- | Remove one document from the cache and return the cleared file path.
-closeDocuments :: Documents -> Value -> (Documents, Maybe FilePath)
-closeDocuments docs msg =
-  case normalise <$> documentPath (field "params" msg) of
-    Just file -> (deleteDocument file docs, Just file)
-    Nothing -> (docs, Nothing)
+-- updateDocuments and closeDocuments live in 'SessionDocuments'.
 
 {- | Compute hover information for the requested position.
 
@@ -397,69 +358,7 @@ requestDocument readDocument docs msg = do
   contentResult <- loadDocumentContent readDocument docs file
   pure (file, lineNo, charNo, contentResult)
 
-loadDocumentContent :: (FilePath -> IO (Either String Text)) -> Documents -> FilePath -> IO (Either String Text)
-loadDocumentContent readDocument docs file =
-  maybe (readDocument file) (pure . Right) (lookupDocumentText file docs)
-
-loadDocumentAnalysis ::
-  (FilePath -> IO (Either String Text)) ->
-  (FilePath -> Text -> IO (Either String Analysis)) ->
-  Documents ->
-  FilePath ->
-  IO (Either String Analysis)
-loadDocumentAnalysis readDocument analyze docs file =
-  case lookupCachedDocument file docs of
-    Just cached ->
-      case effectiveCachedAnalysis cached of
-        Just result -> pure result
-        Nothing -> analyze file (cachedDocumentText cached)
-    Nothing -> do
-      contentResult <- readDocument file
-      case contentResult of
-        Left err -> pure (Left err)
-        Right content -> analyze file content
-
-loadWorkspaceDocuments ::
-  (FilePath -> IO (Either String Text)) ->
-  (FilePath -> Text -> IO (Either String Analysis)) ->
-  Documents ->
-  FilePath ->
-  IO [WorkspaceDocument]
-loadWorkspaceDocuments readDocument analyze docs currentFile = do
-  files <- workspaceFilesFor currentFile
-  builtinsFile <- findBuiltinsFile currentFile
-  let targets = nub (files <> maybe [] pure builtinsFile)
-  forM targets $ \path -> do
-    case lookupCachedDocument path docs of
-      Just cached -> do
-        result <-
-          case effectiveCachedAnalysis cached of
-            Just analysisResult -> pure analysisResult
-            Nothing -> analyze path (cachedDocumentText cached)
-        pure
-          WorkspaceDocument
-            { workspaceDocumentFile = path
-            , workspaceDocumentContent = cachedDocumentText cached
-            , workspaceDocumentAnalysis = result
-            }
-      Nothing -> do
-        contentResult <- readDocument path
-        case contentResult of
-          Left err ->
-            pure
-              WorkspaceDocument
-                { workspaceDocumentFile = path
-                , workspaceDocumentContent = ""
-                , workspaceDocumentAnalysis = Left err
-                }
-          Right content -> do
-            result <- analyze path content
-            pure
-              WorkspaceDocument
-                { workspaceDocumentFile = path
-                , workspaceDocumentContent = content
-                , workspaceDocumentAnalysis = result
-                }
+-- loadDocumentContent / loadDocumentAnalysis / loadWorkspaceDocuments live in 'SessionDocuments'.
 
 -- Reference / definition resolution (workspaceDocumentsForTarget,
 -- resolveDefinitionLocation, resolveReferenceTarget, symbolRanges,
@@ -469,8 +368,7 @@ loadWorkspaceDocuments readDocument analyze docs currentFile = do
 -- indexedSymbolInformation, documentCandidateNames, kindForType,
 -- findDeclareRange, locationFromRange) live in 'SessionSymbols'.
 
-workspaceSeedFile :: Documents -> Maybe FilePath
-workspaceSeedFile (Documents docs) = fst <$> Map.lookupMin docs
+-- workspaceSeedFile lives in 'SessionDocuments'.
 
 -- Workspace traversal helpers live in 'SessionWorkspace' so they can be
 -- unit-tested in isolation. Re-exported here for back-compat with callers
@@ -755,38 +653,4 @@ encodeSemanticTokens tokens = snd (foldl step (Nothing, []) (sortOn (\token -> (
 
 -- locationFromRange lives in 'SessionSymbols'.
 
-lookupCachedDocument :: FilePath -> Documents -> Maybe CachedDocument
-lookupCachedDocument file (Documents docs) = Map.lookup (normalise file) docs
-
-insertDocument :: FilePath -> Text -> Maybe (Either String Analysis) -> Documents -> Documents
-insertDocument file content analysis (Documents docs) =
-  Documents
-    ( Map.insert
-        normalizedFile
-        CachedDocument
-          { cachedDocumentText = content
-          , cachedDocumentAnalysis = analysis
-          , cachedDocumentLastGoodAnalysis = newLastGood
-          }
-        docs
-    )
- where
-  normalizedFile = normalise file
-  previousLastGood = cachedDocumentLastGoodAnalysis =<< Map.lookup normalizedFile docs
-  newLastGood =
-    case analysis of
-      Just (Right result) -> Just result
-      _ -> previousLastGood
-
-effectiveCachedAnalysis :: CachedDocument -> Maybe (Either String Analysis)
-effectiveCachedAnalysis cached =
-  case cachedDocumentAnalysis cached of
-    Just (Right result) -> Just (Right result)
-    Just (Left err) ->
-      case cachedDocumentLastGoodAnalysis cached of
-        Just result -> Just (Right result)
-        Nothing -> Just (Left err)
-    Nothing -> Nothing
-
-deleteDocument :: FilePath -> Documents -> Documents
-deleteDocument file (Documents docs) = Documents (Map.delete (normalise file) docs)
+-- lookupCachedDocument / insertDocument / deleteDocument / effectiveCachedAnalysis live in 'SessionDocuments'.
