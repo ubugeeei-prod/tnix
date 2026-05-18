@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.2 - 2026-05-18
+
+- Harden GitHub Actions with pinned third-party actions, least-privilege
+  permissions, checkout credential isolation, explicit timeouts, and release
+  artifact attestations.
+- Split CI into focused metadata, flake, Haskell, fixture, VS Code, Zed, and
+  Neovim checks with a summary status for branch protection.
+- Add release support documentation, CI/CD hardening notes, contribution and
+  security policies, and conventional root `pnpm` scripts.
+- Fix CLI JSON failure output and scaffolded string escaping, and make the
+  Neovim integration detect `tnix.config.tnix` as a workspace root marker.
+
 ## v0.3.1 - 2026-04-06
 
 - Support quoted attribute names, dynamic `${...}` selections, attrset lambda binders, and indented `'' ... ''` strings in executable `tnix`.
