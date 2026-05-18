@@ -1,0 +1,34 @@
+# tnix code owners.
+#
+# Lines below are matched bottom-up; later patterns override earlier ones.
+# Adding a path here automatically requests a review from the listed owners.
+
+* @ubugeeei
+
+# Haskell core packages
+/packages/tnix-core/  @ubugeeei
+/packages/tnix-cli/   @ubugeeei
+/packages/tnix-lsp/   @ubugeeei
+
+# Editor integrations
+/editors/vscode/  @ubugeeei
+/editors/zed/     @ubugeeei
+/editors/neovim/  @ubugeeei
+
+# Documentation and project configuration
+/docs/             @ubugeeei
+/.github/          @ubugeeei
+/flake.nix         @ubugeeei
+/cabal.project     @ubugeeei
+/pnpm-workspace.yaml @ubugeeei
+/package.json      @ubugeeei
+
+# Registry packs and dogfood fixtures
+/registry/  @ubugeeei
+/dogfood/   @ubugeeei
+/examples/  @ubugeeei
+
+# Release tooling
+/scripts/        @ubugeeei
+/RELEASING.md    @ubugeeei
+/CHANGELOG.md    @ubugeeei

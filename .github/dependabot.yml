@@ -1,0 +1,47 @@
+version: 2
+
+# Automated dependency update PRs across the ecosystems used by tnix.
+# Reviews are requested via CODEOWNERS, so reviewers are not duplicated here.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      gh-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /editors/vscode
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - vscode
+    commit-message:
+      prefix: chore(deps)
+      include: scope
+
+  - package-ecosystem: cargo
+    directory: /editors/zed
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - zed
+    commit-message:
+      prefix: chore(deps)
+      include: scope
