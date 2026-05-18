@@ -92,8 +92,37 @@ jobs:
           stage_dir="$(mktemp -d)"
           tar -C "$stage_dir" -xzf "${{ matrix.archive }}"
           archive_root="$(find "$stage_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-          "$archive_root/bin/tnix" --version
-          "$archive_root/bin/tnix-lsp" --version
+          tnix_bin="$archive_root/bin/tnix"
+          lsp_bin="$archive_root/bin/tnix-lsp"
+
+          # Version probes: confirms the binaries actually start and load their data files.
+          "$tnix_bin" --version
+          "$lsp_bin" --version
+
+          # Functional smoke against the in-tree examples and dogfood corpora, so a
+          # binary that links but can't type-check anything fails the release.
+          "$tnix_bin" check ./examples/main.tnix
+          "$tnix_bin" check-project ./examples --format json >/dev/null
+          "$tnix_bin" check ./dogfood/flake-surface.tnix
+
+          # Minimal JSON-RPC handshake against the packaged LSP. We send
+          # `initialize`, then `exit` (which the server handles by exiting
+          # cleanly), and assert the server emits at least one JSON-RPC
+          # response before terminating.
+          lsp_log="$(mktemp)"
+          send_message() {
+            local body="$1"
+            printf 'Content-Length: %s\r\n\r\n%s' "${#body}" "$body"
+          }
+          {
+            send_message '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+            send_message '{"jsonrpc":"2.0","method":"exit","params":null}'
+          } | "$lsp_bin" --stdio >"$lsp_log" 2>&1 || true
+          if ! grep -q '"jsonrpc":"2.0"' "$lsp_log"; then
+            echo "tnix-lsp did not emit any JSON-RPC response during smoke test" >&2
+            cat "$lsp_log" >&2
+            exit 1
+          fi
 
       - name: Verify release checksum
         run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/package-release.ts verify-checksum "${{ matrix.sha }}"
