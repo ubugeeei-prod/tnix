@@ -63,6 +63,22 @@ spec = do
       lookupDocumentText file docs `shouldBe` Just "missing"
       result `shouldBe` Left "analysis failed for missing"
 
+    it "re-analyzes cached content on didSave without text" $ do
+      let docs = documentsFromList [("/tmp/main.tnix", "1")]
+          msg = saveMessage "/tmp/main.tnix" Nothing
+      (docs', file, result) <- updateDocuments readNever analyzeStub docs msg
+      file `shouldBe` "/tmp/main.tnix"
+      lookupDocumentText file docs' `shouldBe` Just "1"
+      fmap analysisRoot result `shouldBe` Right (Just (Scheme [] tInt))
+
+    it "replaces cached content on didSave with full text" $ do
+      let docs = documentsFromList [("/tmp/main.tnix", "stale")]
+          msg = saveMessage "/tmp/main.tnix" (Just "1")
+      (docs', file, result) <- updateDocuments readNever analyzeStub docs msg
+      file `shouldBe` "/tmp/main.tnix"
+      lookupDocumentText file docs' `shouldBe` Just "1"
+      fmap analysisRoot result `shouldBe` Right (Just (Scheme [] tInt))
+
   describe "closeDocuments" $ do
     it "removes cached documents and returns the closed path" $ do
       let docs = documentsFromList [("/tmp/main.tnix", "1"), ("/tmp/other.tnix", "2")]
@@ -339,6 +355,19 @@ closeMessage file =
     [ "params"
         .= object
           [ "textDocument" .= object ["uri" .= ("file://" <> file)]
+          ]
+    ]
+
+saveMessage :: FilePath -> Maybe Text -> Value
+saveMessage file mText =
+  object
+    [ "params"
+        .= object
+          [ "textDocument"
+              .= object
+                ( ["uri" .= ("file://" <> file)]
+                    <> maybe [] (\t -> ["text" .= t]) mText
+                )
           ]
     ]
 

@@ -3,6 +3,7 @@
 
 -- | Testable JSON-RPC/LSP helpers for tnix.
 module Server (
+  ReadOutcome (..),
   applyContentChanges,
   asInt,
   asText,
@@ -25,6 +26,7 @@ module Server (
   publishDiagnostics,
   publishDiagnosticsWithContent,
   readMessage,
+  readMessageOutcome,
   respond,
   send,
   textOffsetToUtf16Column,
@@ -102,7 +104,12 @@ clientCapabilities =
                       ]
                 , "full" .= True
                 ]
-          , "textDocumentSync" .= object ["openClose" .= True, "change" .= (2 :: Int)]
+          , "textDocumentSync"
+              .= object
+                [ "openClose" .= True
+                , "change" .= (2 :: Int)
+                , "save" .= object ["includeText" .= True]
+                ]
           ]
     ]
 
@@ -577,16 +584,59 @@ contentLengthFromHeaders headers =
   stripPrefixCI needle haystack =
     stripPrefix (map toLower needle) (map toLower haystack)
 
-readMessage :: Handle -> IO (Maybe Value)
-readMessage handle = do
+-- | Result of attempting to read one JSON-RPC framed message from a handle.
+data ReadOutcome
+  = -- | The peer closed the stream cleanly.
+    ReadEof
+  | -- | A well-formed message was decoded.
+    ReadMessage Value
+  | -- | The framing or payload could not be parsed. The text describes the failure
+    --   so callers can log it without blowing up the event loop.
+    ReadError Text
+
+-- | Read one JSON-RPC framed message, returning a tagged outcome.
+--
+-- This differentiates clean EOF (no log) from protocol-level decode errors
+-- (which should surface on stderr) so the event loop can stay alive on a
+-- malformed message instead of silently spinning.
+readMessageOutcome :: Handle -> IO ReadOutcome
+readMessageOutcome handle = do
   eof <- hIsEOF handle
   if eof
-    then pure Nothing
+    then pure ReadEof
     else do
       headers <- readHeaders handle
       case contentLengthFromHeaders headers of
-        Nothing -> pure Nothing
-        Just len -> decodeStrict' <$> BS.hGet handle len
+        Nothing ->
+          pure (ReadError ("missing or malformed Content-Length header (got " <> renderHeaders headers <> ")"))
+        Just len -> do
+          body <- BS.hGet handle len
+          case decodeStrict' body of
+            Just value -> pure (ReadMessage value)
+            Nothing ->
+              pure
+                ( ReadError
+                    ( "failed to decode JSON-RPC body of "
+                        <> T.pack (show len)
+                        <> " bytes"
+                    )
+                )
+ where
+  renderHeaders headers =
+    if null headers
+      then "no headers"
+      else T.intercalate "; " (map (T.pack . B8.unpack) headers)
+
+-- | Backwards-compatible wrapper that flattens the outcome into 'Maybe'.
+--
+-- Treats every non-message outcome as 'Nothing'. New callers should prefer
+-- 'readMessageOutcome' so they can log protocol errors.
+readMessage :: Handle -> IO (Maybe Value)
+readMessage handle = do
+  outcome <- readMessageOutcome handle
+  pure $ case outcome of
+    ReadMessage value -> Just value
+    _ -> Nothing
 
 send :: Handle -> Value -> IO ()
 send handle payload = do
