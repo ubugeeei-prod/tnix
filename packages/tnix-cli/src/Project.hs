@@ -18,7 +18,7 @@ module Project
   )
 where
 
-import Control.Exception (IOException, try)
+import Control.Exception (IOException, bracketOnError, try)
 import Control.Monad (forM)
 import Data.List (group, isPrefixOf, nub, partition, sort)
 import Data.Map.Strict qualified as Map
@@ -29,8 +29,9 @@ import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Parser (parseProgram)
 import Syntax
-import System.Directory (canonicalizePath, createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory, makeAbsolute)
-import System.FilePath (addTrailingPathSeparator, (</>), isAbsolute, makeRelative, normalise, replaceExtension, takeBaseName, takeDirectory)
+import System.Directory (canonicalizePath, createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory, makeAbsolute, removeFile, renameFile)
+import System.FilePath (addTrailingPathSeparator, (</>), isAbsolute, makeRelative, normalise, replaceExtension, takeBaseName, takeDirectory, takeFileName)
+import System.IO (hClose, hFlush, openTempFile)
 
 data ProjectConfig = ProjectConfig
   { configRoot :: FilePath,
@@ -69,7 +70,7 @@ initProject target = do
     then pure (Left ("tnix.config.tnix already exists in " <> root))
     else do
       let config = defaultConfig root
-      TextIO.writeFile configPath (renderConfig config)
+      writeFileAtomic configPath (renderConfig config)
       scaffoldResult <- scaffoldFromConfig config
       pure $
         fmap
@@ -166,8 +167,31 @@ materializeFile planned = do
     then pure (False, plannedPath planned)
     else do
       createDirectoryIfMissing True (takeDirectory (plannedPath planned))
-      TextIO.writeFile (plannedPath planned) (plannedContent planned)
+      writeFileAtomic (plannedPath planned) (plannedContent planned)
       pure (True, plannedPath planned)
+
+-- | Write a file by staging the content in a sibling temporary file and then
+-- atomically renaming it into place.
+--
+-- The rename is atomic on POSIX file systems (and on NTFS via Windows
+-- semantics), so a crash mid-write can never leave a half-populated file at
+-- the target path. On exception the temporary file is removed.
+writeFileAtomic :: FilePath -> Text -> IO ()
+writeFileAtomic target content =
+  bracketOnError
+    (openTempFile (takeDirectory target) (takeFileName target <> ".tmp"))
+    cleanupOnError
+    writeAndCommit
+ where
+  writeAndCommit (tmpPath, handle) = do
+    TextIO.hPutStr handle content
+    hFlush handle
+    hClose handle
+    renameFile tmpPath target
+  cleanupOnError (tmpPath, handle) = do
+    _ <- try @IOException (hClose handle)
+    _ <- try @IOException (removeFile tmpPath)
+    pure ()
 
 discoverProjectSources :: ProjectConfig -> IO [ProjectSource]
 discoverProjectSources config = do

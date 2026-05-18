@@ -12,7 +12,7 @@ import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Driver (Analysis (..))
 import Options.Applicative (ParserPrefs, ParserResult (..), defaultPrefs, execParserPure, getParseResult, info, renderFailure)
-import System.Directory (createDirectory, createDirectoryIfMissing, createDirectoryLink, doesFileExist, getTemporaryDirectory, removeFile, removePathForcibly)
+import System.Directory (createDirectory, createDirectoryIfMissing, createDirectoryLink, doesFileExist, getTemporaryDirectory, listDirectory, removeFile, removePathForcibly)
 import System.FilePath (takeDirectory, (</>))
 import System.IO (hClose, openTempFile)
 import System.Timeout (timeout)
@@ -153,6 +153,13 @@ spec = do
         doesFileExist configDeclPath `shouldReturn` True
         doesFileExist entryPath `shouldReturn` True
         doesFileExist builtinsPath `shouldReturn` True
+        -- Atomic write should leave no `*.tmp*` siblings around once init succeeds.
+        rootEntries <- listDirectory root
+        any (".tmp" `isInfixOf`) rootEntries `shouldBe` False
+        srcEntries <- listDirectory (root </> "src")
+        any (".tmp" `isInfixOf`) srcEntries `shouldBe` False
+        typesEntries <- listDirectory (root </> "types")
+        any (".tmp" `isInfixOf`) typesEntries `shouldBe` False
         config <- TextIO.readFile configPath
         configDecl <- TextIO.readFile configDeclPath
         entry <- TextIO.readFile entryPath
