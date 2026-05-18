@@ -3,13 +3,13 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   run: {
     tasks: {
-      build: {
+      "workspace:build": {
         command: "vp run build:haskell && pnpm --filter tnix build && vp run build:zed",
       },
-      check: {
+      "workspace:check": {
         command: "vp run check:versions && vp run check:haskell && vp run test:haskell && vp run check:dogfood && vp run check:examples && pnpm --filter tnix check && pnpm --filter tnix test && vp run check:zed && vp run test:zed && vp run check:neovim",
       },
-      fmt: {
+      "workspace:fmt": {
         command: "vp run fmt:haskell && pnpm --filter tnix fmt",
       },
       ide: {

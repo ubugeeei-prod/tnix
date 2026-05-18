@@ -107,7 +107,8 @@ For local development, enter the reproducible shell first:
 ```bash
 nix develop
 nix flake check --accept-flake-config
-vp run check
+pnpm run check
+vp run workspace:check
 vp cli
 vp ide
 ```
@@ -115,8 +116,9 @@ vp ide
 `nix flake check` now exercises the published flake outputs, version metadata,
 smoke-tests the built `tnix` / `tnix-lsp` binaries, runs the Haskell package
 test suites, and validates the dogfood/example corpus with the packaged CLI.
-`vp run check` remains the full workspace verification suite, including editor
-integrations.
+`pnpm run check` is the conventional npm-compatible entrypoint and delegates to
+the full workspace verification suite, including editor integrations.
+`vp run workspace:check` is the direct task-runner entrypoint.
 `vp cli` installs the local `tnix` / `tnix-lsp` toolchain into your active Nix
 profile. `vp ide` reuses that toolchain install, packages the VS Code
 extension, and installs the local Zed extension when its support directory is
