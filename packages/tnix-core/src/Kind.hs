@@ -21,7 +21,8 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
 import Alias (mkAliasEnv)
-import Pretty (renderKind)
+import Diagnostics (DiagnosticCode (..), withCode)
+import Pretty (renderKind, renderType)
 import Syntax
 import Type
 
@@ -171,11 +172,14 @@ validateKind env label ty = do
     KType -> pure ()
     other ->
       liftLeft
-        ( label
-            <> " must resolve to Type, but got "
-            <> show other
-            <> " for "
-            <> show ty
+        ( withCode
+            TK0003KindMustBeType
+            ( label
+                <> " must resolve to Type, but got "
+                <> T.unpack (renderKind other)
+                <> " for "
+                <> T.unpack (renderType ty)
+            )
         )
 
 validateResolvedKind :: Kind -> KindM Kind
@@ -223,13 +227,13 @@ unifyKind left right = do
     (kind, KMeta n) -> bindKindMeta n kind
     (KType, KType) -> pure KType
     (KFun a b, KFun c d) -> KFun <$> unifyKind a c <*> unifyKind b d
-    _ -> liftLeft ("kind mismatch: " <> showKind left' <> " vs " <> showKind right')
+    _ -> liftLeft (withCode TK0001KindMismatch ("kind mismatch: " <> showKind left' <> " vs " <> showKind right'))
 
 bindKindMeta :: Int -> Kind -> KindM Kind
 bindKindMeta n kind = do
   resolved <- zonkKind kind
   if resolved == KMeta n || occursKind n resolved
-    then liftLeft "kind occurs check failed"
+    then liftLeft (withCode TK0002KindOccursCheck "kind occurs check failed")
     else do
       modify' (\st -> st {kindSubstitutions = Map.insert n resolved (kindSubstitutions st)})
       pure resolved
