@@ -15,6 +15,7 @@ library
   exposed-modules:
       Server
     , Session
+    , SessionText
     , SessionWorkspace
   hs-source-dirs: src
   build-depends:
@@ -71,6 +72,7 @@ test-suite tnix-lsp-session-spec
   hs-source-dirs: src
   other-modules:
       Session
+    , SessionText
     , SessionWorkspace
     , Server
   build-depends:

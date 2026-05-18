@@ -54,6 +54,7 @@ import Server (
   uriPath,
   wordAt,
  )
+import SessionText (definitionSpans, fieldSpans, wordChar, wordSpans)
 import SessionWorkspace
   ( findBuiltinsFile,
     findWorkspaceRoot,
@@ -740,53 +741,7 @@ allWordRanges content symbol =
     )
     (zip [0 ..] (Text.lines content))
 
-definitionSpans :: Text -> Text -> [(Int, Int)]
-definitionSpans line symbol =
-  let stripped = Text.stripStart line
-      indent = Text.length line - Text.length stripped
-      candidates =
-        [ "type " <> symbol
-        , symbol <> "::"
-        , symbol <> " ::"
-        , symbol <> "="
-        , symbol <> " ="
-        ]
-   in nub
-        [ (indent + startChar, indent + startChar + Text.length symbol)
-        | candidate <- candidates
-        , let (prefix, suffix) = Text.breakOn candidate stripped
-        , not (Text.null suffix)
-        , let startChar = Text.length prefix + if "type " `Text.isPrefixOf` candidate then 5 else 0
-        ]
-
-fieldSpans :: Text -> Text -> [Int]
-fieldSpans line symbol =
-  [ Text.length prefix + 1
-  | (prefix, _) <- Text.breakOnAll ("." <> symbol) line
-  ]
-
-wordSpans :: Text -> Text -> [Int]
-wordSpans line symbol =
-  mapMaybe validOffset offsets
- where
-  offsets = map (Text.length . fst) (Text.breakOnAll symbol line)
-  validOffset startChar =
-    if boundary (startChar - 1) && boundary (startChar + Text.length symbol)
-      then Just startChar
-      else Nothing
-  boundary ix
-    | ix < 0 = True
-    | ix >= Text.length line = True
-    | otherwise = not (wordChar (Text.index line ix))
-
-wordChar :: Char -> Bool
-wordChar char =
-  char == '_'
-    || char == '-'
-    || char == '\''
-    || char == '?'
-    || char == '!'
-    || isAlphaNum char
+-- Span helpers and character classification live in 'SessionText'.
 
 findDeclareRange :: Text -> FilePath -> Maybe (Int, Int, Int)
 findDeclareRange content path =
