@@ -11,6 +11,6 @@
     "test": "vp run test:haskell && pnpm --filter tnix test && vp run test:zed"
   },
   "devDependencies": {
-    "vite-plus": "^0.1.14"
+    "vite-plus": "^0.1.21"
   }
 }
