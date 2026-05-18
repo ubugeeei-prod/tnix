@@ -64,6 +64,16 @@ import SessionDocuments
     updateDocuments,
     workspaceSeedFile,
   )
+import SessionDiagnostics
+  ( closestCandidate,
+    diagnosticPayloads,
+    diagnosticRange,
+    diagnosticSymbolName,
+    directiveActions,
+    quickFixAction,
+    textEdit,
+    workspaceEdit,
+  )
 import SessionSemanticTokens (encodeSemanticTokens, semanticTokensFor)
 import SessionReferences
   ( resolveDefinitionLocation,
@@ -378,113 +388,7 @@ requestDocument readDocument docs msg = do
 
 -- findDeclareRange and kindForType live in 'SessionSymbols'.
 
-textEdit :: Int -> Int -> Int -> Text -> Value
-textEdit lineNo startChar endChar newText =
-  object
-    [ "range" .= rangeValue lineNo startChar endChar
-    , "newText" .= newText
-    ]
-
-rangeValue :: Int -> Int -> Int -> Value
-rangeValue lineNo startChar endChar =
-  object
-    [ "start" .= object ["line" .= lineNo, "character" .= startChar]
-    , "end" .= object ["line" .= lineNo, "character" .= endChar]
-    ]
-
-workspaceEdit :: [(FilePath, [Value])] -> Value
-workspaceEdit edits =
-  object
-    [ "changes"
-        .= Object
-          ( KeyMap.fromList
-              [ (Key.fromText (pathUri file), toJSON fileEdits)
-              | (file, fileEdits) <- edits
-              ]
-          )
-    ]
-
-diagnosticPayloads :: Value -> [Value]
-diagnosticPayloads msg =
-  case field "params" msg >>= field "context" >>= field "diagnostics" of
-    Just (Array diagnostics) -> toList diagnostics
-    _ -> []
- where
-  toList = foldr (:) []
-
-diagnosticRange :: Value -> Maybe (Int, Int, Int)
-diagnosticRange diagnostic = do
-  range <- field "range" diagnostic
-  start <- field "start" range
-  ending <- field "end" range
-  lineNo <- field "line" start
-  startChar <- field "character" start
-  endChar <- field "character" ending
-  pure (asInt lineNo, asInt startChar, asInt endChar)
-
-diagnosticSymbolName :: Text -> Maybe Text
-diagnosticSymbolName message = do
-  (_, suffix) <- listToMaybe (Text.breakOnAll "\"" message)
-  let rest = Text.drop 1 suffix
-      (quoted, trailing) = Text.breakOn "\"" rest
-  if Text.null trailing then Nothing else Just quoted
-
-directiveActions :: FilePath -> Text -> Value -> [Value]
-directiveActions file content diagnostic =
-  case diagnosticRange diagnostic of
-    Just (lineNo, _, _)
-      | not (lineHasDirective "# @tnix-ignore" lineNo content) ->
-          [ quickFixAction "Add `# @tnix-ignore`" file [insertLineEdit lineNo "# @tnix-ignore\n"]
-          , quickFixAction "Add `# @tnix-expected`" file [insertLineEdit lineNo "# @tnix-expected\n"]
-          ]
-      | otherwise -> []
-    Nothing -> []
-
-insertLineEdit :: Int -> Text -> Value
-insertLineEdit lineNo newText =
-  object
-    [ "range"
-        .= object
-          [ "start" .= object ["line" .= lineNo, "character" .= (0 :: Int)]
-          , "end" .= object ["line" .= lineNo, "character" .= (0 :: Int)]
-          ]
-    , "newText" .= newText
-    ]
-
-lineHasDirective :: Text -> Int -> Text -> Bool
-lineHasDirective directive lineNo content =
-  case if lineNo <= 0 then [] else drop (lineNo - 1) (Text.lines content) of
-    previous : _ -> directive `Text.isPrefixOf` Text.stripStart previous
-    [] -> False
-
-quickFixAction :: Text -> FilePath -> [Value] -> Value
-quickFixAction title file edits =
-  object
-    [ "title" .= title
-    , "kind" .= ("quickfix" :: Text)
-    , "edit" .= workspaceEdit [(file, edits)]
-    ]
-
-closestCandidate :: [Text] -> Text -> Maybe Text
-closestCandidate candidates needle =
-  case sortOn (\candidate -> (nameDistance needle candidate, candidate)) (filter (/= needle) candidates) of
-    candidate : _
-      | nameDistance needle candidate <= max 2 (Text.length needle `div` 2) -> Just candidate
-    _ -> Nothing
-
-nameDistance :: Text -> Text -> Int
-nameDistance left right = last (foldl' step [0 .. length rightChars] (zip [1 ..] leftChars))
- where
-  leftChars = map toLower (Text.unpack left)
-  rightChars = map toLower (Text.unpack right)
-  step previousRow (rowIndex, leftChar) =
-    scanl
-      (\leftCost (columnIndex, rightChar) -> minimum [leftCost + 1, previousRow !! columnIndex + 1, previousRow !! (columnIndex - 1) + substitutionCost leftChar rightChar])
-      rowIndex
-      (zip [1 ..] rightChars)
-  substitutionCost leftChar rightChar
-    | leftChar == rightChar = 0
-    | otherwise = 1
+-- Edit/diagnostic/quickfix helpers live in 'SessionDiagnostics'.
 
 -- The semantic-tokens provider lives in 'SessionSemanticTokens'.
 
