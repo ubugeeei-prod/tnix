@@ -127,12 +127,24 @@ jobs:
       - name: Verify release checksum
         run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/package-release.ts verify-checksum "${{ matrix.sha }}"
 
-      - name: Attest release archive and checksum
+      - name: Generate SBOM for release archive
+        id: sbom
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec # v0.20.5
+        with:
+          file: ${{ matrix.archive }}
+          format: cyclonedx-json
+          output-file: tnix-${{ github.ref_name }}-${{ matrix.label }}.cdx.json
+          artifact-name: sbom-${{ matrix.label }}.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Attest release archive, checksum, and SBOM
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
           subject-path: |
             ${{ matrix.archive }}
             ${{ matrix.sha }}
+            tnix-${{ github.ref_name }}-${{ matrix.label }}.cdx.json
 
       - name: Upload release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -142,6 +154,7 @@ jobs:
           path: |
             ./${{ matrix.archive }}
             ./${{ matrix.sha }}
+            ./tnix-${{ github.ref_name }}-${{ matrix.label }}.cdx.json
           retention-days: 7
 
   build-vscode-extension:
@@ -191,17 +204,30 @@ jobs:
           nix develop --accept-flake-config --command pnpm --filter tnix build
           nix develop --accept-flake-config --command pnpm --filter tnix exec vsce package --no-dependencies --out "../../tnix-vscode-$REF_NAME.vsix"
 
-      - name: Attest VS Code extension
+      - name: Generate SBOM for VS Code extension
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec # v0.20.5
+        with:
+          file: ./tnix-vscode-${{ env.REF_NAME }}.vsix
+          format: cyclonedx-json
+          output-file: ./tnix-vscode-${{ env.REF_NAME }}.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Attest VS Code extension and SBOM
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
-          subject-path: ./tnix-vscode-${{ env.REF_NAME }}.vsix
+          subject-path: |
+            ./tnix-vscode-${{ env.REF_NAME }}.vsix
+            ./tnix-vscode-${{ env.REF_NAME }}.cdx.json
 
       - name: Upload VS Code extension
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-vscode
           if-no-files-found: error
-          path: ./tnix-vscode-${{ github.ref_name }}.vsix
+          path: |
+            ./tnix-vscode-${{ github.ref_name }}.vsix
+            ./tnix-vscode-${{ github.ref_name }}.cdx.json
           retention-days: 7
 
   publish-release:
