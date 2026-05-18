@@ -1,7 +1,7 @@
 local M = {}
 
 local default_cmd = { "tnix-lsp" }
-local default_root_markers = { "flake.nix", "cabal.project", "pnpm-workspace.yaml", ".git" }
+local default_root_markers = { "flake.nix", "cabal.project", "pnpm-workspace.yaml", "tnix.config.tnix", ".git" }
 
 local function clone(list)
   return vim.deepcopy(list)

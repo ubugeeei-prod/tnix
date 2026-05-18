@@ -28,7 +28,7 @@ end
 assert_equal(config.normalize_cmd(nil), { "tnix-lsp" }, "normalize_cmd falls back to tnix-lsp")
 assert_equal(config.normalize_cmd(" custom-lsp "), { "custom-lsp" }, "normalize_cmd trims string commands")
 assert_equal(config.normalize_cmd({ "custom-lsp", "", " --stdio " }), { "custom-lsp", "--stdio" }, "normalize_cmd compacts argv lists")
-assert_equal(config.root_markers(nil), { "flake.nix", "cabal.project", "pnpm-workspace.yaml", ".git" }, "root_markers exposes the default workspace markers")
+assert_equal(config.root_markers(nil), { "flake.nix", "cabal.project", "pnpm-workspace.yaml", "tnix.config.tnix", ".git" }, "root_markers exposes the default workspace markers")
 assert_equal(config.root_markers({ "", "flake.nix", "custom.marker" }), { "flake.nix", "custom.marker" }, "root_markers drops blank entries")
 
 with_temp_tree({
@@ -52,6 +52,13 @@ with_temp_tree({
     },
     "server_config assembles lsp.start options"
   )
+end)
+
+with_temp_tree({
+  ["tnix.config.tnix"] = "{}",
+  ["src/main.tnix"] = "1",
+}, function(root)
+  assert_equal(config.resolve_root_dir(root .. "/src/main.tnix", {}), root, "resolve_root_dir treats tnix.config.tnix as a workspace marker")
 end)
 
 plugin.setup({})
