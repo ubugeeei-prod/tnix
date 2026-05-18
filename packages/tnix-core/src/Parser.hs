@@ -5,24 +5,93 @@
 -- This wrapper converts Megaparsec's rich diagnostic bundle into plain text so
 -- the rest of the pipeline can forward parse errors through the CLI, LSP, and
 -- tests without depending on parser-specific types.
-module Parser (parseProgram) where
+--
+-- 'parseProgramDetailed' also exposes a small structured error type so editors
+-- can attach diagnostics to the exact line/column instead of column 0.
+module Parser
+  ( ParseError (..),
+    parseProgram,
+    parseProgramDetailed,
+  )
+where
 
 import Control.Monad.Reader (runReaderT)
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Map.Strict qualified as Map
-import Text.Megaparsec (eof, errorBundlePretty, runParser)
 import ParserExpr
 import ParserLexer
 import Syntax
+import Text.Megaparsec
+  ( PosState (..),
+    SourcePos (..),
+    bundleErrors,
+    bundlePosState,
+    eof,
+    errorBundlePretty,
+    errorOffset,
+    parseErrorTextPretty,
+    reachOffset,
+    runParser,
+    unPos,
+  )
 
--- | Parse a complete tnix program.
+-- | Structured parser diagnostic.
+--
+-- All offsets are 1-based to match what editors and humans expect; the LSP
+-- conversion subtracts 1 when it builds a 0-based LSP `Range`.
+data ParseError = ParseError
+  { parseErrorLine :: Int,
+    parseErrorColumn :: Int,
+    parseErrorMessage :: Text
+  }
+  deriving (Eq, Show)
+
+-- | Parse a complete tnix program, returning a pretty-printed error message
+-- on failure. Kept as the back-compatible entry point used by the rest of
+-- the pipeline.
 parseProgram :: FilePath -> Text -> Either Text Program
-parseProgram path input = do
-  directives <- scanDiagnosticDirectives input
+parseProgram path = either (Left . renderParseError) Right . parseProgramDetailed path
+
+renderParseError :: ParseError -> Text
+renderParseError err =
+  Text.pack (show (parseErrorLine err))
+    <> ":"
+    <> Text.pack (show (parseErrorColumn err))
+    <> ": "
+    <> parseErrorMessage err
+
+-- | Parse a complete tnix program with structured location info on failure.
+parseProgramDetailed :: FilePath -> Text -> Either ParseError Program
+parseProgramDetailed path input = do
+  directives <- mapDirectiveError input (scanDiagnosticDirectives input)
   case runParser (runReaderT (sc *> programParser <* eof) directives) path input of
-    Left err -> Left (Text.pack (errorBundlePretty err))
+    Left bundle -> Left (megaparsecError bundle)
     Right program -> Right program
+
+mapDirectiveError :: Text -> Either Text a -> Either ParseError a
+mapDirectiveError _ (Right a) = Right a
+mapDirectiveError _ (Left message) =
+  Left ParseError {parseErrorLine = 1, parseErrorColumn = 1, parseErrorMessage = message}
+
+-- | Lift the first error in a Megaparsec bundle into our structured form,
+-- recovering the offending source line/column from the parser's PosState.
+megaparsecError bundle =
+  let firstError :| _ = bundleErrors bundle
+      (_, finalState) = reachOffset (errorOffset firstError) (bundlePosState bundle)
+      SourcePos _ srcLine srcColumn = pstateSourcePos finalState
+      humanMessage = Text.pack (errorBundlePretty bundle)
+      compactMessage = Text.pack (parseErrorTextPretty firstError)
+      message =
+        if Text.null humanMessage
+          then compactMessage
+          else humanMessage
+   in ParseError
+        { parseErrorLine = unPos srcLine,
+          parseErrorColumn = unPos srcColumn,
+          parseErrorMessage = message
+        }
 
 scanDiagnosticDirectives :: Text -> Either Text DirectiveTargets
 scanDiagnosticDirectives input = go 1 Nothing Map.empty (Text.lines input)
