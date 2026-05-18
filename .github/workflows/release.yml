@@ -182,7 +182,7 @@ jobs:
       contents: write
     steps:
       - name: Download built artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: ./release-artifacts
           pattern: release-*
@@ -235,7 +235,7 @@ jobs:
         run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
 
       - name: Download VS Code extension
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-vscode
           path: ./release-vscode
