@@ -10,6 +10,15 @@
 
 If you already know Nix, the goal is that `tnix` feels like "Nix plus a type surface", not a different runtime language.
 
+## Supported Platforms
+
+Prebuilt `tnix` and `tnix-lsp` archives ship for Linux x64 and macOS arm64.
+Linux arm64 and macOS x64 are best-effort and build through the Nix flake on
+the target host. Windows is not tested today — use WSL2 with the Linux x64
+instructions, or build from source through the flake on a Linux/macOS host.
+See [support-matrix.md](./support-matrix.md) for the full per-platform tier
+table.
+
 ## First Commands
 
 From the repository root:

@@ -97,7 +97,11 @@ nix profile install github:ubugeeei/tnix#tnix-lsp
 ```
 
 Or download the prebuilt archives attached to each GitHub release and place
-`tnix` / `tnix-lsp` somewhere on your `PATH`.
+`tnix` / `tnix-lsp` somewhere on your `PATH`. Prebuilt archives ship for
+Linux x64 and macOS arm64 today; see [docs/support-matrix.md](./docs/support-matrix.md)
+for the full per-platform tier table. **Windows users:** the CLI is not tested
+on Windows. Use WSL2 with the Linux x64 instructions, or build from source
+through the flake on a Linux/macOS host.
 
 Quick verification:
 
