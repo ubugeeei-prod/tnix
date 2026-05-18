@@ -68,7 +68,14 @@
           "description": "Optional working directory used when starting the tnix language server."
         }
       }
-    }
+    },
+    "commands": [
+      {
+        "command": "tnix.restartServer",
+        "title": "tnix: Restart Language Server",
+        "category": "tnix"
+      }
+    ]
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && ./node_modules/.bin/esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
