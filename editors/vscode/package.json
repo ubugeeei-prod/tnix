@@ -81,12 +81,12 @@
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.6.2",
-    "@types/node": "^24.0.0",
-    "@types/vscode": "^1.110.0",
-    "esbuild": "^0.25.3",
-    "ovsx": "^0.10.3",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.3"
+    "@vscode/vsce": "^3.9.1",
+    "@types/node": "^25.8.0",
+    "@types/vscode": "^1.120.0",
+    "esbuild": "^0.28.0",
+    "ovsx": "^0.10.12",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
   }
 }
