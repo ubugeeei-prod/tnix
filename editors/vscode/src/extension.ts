@@ -16,7 +16,9 @@ let client: LanguageClient | undefined;
  * `tnix-lsp` binary path, while everything else is derived from the current
  * workspace. The runtime work itself is delegated to the Haskell LSP server.
  */
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export async function activate(
+  context: vscode.ExtensionContext,
+): Promise<void> {
   const config = vscode.workspace.getConfiguration("tnix");
   const runtime = resolveRuntimeConfig(
     config.get<string>("server.path"),
@@ -36,7 +38,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const clientOptions: LanguageClientOptions = {
     documentSelector: runtime.documentSelector,
     synchronize: {
-      fileEvents: vscode.workspace.createFileSystemWatcher(runtime.watchPattern),
+      fileEvents: vscode.workspace.createFileSystemWatcher(
+        runtime.watchPattern,
+      ),
     },
   };
 
