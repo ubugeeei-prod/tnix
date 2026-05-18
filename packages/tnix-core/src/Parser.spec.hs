@@ -3,8 +3,9 @@
 module Main (main) where
 
 import Data.Map.Strict qualified as Map
+import Data.Text qualified as Text
 import Test.Hspec
-import Parser (parseProgram)
+import Parser (ParseError (..), parseProgram, parseProgramDetailed)
 import Syntax
 import TestSupport (expectRight, source)
 import Type
@@ -246,6 +247,30 @@ spec = describe "parseProgram" $ do
 
   it "rejects reserved words as identifiers" $
     parseProgram "main.tnix" "let if = 1; in if" `shouldSatisfy` isLeft
+
+  it "surfaces 1-based line/column on parser failure via parseProgramDetailed" $ do
+    case parseProgramDetailed "main.tnix" "let x = ;" of
+      Left err -> do
+        parseErrorLine err `shouldBe` 1
+        parseErrorColumn err `shouldSatisfy` (> 0)
+      Right _ -> expectationFailure "expected a parse failure for `let x = ;`"
+
+  it "points the directive-balance error at the file boundary" $ do
+    case parseProgramDetailed "main.tnix" "# @tnix-ignore" of
+      Left err -> do
+        parseErrorLine err `shouldBe` 1
+        parseErrorMessage err
+          `shouldSatisfy` (\msg -> "dangling tnix diagnostic directive" `Text.isInfixOf` msg)
+      Right _ -> expectationFailure "expected a dangling-directive failure"
+
+  it "back-compat parseProgram preserves the line:column prefix expected by the LSP" $
+    case parseProgram "main.tnix" "let x = ;" of
+      Left message ->
+        let header = Text.takeWhile (/= ':') message
+         in case Text.unpack header of
+              digits | all (`elem` ("0123456789" :: String)) digits, not (null digits) -> pure ()
+              _ -> expectationFailure ("expected a numeric line prefix, got " <> Text.unpack header)
+      Right _ -> expectationFailure "expected a parse failure"
   where
     plain = Marked Nothing
     isLeft (Left _) = True
