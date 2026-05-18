@@ -53,3 +53,9 @@ Bug fixes should include a regression test near the affected surface:
   `editors/neovim`.
 
 When a test is not practical, explain the residual risk in the PR body.
+
+## Project Governance
+
+How decisions get made, how releases get cut, and how to escalate is documented
+in [`GOVERNANCE.md`](GOVERNANCE.md). Read it once before opening a larger
+change — for small fixes, the rest of this document is sufficient.

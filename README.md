@@ -59,6 +59,7 @@ After compilation, type information is erased and only ordinary Nix code remains
 - [Architecture](./docs/architecture.md)
 - [Roadmap](./docs/roadmap.md)
 - [Contributing](./CONTRIBUTING.md)
+- [Governance](./GOVERNANCE.md)
 - [Security Policy](./SECURITY.md)
 - [Support Matrix](./docs/support-matrix.md)
 - [CI/CD Hardening](./docs/ci-cd.md)
