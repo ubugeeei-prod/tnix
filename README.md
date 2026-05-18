@@ -54,6 +54,7 @@ After compilation, type information is erased and only ordinary Nix code remains
 
 - [Getting Started](./docs/getting-started.md)
 - [Language Reference](./docs/language-reference.md)
+- [Grammar](./docs/grammar.md)
 - [Language Design](./docs/language-design.md)
 - [Type System](./docs/type-system.md)
 - [Architecture](./docs/architecture.md)
