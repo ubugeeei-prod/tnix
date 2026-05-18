@@ -247,6 +247,57 @@ jobs:
       - name: Check Neovim plugin
         run: nix develop --accept-flake-config --command nvim --headless -u NONE -c "lua vim.opt.runtimepath:append(vim.fn.getcwd() .. '/editors/neovim')" -l editors/neovim/test/config_spec.lua
 
+  lint:
+    name: Lint (formatters)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: |
+          store_path="$(nix develop --accept-flake-config --command pnpm store path --silent | tail -n 1)"
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install workspace dependencies
+        run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
+
+      - name: Check VS Code extension formatting
+        run: nix develop --accept-flake-config --command pnpm --filter tnix fmt
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.cargo/git
+            ~/.cargo/registry
+            editors/zed/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check Zed extension formatting
+        run: nix develop --accept-flake-config --command cargo fmt --manifest-path editors/zed/Cargo.toml --all --check
+
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
@@ -261,6 +312,7 @@ jobs:
       - vscode
       - zed
       - neovim
+      - lint
     if: ${{ always() }}
     steps:
       - name: Fail if any split check failed

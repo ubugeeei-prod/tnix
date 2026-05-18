@@ -3,19 +3,12 @@
     "target": "ES2022",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "lib": [
-      "ES2022"
-    ],
+    "lib": ["ES2022"],
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": "src",
-    "types": [
-      "node",
-      "vscode"
-    ]
+    "types": ["node", "vscode"]
   },
-  "include": [
-    "src/**/*.ts"
-  ]
+  "include": ["src/**/*.ts"]
 }
