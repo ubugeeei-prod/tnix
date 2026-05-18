@@ -57,7 +57,12 @@ spec = do
                             ]
                       , "full" .= True
                       ]
-                , "textDocumentSync" .= object ["openClose" .= True, "change" .= (2 :: Int)]
+                , "textDocumentSync"
+                    .= object
+                      [ "openClose" .= True
+                      , "change" .= (2 :: Int)
+                      , "save" .= object ["includeText" .= True]
+                      ]
                 ]
           ]
 
@@ -297,6 +302,33 @@ spec = do
         hSeek handle AbsoluteSeek 0
         readMessage handle `shouldReturn` Just (object ["jsonrpc" .= ("2.0" :: String)])
 
+    it "tags clean end-of-stream as ReadEof" $
+      withTempHandle $ \handle -> do
+        outcome <- readMessageOutcome handle
+        case outcome of
+          ReadEof -> pure ()
+          other -> expectationFailure ("expected ReadEof, got " <> describeOutcome other)
+
+    it "reports malformed Content-Length headers as ReadError" $
+      withTempHandle $ \handle -> do
+        B8.hPutStr handle "Content-Length: nope\r\n\r\n"
+        hFlush handle
+        hSeek handle AbsoluteSeek 0
+        outcome <- readMessageOutcome handle
+        case outcome of
+          ReadError _ -> pure ()
+          other -> expectationFailure ("expected ReadError, got " <> describeOutcome other)
+
+    it "reports unparseable JSON bodies as ReadError" $
+      withTempHandle $ \handle -> do
+        B8.hPutStr handle "Content-Length: 7\r\n\r\nnot{jso"
+        hFlush handle
+        hSeek handle AbsoluteSeek 0
+        outcome <- readMessageOutcome handle
+        case outcome of
+          ReadError _ -> pure ()
+          other -> expectationFailure ("expected ReadError, got " <> describeOutcome other)
+
 successAnalysis :: Analysis
 successAnalysis =
   Analysis
@@ -424,6 +456,11 @@ withPipeHandles action =
     hSetBinaryMode writeHandle True
     pure (readHandle, writeHandle)
   close (readHandle, writeHandle) = hClose readHandle >> hClose writeHandle
+
+describeOutcome :: ReadOutcome -> String
+describeOutcome ReadEof = "ReadEof"
+describeOutcome (ReadMessage value) = "ReadMessage " <> show value
+describeOutcome (ReadError reason) = "ReadError " <> show reason
 
 completionLabels :: Value -> [Text]
 completionLabels value =

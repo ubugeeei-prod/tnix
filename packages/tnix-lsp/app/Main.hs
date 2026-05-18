@@ -8,11 +8,11 @@
 -- to real editors without burying the logic inside an opaque event loop.
 module Main (main) where
 
-import Control.Monad (forever)
 import Control.Exception (IOException, try)
 import Data.Aeson
 import Data.IORef
 import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
 import Paths_tnix_lsp qualified as PackageInfo
@@ -21,7 +21,7 @@ import System.Exit (exitFailure, exitSuccess)
 import System.IO (BufferMode (NoBuffering), hPutStrLn, hSetBinaryMode, hSetBuffering, stderr, stdin, stdout)
 import Driver (Analysis (..), analyzeText)
 import Session qualified
-import Server (asText, clearDiagnostics, clientCapabilities, field, notify, publishDiagnostics, publishDiagnosticsWithContent, readMessage, respond)
+import Server (ReadOutcome (..), asText, clearDiagnostics, clientCapabilities, field, notify, publishDiagnostics, publishDiagnosticsWithContent, readMessageOutcome, respond)
 
 -- | Start the stdio event loop and keep the latest document text in memory.
 main :: IO ()
@@ -48,7 +48,16 @@ runServer = do
   hSetBuffering stdin NoBuffering
   hSetBuffering stdout NoBuffering
   ref <- newIORef mempty
-  forever $ readMessage stdin >>= maybe (pure ()) (handle ref)
+  loop ref
+ where
+  loop ref = do
+    outcome <- readMessageOutcome stdin
+    case outcome of
+      ReadEof -> pure ()
+      ReadMessage msg -> handle ref msg >> loop ref
+      ReadError reason -> do
+        hPutStrLn stderr ("tnix-lsp: " <> T.unpack reason)
+        loop ref
 
 helpText :: String
 helpText =
@@ -72,6 +81,7 @@ handle ref msg = case field "method" msg >>= asText of
   Just "exit" -> exitSuccess
   Just "textDocument/didOpen" -> update ref msg >>= publish
   Just "textDocument/didChange" -> update ref msg >>= publish
+  Just "textDocument/didSave" -> update ref msg >>= publish
   Just "textDocument/didClose" -> closeDocument ref msg
   Just "textDocument/hover" -> hover ref msg >>= respond stdout msg
   Just "textDocument/completion" -> completion ref msg >>= respond stdout msg
