@@ -58,6 +58,8 @@ After compilation, type information is erased and only ordinary Nix code remains
 - [Type System](./docs/type-system.md)
 - [Architecture](./docs/architecture.md)
 - [Roadmap](./docs/roadmap.md)
+- [Contributing](./CONTRIBUTING.md)
+- [Security Policy](./SECURITY.md)
 
 ## Current Status
 
