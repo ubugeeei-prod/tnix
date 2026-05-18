@@ -8,12 +8,13 @@
 -- check, and declaration emission.
 module Main (main) where
 
-import Data.Text.IO qualified as Text
+import Data.Text qualified as Text
+import Data.Text.IO qualified as TextIO
 import Data.Version (showVersion)
 import Cli qualified
 import Options.Applicative
 import Paths_tnix_cli qualified as PackageInfo
-import System.Exit (die)
+import System.Exit (die, exitFailure)
 
 -- | Parse arguments and execute the requested command.
 main :: IO ()
@@ -32,8 +33,11 @@ main = execParser opts >>= run
 run :: Cli.Command -> IO ()
 run cmd =
   Cli.executeCommand cmd >>= \case
-    Left err -> die err
+    Left err ->
+      case Cli.commandOutputFormat cmd of
+        Just Cli.JsonFormat -> TextIO.putStr (Text.pack err) >> exitFailure
+        _ -> die err
     Right content ->
       case Cli.commandOutputPath cmd of
         Just output -> Cli.writeOutput (Just output) content
-        Nothing -> Text.putStr content
+        Nothing -> TextIO.putStr content

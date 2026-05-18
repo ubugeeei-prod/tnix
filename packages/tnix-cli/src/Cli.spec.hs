@@ -2,7 +2,7 @@
 
 module Main (main) where
 
-import Cli (Command (..), OutputFormat (..), commandOutputPath, commandParser, executeCommand, renderAnalysis, writeOutput)
+import Cli (Command (..), OutputFormat (..), commandOutputFormat, commandOutputPath, commandParser, executeCommand, renderAnalysis, writeOutput)
 import Control.Exception (bracket)
 import Control.Monad (forM_)
 import Data.List (isInfixOf)
@@ -66,6 +66,15 @@ spec = do
       commandOutputPath (Init Nothing) `shouldBe` Nothing
       commandOutputPath (Scaffold Nothing) `shouldBe` Nothing
 
+  describe "commandOutputFormat" $
+    it "tracks commands that can emit machine-readable reports" $ do
+      commandOutputFormat (Check "main.tnix" JsonFormat) `shouldBe` Just JsonFormat
+      commandOutputFormat (CheckProject Nothing TextFormat) `shouldBe` Just TextFormat
+      commandOutputFormat (BuildProject Nothing JsonFormat) `shouldBe` Just JsonFormat
+      commandOutputFormat (EmitProject Nothing JsonFormat) `shouldBe` Just JsonFormat
+      commandOutputFormat (Compile "main.tnix" Nothing) `shouldBe` Nothing
+      commandOutputFormat (Init Nothing) `shouldBe` Nothing
+
   describe "executeCommand" $ do
     it "compiles source files through the driver end-to-end" $
       withTempTree
@@ -127,6 +136,10 @@ spec = do
     it "surfaces missing source files as user-facing errors" $
       executeCommand (Check "/tmp/tnix-cli-missing/main.tnix" TextFormat)
         >>= (`expectLeftContaining` "failed to read")
+
+    it "renders check failures as json when json output is requested" $
+      executeCommand (Check "/tmp/tnix-cli-missing/main.tnix" JsonFormat)
+        >>= (`expectLeftContaining` "\"success\":false")
 
     it "initializes a project with tnix.config.tnix and starter files" $
       withTempTree [] $ \root -> do
