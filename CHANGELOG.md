@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.3.2 - 2026-05-18
+## v0.4.0 - 2026-05-18
 
 - Harden GitHub Actions with pinned third-party actions, least-privilege
   permissions, checkout credential isolation, explicit timeouts, and release
