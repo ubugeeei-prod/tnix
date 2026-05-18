@@ -12,15 +12,41 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  verify:
-    name: Verify (${{ matrix.os }})
+  metadata:
+    name: Metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate release metadata
+        run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/check-version-sync.ts
+
+  flake:
+    name: Flake (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -29,30 +55,215 @@ jobs:
           - macos-latest
     steps:
       - name: Check out sources
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install workspace dependencies
-        run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
-
-      - name: Prime the Cabal package index
-        run: nix develop --accept-flake-config --command cabal update
-
-      - name: Validate release metadata
-        run: nix develop --accept-flake-config --command vp run check:versions
 
       - name: Run flake checks
         run: nix flake check --accept-flake-config
 
-      - name: Build the monorepo
-        run: nix develop --accept-flake-config --command vp run workspace:build
+  haskell:
+    name: Haskell (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
 
-      - name: Package the VS Code extension
-        run: nix develop --accept-flake-config --command bash -lc 'pnpm --filter tnix build && pnpm --filter tnix exec vsce package --no-dependencies --out /tmp/tnix-ci.vsix'
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run the full verification suite
-        run: nix develop --accept-flake-config --command vp run workspace:check
+      - name: Cache Cabal dependencies
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.cabal/packages
+            ~/.cabal/store
+          key: ${{ runner.os }}-cabal-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-cabal-
+
+      - name: Prime the Cabal package index
+        run: nix develop --accept-flake-config --command cabal update
+
+      - name: Build Haskell packages
+        run: nix develop --accept-flake-config --command cabal build all
+
+      - name: Test Haskell packages
+        run: nix develop --accept-flake-config --command cabal test all
+
+  fixtures:
+    name: Dogfood and Examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Cabal dependencies
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.cabal/packages
+            ~/.cabal/store
+          key: ${{ runner.os }}-cabal-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-cabal-
+
+      - name: Prime the Cabal package index
+        run: nix develop --accept-flake-config --command cabal update
+
+      - name: Check dogfood fixtures
+        run: nix develop --accept-flake-config --command cabal run tnix -- check ./dogfood/flake-surface.tnix
+
+      - name: Check example projects
+        run: nix develop --accept-flake-config --command cabal run tnix -- check-project ./examples --format json
+
+  vscode:
+    name: VS Code Extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(nix develop --accept-flake-config --command pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install workspace dependencies
+        run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
+
+      - name: Typecheck VS Code extension
+        run: nix develop --accept-flake-config --command pnpm --filter tnix check
+
+      - name: Test VS Code extension
+        run: nix develop --accept-flake-config --command pnpm --filter tnix test
+
+      - name: Package VS Code extension
+        run: |
+          nix develop --accept-flake-config --command pnpm --filter tnix build
+          nix develop --accept-flake-config --command pnpm --filter tnix exec vsce package --no-dependencies --out /tmp/tnix-ci.vsix
+
+  zed:
+    name: Zed Extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.cargo/git
+            ~/.cargo/registry
+            editors/zed/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Zed extension
+        run: nix develop --accept-flake-config --command cargo build --manifest-path editors/zed/Cargo.toml
+
+      - name: Check Zed extension
+        run: nix develop --accept-flake-config --command cargo check --manifest-path editors/zed/Cargo.toml
+
+      - name: Test Zed extension
+        run: nix develop --accept-flake-config --command cargo test --manifest-path editors/zed/Cargo.toml
+
+  neovim:
+    name: Neovim Plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Neovim plugin
+        run: nix develop --accept-flake-config --command nvim --headless -u NONE -c "lua vim.opt.runtimepath:append(vim.fn.getcwd() .. '/editors/neovim')" -l editors/neovim/test/config_spec.lua
+
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    needs:
+      - metadata
+      - flake
+      - haskell
+      - fixtures
+      - vscode
+      - zed
+      - neovim
+    if: ${{ always() }}
+    steps:
+      - name: Fail if any split check failed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        run: exit 1
+
+      - name: Report success
+        run: echo "All split CI checks passed."

@@ -8,6 +8,8 @@
 - `tnix-lsp` language server binary
 - SHA-256 checksum files for each archive
 - VS Code `.vsix` extension package
+- GitHub artifact attestations for release archives, checksum files, and the
+  VS Code extension package
 - Optional VS Code Marketplace publish when `VSCE_PAT` is configured
 - Optional Open VSX publish when `OVSX_PAT` is configured
 - Nix flake packages and apps exposed as `#tnix` and `#tnix-lsp`
@@ -45,6 +47,13 @@ To validate a release archive checksum locally, keep the archive next to its
 node --experimental-strip-types ./scripts/package-release.ts verify-checksum tnix-v0.2.1-linux-x64.sha256
 ```
 
+To verify release artifact provenance, use GitHub's attestation verifier:
+
+```bash
+gh attestation verify tnix-v0.2.1-linux-x64.tar.gz -R ubugeeei/tnix
+gh attestation verify tnix-v0.2.1-linux-x64.sha256 -R ubugeeei/tnix
+```
+
 ## Notes
 
 - `nix flake check` is the canonical release-grade validation entrypoint for
@@ -53,6 +62,8 @@ node --experimental-strip-types ./scripts/package-release.ts verify-checksum tni
 - The release workflow verifies each generated checksum with Node before
   uploading the archive and checksum file, so the check is portable across
   Linux and macOS runners.
+- The release workflow generates artifact attestations before uploading release
+  assets so users can verify provenance with the GitHub CLI.
 - CI now primes the Cabal package index explicitly so clean runners can resolve Haskell dependencies reliably.
 - The release workflow always creates a GitHub Release. Marketplace publishing is layered on top and only runs when the corresponding repository secrets are present.
 - Configure `VSCE_PAT` with a Visual Studio Marketplace publisher token and `OVSX_PAT` with an Open VSX token to enable automatic extension publishing on tag pushes.

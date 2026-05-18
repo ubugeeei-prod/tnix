@@ -6,7 +6,11 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: release-${{ github.ref }}
@@ -17,6 +21,10 @@ jobs:
     name: Build Release Assets (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -31,12 +39,36 @@ jobs:
             sha: tnix-${{ github.ref_name }}-macos-arm64.sha256
     steps:
       - name: Check out sources
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Cabal dependencies
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.cabal/packages
+            ~/.cabal/store
+          key: ${{ runner.os }}-cabal-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-cabal-
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(nix develop --accept-flake-config --command pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install workspace dependencies
         run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
@@ -48,10 +80,13 @@ jobs:
         run: nix develop --accept-flake-config --command vp run check:versions
 
       - name: Build release binaries
-        run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/package-release.ts "${{ github.ref_name }}" "${{ matrix.label }}" "${{ matrix.archive }}" "${{ matrix.sha }}"
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/package-release.ts "$REF_NAME" "${{ matrix.label }}" "${{ matrix.archive }}" "${{ matrix.sha }}"
 
       - name: Smoke test packaged binaries
         run: |
+          set -euo pipefail
           stage_dir="$(mktemp -d)"
           tar -C "$stage_dir" -xzf "${{ matrix.archive }}"
           archive_root="$(find "$stage_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
@@ -61,26 +96,55 @@ jobs:
       - name: Verify release checksum
         run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/package-release.ts verify-checksum "${{ matrix.sha }}"
 
+      - name: Attest release archive and checksum
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
+        with:
+          subject-path: |
+            ${{ matrix.archive }}
+            ${{ matrix.sha }}
+
       - name: Upload release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-${{ matrix.label }}
+          if-no-files-found: error
           path: |
             ./${{ matrix.archive }}
             ./${{ matrix.sha }}
+          retention-days: 7
 
   build-vscode-extension:
     name: Build VS Code Extension
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    env:
+      REF_NAME: ${{ github.ref_name }}
     steps:
       - name: Check out sources
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(nix develop --accept-flake-config --command pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install workspace dependencies
         run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
@@ -89,30 +153,43 @@ jobs:
         run: nix develop --accept-flake-config --command vp run check:versions
 
       - name: Package VS Code extension
-        run: nix develop --accept-flake-config --command bash -lc 'pnpm --filter tnix build && pnpm --filter tnix exec vsce package --no-dependencies --out ../../tnix-vscode-${{ github.ref_name }}.vsix'
+        run: |
+          set -euo pipefail
+          nix develop --accept-flake-config --command pnpm --filter tnix build
+          nix develop --accept-flake-config --command pnpm --filter tnix exec vsce package --no-dependencies --out "../../tnix-vscode-$REF_NAME.vsix"
+
+      - name: Attest VS Code extension
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
+        with:
+          subject-path: ./tnix-vscode-${{ env.REF_NAME }}.vsix
 
       - name: Upload VS Code extension
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-vscode
+          if-no-files-found: error
           path: ./tnix-vscode-${{ github.ref_name }}.vsix
+          retention-days: 7
 
   publish-release:
     name: Publish Release
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs:
       - build-assets
       - build-vscode-extension
+    permissions:
+      contents: write
     steps:
       - name: Download built artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: ./release-artifacts
           pattern: release-*
           merge-multiple: true
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: ./release-artifacts/*
           generate_release_notes: true
@@ -121,6 +198,7 @@ jobs:
   publish-vscode-marketplaces:
     name: Publish VS Code Extension
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       - build-vscode-extension
       - publish-release
@@ -132,18 +210,32 @@ jobs:
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
       - name: Check out sources
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(nix develop --accept-flake-config --command pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install workspace dependencies
         run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
 
       - name: Download VS Code extension
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-vscode
           path: ./release-vscode
