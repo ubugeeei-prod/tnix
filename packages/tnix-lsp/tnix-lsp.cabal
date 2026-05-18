@@ -17,6 +17,7 @@ library
     , Session
     , SessionDocuments
     , SessionReferences
+    , SessionSemanticTokens
     , SessionSymbols
     , SessionText
     , SessionTypes
@@ -78,6 +79,7 @@ test-suite tnix-lsp-session-spec
       Session
     , SessionDocuments
     , SessionReferences
+    , SessionSemanticTokens
     , SessionSymbols
     , SessionText
     , SessionTypes
