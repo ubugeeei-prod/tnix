@@ -25,7 +25,8 @@
 -- system for dependent types. It is a pragmatic static approximation that keeps
 -- useful facts alive for later phases.
 module Subtyping
-  ( isConsistent,
+  ( foldRight1,
+    isConsistent,
     isSubtype,
     joinTypes,
     lookupRecordField,
@@ -109,11 +110,10 @@ lookupRecordField env ty field =
     TUnion members ->
       let hits = mapMaybe (\member -> lookupRecordField env member field) members
        in case hits of
-            [] -> Nothing
-            _
+            x : xs
               | length hits == length members ->
-                  Just (foldr1 (joinTypes env) hits)
-              | otherwise -> Nothing
+                  Just (foldRight1 (joinTypes env) x xs)
+            _ -> Nothing
     _ -> Nothing
 
 -- | Compute the least-upper-bound style merge used by the checker.
@@ -505,3 +505,11 @@ typeDefinitelyZero = \case
           (Just (NumericInt 0), Just (NumericInt 0)) -> True
           _ -> False
   _ -> False
+
+-- | Right-associative fold over a non-empty list produced from a head + tail.
+--
+-- Equivalent to @foldr1 f (x : xs)@ but total: callers pass the head and tail
+-- separately so the empty case is unrepresentable.
+foldRight1 :: (a -> a -> a) -> a -> [a] -> a
+foldRight1 _ x [] = x
+foldRight1 f x (y : ys) = f x (foldRight1 f y ys)

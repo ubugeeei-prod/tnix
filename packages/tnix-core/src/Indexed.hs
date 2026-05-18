@@ -87,10 +87,12 @@ inferListType :: (Type -> Type -> Type) -> [Type] -> Type
 inferListType joinElem members =
   case members of
     [] -> surfaceTensorType [TLit (LInt 0)] tDynamic
-    _ ->
+    firstMember : restMembers ->
       let normalized = normalizeIndexedType <$> members
+          normalizedHead = normalizeIndexedType firstMember
+          normalizedRest = normalizeIndexedType <$> restMembers
           views = tensorView <$> normalized
-          elemTy = foldl1 joinElem normalized
+          elemTy = foldl joinElem normalizedHead normalizedRest
           lenTy = TLit (LInt (toInteger (length members)))
        in case sequence views >>= foldTensorMembers joinElem of
             Just (shape, baseTy) -> surfaceTensorType (lenTy : shape) baseTy
@@ -234,7 +236,7 @@ tupleListView ty = do
   pure $
     case items of
       [] -> surfaceTensorType [TLit (LInt 0)] tDynamic
-      _ -> tList (foldl1 joinTupleItems items)
+      x : xs -> tList (foldl joinTupleItems x xs)
 
 -- | Validate all indexed, numeric-refinement, and unit annotations inside a
 -- parsed program before the type checker consumes them.

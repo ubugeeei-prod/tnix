@@ -64,7 +64,10 @@ unionParser = mkUnion <$> sepBy1 appParser (symbol "|")
 
 -- | Parse left-associated type applications.
 appParser :: Parser Type
-appParser = foldl1 TApp <$> some atomParser
+appParser = do
+  head' <- atomParser
+  rest <- many atomParser
+  pure (foldl TApp head' rest)
 
 -- | Parse atomic type forms.
 atomParser :: Parser Type

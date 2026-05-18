@@ -125,7 +125,10 @@ additionParser = chainLeft1 castParser (EAdd <$ symbol "+")
 
 -- | Parse left-associated application chains.
 applicationParser :: Parser Expr
-applicationParser = foldl1 EApp <$> some postfixParser
+applicationParser = do
+  head' <- postfixParser
+  rest <- many postfixParser
+  pure (foldl EApp head' rest)
 
 -- | Parse postfix field selections without stealing path literals.
 postfixParser :: Parser Expr
