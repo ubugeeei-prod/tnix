@@ -39,3 +39,28 @@ assets with:
 ```bash
 gh attestation verify <artifact> -R ubugeeei/tnix
 ```
+
+## Dependency Updates
+
+[`.github/dependabot.yml`](../.github/dependabot.yml) opens weekly update PRs for
+three ecosystems:
+
+- `github-actions` across every workflow
+- `npm` for the VS Code extension under `editors/vscode`
+- `cargo` for the Zed extension under `editors/zed`
+
+GHC, cabal, and `nixpkgs` versions are tracked through the flake; bump them by
+updating `flake.lock` rather than waiting on Dependabot.
+
+## Code Owners and Branch Protection
+
+[`.github/CODEOWNERS`](../.github/CODEOWNERS) requests reviewers automatically
+based on the changed paths. The recommended branch protection rule for `main`
+is:
+
+- Require pull request reviews from code owners.
+- Require status checks to pass before merging, with `CI Summary` selected as
+  the required check (it depends on every split job and represents the full
+  pipeline).
+- Require branches to be up to date before merging, and dismiss stale review
+  approvals when new commits are pushed.
