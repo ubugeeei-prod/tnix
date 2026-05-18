@@ -55,6 +55,15 @@ import Server (
   wordAt,
  )
 import SessionText (definitionSpans, fieldSpans, wordChar, wordSpans)
+import SessionTypes
+  ( CachedDocument (..),
+    Documents (..),
+    IndexedSymbol (..),
+    MatchMode (..),
+    ReferenceTarget (..),
+    SemanticToken (..),
+    WorkspaceDocument (..),
+  )
 import SessionWorkspace
   ( findBuiltinsFile,
     findWorkspaceRoot,
@@ -68,22 +77,9 @@ import Syntax
 import System.FilePath (normalise, takeDirectory, (</>))
 import Type
 
-data CachedDocument = CachedDocument
-  { cachedDocumentText :: Text
-  , cachedDocumentAnalysis :: Maybe (Either String Analysis)
-  , cachedDocumentLastGoodAnalysis :: Maybe Analysis
-  }
-  deriving (Eq, Show)
-
--- | In-memory document cache keyed by normalized file path.
-newtype Documents = Documents {unDocuments :: Map FilePath CachedDocument}
-  deriving (Eq, Show)
-
-instance Semigroup Documents where
-  Documents left <> Documents right = Documents (left <> right)
-
-instance Monoid Documents where
-  mempty = Documents Map.empty
+-- Document cache, workspace, symbol index, reference, and semantic-token
+-- data types live in 'SessionTypes'; this module re-imports them so existing
+-- call sites and tests keep importing them from 'Session'.
 
 documentsFromList :: [(FilePath, Text)] -> Documents
 documentsFromList =
@@ -104,36 +100,7 @@ lookupDocumentText :: FilePath -> Documents -> Maybe Text
 lookupDocumentText file (Documents docs) =
   cachedDocumentText <$> Map.lookup (normalise file) docs
 
-data WorkspaceDocument = WorkspaceDocument
-  { workspaceDocumentFile :: FilePath
-  , workspaceDocumentContent :: Text
-  , workspaceDocumentAnalysis :: Either String Analysis
-  }
-
-data IndexedSymbol = IndexedSymbol
-  { indexedSymbolName :: Text
-  , indexedSymbolKind :: Int
-  , indexedSymbolFile :: FilePath
-  , indexedSymbolRange :: (Int, Int, Int)
-  , indexedSymbolContainer :: Maybe Text
-  }
-
-data MatchMode
-  = WholeWordMatch
-  | FieldWordMatch
-
-data ReferenceTarget = ReferenceTarget
-  { referenceTargetFiles :: [FilePath]
-  , referenceTargetNeedle :: Text
-  , referenceTargetMode :: MatchMode
-  }
-
-data SemanticToken = SemanticToken
-  { semanticTokenLine :: Int
-  , semanticTokenStart :: Int
-  , semanticTokenLength :: Int
-  , semanticTokenType :: Int
-  }
+-- (Type definitions moved to 'SessionTypes'.)
 
 {- | Update or open one document and re-run semantic analysis.
 
