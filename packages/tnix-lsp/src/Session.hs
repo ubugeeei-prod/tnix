@@ -30,7 +30,7 @@ import Data.Aeson (Value (..), object, toJSON, (.=))
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Char (isAlphaNum, isDigit, isLetter, isUpper, toLower)
-import Data.List (isPrefixOf, isSuffixOf, nub, sortOn)
+import Data.List (isSuffixOf, nub, sortOn)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
@@ -54,9 +54,16 @@ import Server (
   uriPath,
   wordAt,
  )
+import SessionWorkspace
+  ( findBuiltinsFile,
+    findWorkspaceRoot,
+    hasWorkspaceMarker,
+    ignoredDirectory,
+    isSourceFile,
+    workspaceFilesFor,
+  )
 import Subtyping (resolveType)
 import Syntax
-import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.FilePath (normalise, takeDirectory, (</>))
 import Type
 
@@ -683,77 +690,9 @@ documentCandidateNames result =
 workspaceSeedFile :: Documents -> Maybe FilePath
 workspaceSeedFile (Documents docs) = fst <$> Map.lookupMin docs
 
-workspaceFilesFor :: FilePath -> IO [FilePath]
-workspaceFilesFor file
-  | null file = pure []
-  | otherwise = do
-      root <- findWorkspaceRoot file
-      marked <- hasWorkspaceMarker root
-      if marked
-        then sortOn id . nub <$> go root
-        else pure [normalise file]
- where
-  go dir = do
-    names <- sortOn id <$> listDirectory dir
-    fmap concat . forM names $ \name -> do
-      let path = normalise (dir </> name)
-      isDir <- doesDirectoryExist path
-      if isDir
-        then
-          if ignoredDirectory name
-            then pure []
-            else go path
-        else
-          if isSourceFile name
-            then pure [path]
-            else pure []
-
-findWorkspaceRoot :: FilePath -> IO FilePath
-findWorkspaceRoot path = go start
- where
-  start = normalise (takeDirectory path)
-  go dir = do
-    marked <- hasWorkspaceMarker dir
-    let parent = normalise (takeDirectory dir)
-    if marked
-      then pure dir
-      else
-        if parent == dir
-          then pure start
-          else go parent
-
-hasWorkspaceMarker :: FilePath -> IO Bool
-hasWorkspaceMarker dir =
-  or
-    <$> sequence
-      [ doesFileExist (dir </> "flake.nix")
-      , doesFileExist (dir </> "cabal.project")
-      , doesFileExist (dir </> "pnpm-workspace.yaml")
-      , doesFileExist (dir </> "tnix.config.tnix")
-      , doesDirectoryExist (dir </> ".git")
-      ]
-
-findBuiltinsFile :: FilePath -> IO (Maybe FilePath)
-findBuiltinsFile file = go (normalise (takeDirectory file))
- where
-  go dir = do
-    let candidate = dir </> "builtins.d.tnix"
-        parent = normalise (takeDirectory dir)
-    exists <- doesFileExist candidate
-    if exists
-      then pure (Just candidate)
-      else
-        if parent == dir
-          then pure Nothing
-          else go parent
-
-ignoredDirectory :: FilePath -> Bool
-ignoredDirectory name =
-  name `elem` [".git", ".direnv", ".devenv", "node_modules", "dist"]
-    || "result" `isPrefixOf` name
-
-isSourceFile :: FilePath -> Bool
-isSourceFile name = ".tnix" `isSuffixOf` name
+-- Workspace traversal helpers live in 'SessionWorkspace' so they can be
+-- unit-tested in isolation. Re-exported here for back-compat with callers
+-- that still import them from 'Session'.
 
 symbolRanges :: Text -> Text -> MatchMode -> [(Int, Int, Int)]
 symbolRanges content symbol mode =
