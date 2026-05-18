@@ -83,6 +83,29 @@ spec = describe "analysis" $ do
   it "reports missing fields" $
     analyzeText "main.tnix" "{ value = 1; }.missing" >>= (`expectLeftContaining` "missing field")
 
+  it "renders diagnostics with surface syntax and no raw AST constructors" $ do
+    let assertHumanReadable input needle =
+          analyzeText "main.tnix" input >>= \result ->
+            case result of
+              Left err -> do
+                err `shouldContain` needle
+                err `shouldNotContain` "TRecord"
+                err `shouldNotContain` "TLit"
+                err `shouldNotContain` "TFun"
+                err `shouldNotContain` "TUnion"
+              Right _ -> expectationFailure ("expected diagnostic containing " <> show needle)
+    assertHumanReadable "{ value = 1; }.missing" "missing field `missing`"
+    assertHumanReadable "missing" "unbound name: `missing`"
+    assertHumanReadable
+      ( source
+          [ "let",
+            "  pkg :: { name :: String; };",
+            "  pkg = { name = 1; };",
+            "in pkg"
+          ]
+      )
+      "type mismatch"
+
   it "resolves field selections through previously inferred let bindings" $ do
     analysis <-
       analyzeText

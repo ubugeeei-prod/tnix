@@ -25,7 +25,7 @@ module Driver
 where
 
 import Control.Applicative ((<|>))
-import Control.Exception (IOException, try)
+import Control.Exception (IOException, displayException, try)
 import Control.Monad (foldM, forM)
 import Data.List (group, isSuffixOf, nub, sort)
 import Data.Map.Strict (Map)
@@ -42,6 +42,7 @@ import Emit
 import Indexed
 import Kind
 import Parser
+import Pretty (renderExpr)
 import Syntax
 import Type
 
@@ -224,12 +225,12 @@ decodeDeclarationPackField root = \case
 decodePathList :: FilePath -> Text -> Expr -> Either String [FilePath]
 decodePathList root label = \case
   EList items -> traverse decodeItem items
-  other -> Left ("expected list of path-like values for " <> Text.unpack label <> ", but got " <> show other)
+  other -> Left ("expected list of path-like values for " <> Text.unpack label <> ", but got " <> Text.unpack (renderExpr other))
   where
     decodeItem = \case
       EPath path -> Right (resolveConfigPath root path)
       EString text -> Right (resolveConfigPath root (Text.unpack (stringLiteralText text)))
-      item -> Left ("expected path-like item in " <> Text.unpack label <> ", but got " <> show item)
+      item -> Left ("expected path-like item in " <> Text.unpack label <> ", but got " <> Text.unpack (renderExpr item))
 
 expandDeclarationPackPath :: FilePath -> FilePath -> IO (Either String [DeclarationSupportFile])
 expandDeclarationPackPath root path = do
@@ -301,7 +302,7 @@ collectAmbientWithBase :: FilePath -> FilePath -> Program -> Either String (Map 
 collectAmbientWithBase file resolveBase program = do
   let duplicates = duplicateNames (map (resolvePath resolveBase . ambientPath) (programAmbient program))
   case duplicates of
-    dup : _ -> Left ("duplicate ambient declarations for target " <> show dup <> " in " <> file)
+    dup : _ -> Left ("duplicate ambient declarations for target `" <> dup <> "` in " <> file)
     [] -> Map.fromList <$> traverse toPair (programAmbient program)
   where
     toPair decl = do
@@ -309,7 +310,7 @@ collectAmbientWithBase file resolveBase program = do
       pure (resolvePath resolveBase (ambientPath decl), scheme)
     schemeFromEntries entries =
       case duplicateNames (map ambientEntryName entries) of
-        dup : _ -> Left ("duplicate ambient entry " <> show dup <> " in " <> file)
+        dup : _ -> Left ("duplicate ambient entry `" <> Text.unpack dup <> "` in " <> file)
         [] ->
           Right $
             case entries of
@@ -410,7 +411,7 @@ readTextFile path = do
   result <- try @IOException (Text.readFile path)
   pure $
     case result of
-      Left err -> Left ("failed to read " <> path <> ": " <> show err)
+      Left err -> Left ("failed to read " <> path <> ": " <> displayException err)
       Right input -> Right input
 
 collapseParentSegments :: FilePath -> FilePath

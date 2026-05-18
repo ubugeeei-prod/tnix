@@ -8,6 +8,7 @@
 module Pretty
   ( renderDeclarationFile,
     renderExpr,
+    renderKind,
     renderProgramAsNix,
     renderScheme,
     renderType,
@@ -40,6 +41,10 @@ renderExpr = render . prettyExpr 0
 -- | Render a type without scheme quantifiers.
 renderType :: Type -> Text
 renderType = render . prettyType 0
+
+-- | Render a kind using arrow syntax for higher-kinded constructors.
+renderKind :: Kind -> Text
+renderKind = render . prettyKind 0
 
 -- | Render a polymorphic scheme for CLI and LSP display.
 renderScheme :: Scheme -> Text
@@ -170,6 +175,12 @@ isBareAttrName name =
   where
     attrNameStart c = isLetter c || c == '_'
     attrNameCont c = isAlphaNum c || c `elem` ("_'-" :: String)
+
+prettyKind :: Int -> Kind -> Doc ann
+prettyKind p = \case
+  KType -> "Type"
+  KMeta n -> pretty ("?" <> show n)
+  KFun a b -> parenIf (p > 0) (prettyKind 1 a <+> "->" <+> prettyKind 0 b)
 
 parenIf :: Bool -> Doc ann -> Doc ann
 parenIf True = parens
