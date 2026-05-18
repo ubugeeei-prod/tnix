@@ -19,7 +19,9 @@ import Control.Monad (foldM, replicateM, void)
 import Control.Monad.State.Strict (StateT, evalStateT, get, lift, modify', put)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Text qualified as T
 import Alias (mkAliasEnv)
+import Pretty (renderKind)
 import Syntax
 import Type
 
@@ -216,7 +218,7 @@ unifyKind left right = do
     (kind, KMeta n) -> bindKindMeta n kind
     (KType, KType) -> pure KType
     (KFun a b, KFun c d) -> KFun <$> unifyKind a c <*> unifyKind b d
-    _ -> liftLeft ("kind mismatch: " <> show left' <> " vs " <> show right')
+    _ -> liftLeft ("kind mismatch: " <> showKind left' <> " vs " <> showKind right')
 
 bindKindMeta :: Int -> Kind -> KindM Kind
 bindKindMeta n kind = do
@@ -310,3 +312,6 @@ traverse_ step = foldM (\() item -> step item >> pure ()) ()
 
 liftLeft :: String -> KindM a
 liftLeft = lift . Left
+
+showKind :: Kind -> String
+showKind = T.unpack . renderKind
