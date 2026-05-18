@@ -93,7 +93,7 @@
     "@types/vscode": "^1.110.0",
     "esbuild": "^0.25.3",
     "ovsx": "^0.10.12",
-    "prettier": "^3.5.3",
+    "prettier": "^3.8.3",
     "typescript": "^5.8.3"
   }
 }
