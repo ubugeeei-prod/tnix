@@ -5,6 +5,7 @@
 module Cli (
   Command (..),
   OutputFormat (..),
+  commandOutputFormat,
   commandOutputPath,
   commandParser,
   executeCommand,
@@ -95,6 +96,19 @@ commandOutputPath cmd =
     CheckProject _ _ -> Nothing
     BuildProject _ _ -> Nothing
     EmitProject _ _ -> Nothing
+
+-- | Extract the requested machine-readable output format, if a command has one.
+commandOutputFormat :: Command -> Maybe OutputFormat
+commandOutputFormat cmd =
+  case cmd of
+    Check _ format -> Just format
+    CheckProject _ format -> Just format
+    BuildProject _ format -> Just format
+    EmitProject _ format -> Just format
+    Compile _ _ -> Nothing
+    Emit _ _ -> Nothing
+    Init _ -> Nothing
+    Scaffold _ -> Nothing
 
 -- | Execute one CLI command and return the rendered text payload.
 executeCommand :: Command -> IO (Either String Text)
