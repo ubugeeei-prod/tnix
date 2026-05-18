@@ -22,12 +22,14 @@ import Control.Exception (IOException, try)
 import Control.Monad (forM)
 import Data.List (group, isPrefixOf, nub, partition, sort)
 import Data.Map.Strict qualified as Map
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Parser (parseProgram)
 import Syntax
-import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory, makeAbsolute)
+import System.Directory (canonicalizePath, createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory, makeAbsolute)
 import System.FilePath (addTrailingPathSeparator, (</>), isAbsolute, makeRelative, normalise, replaceExtension, takeBaseName, takeDirectory)
 
 data ProjectConfig = ProjectConfig
@@ -221,23 +223,52 @@ expandConfiguredPaths root =
         then walkTnixFiles path
         else pure [path]
 
+-- | Maximum depth a source-tree walk is allowed to recurse before bailing out.
+--
+-- Picked generously so realistic project layouts never hit it, but small enough
+-- that a misconfigured or maliciously-symlinked workspace still terminates.
+walkTnixFilesMaxDepth :: Int
+walkTnixFilesMaxDepth = 64
+
 walkTnixFiles :: FilePath -> IO [FilePath]
-walkTnixFiles root = do
-  exists <- doesDirectoryExist root
-  if not exists
-    then pure []
-    else do
-      names <- sort <$> listDirectory root
-      fmap concat $
-        traverse
-          ( \name -> do
-              let path = root </> name
-              isDir <- doesDirectoryExist path
-              if isDir
-                then walkTnixFiles path
-                else pure [path]
-          )
-          names
+walkTnixFiles root = walkTnixFilesWithLimit walkTnixFilesMaxDepth Set.empty root
+
+-- | Cycle-safe, depth-bounded directory walk.
+--
+-- 'canonicalizePath' is used to detect already-visited directories so symlink
+-- loops terminate. When the depth or visited set guard kicks in the helper
+-- silently returns no files for the offending branch — callers see a clean
+-- short list instead of a hang.
+walkTnixFilesWithLimit :: Int -> Set FilePath -> FilePath -> IO [FilePath]
+walkTnixFilesWithLimit remaining visited root
+  | remaining <= 0 = pure []
+  | otherwise = do
+      exists <- doesDirectoryExist root
+      if not exists
+        then pure []
+        else do
+          canonical <- canonicalizePathSafe root
+          if Set.member canonical visited
+            then pure []
+            else do
+              names <- sort <$> listDirectory root
+              let visited' = Set.insert canonical visited
+                  next = remaining - 1
+              fmap concat $
+                traverse
+                  ( \name -> do
+                      let path = root </> name
+                      isDir <- doesDirectoryExist path
+                      if isDir
+                        then walkTnixFilesWithLimit next visited' path
+                        else pure [path]
+                  )
+                  names
+
+canonicalizePathSafe :: FilePath -> IO FilePath
+canonicalizePathSafe path = do
+  result <- try @IOException (canonicalizePath path)
+  pure (either (const (normalise path)) id result)
 
 loadProjectConfig :: FilePath -> IO (Either String ProjectConfig)
 loadProjectConfig configPath = do

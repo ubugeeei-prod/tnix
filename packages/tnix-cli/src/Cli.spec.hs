@@ -5,16 +5,17 @@ module Main (main) where
 import Cli (Command (..), OutputFormat (..), commandOutputFormat, commandOutputPath, commandParser, executeCommand, renderAnalysis, writeOutput)
 import Control.Exception (bracket)
 import Control.Monad (forM_)
-import Data.List (isInfixOf)
+import Data.List (intercalate, isInfixOf)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Driver (Analysis (..))
 import Options.Applicative (ParserPrefs, ParserResult (..), defaultPrefs, execParserPure, getParseResult, info, renderFailure)
-import System.Directory (createDirectory, createDirectoryIfMissing, doesFileExist, getTemporaryDirectory, removeFile, removePathForcibly)
+import System.Directory (createDirectory, createDirectoryIfMissing, createDirectoryLink, doesFileExist, getTemporaryDirectory, removeFile, removePathForcibly)
 import System.FilePath (takeDirectory, (</>))
 import System.IO (hClose, openTempFile)
+import System.Timeout (timeout)
 import Test.Hspec
 import Type
 
@@ -352,6 +353,59 @@ spec = do
         let path = root <> "/dist/nested/out.txt"
         writeOutput (Just path) "hello"
         doesFileExist path `shouldReturn` True
+
+  describe "check-project against pathological filesystems" $ do
+    it "terminates on a directory symlink loop without hanging"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"loop\";"
+              , "  sourceDir = ./src;"
+              , "}"
+              ]
+          )
+        , ("src/main.tnix", "1")
+        ]
+      $ \root -> do
+        -- Create src/loop -> src so a naive walker would recurse forever.
+        createDirectoryLink (root </> "src") (root </> "src/loop")
+        result <-
+          timeout
+            (5 * 1000 * 1000)
+            (executeCommand (CheckProject (Just root) TextFormat))
+        case result of
+          Just (Right report) ->
+            Text.isInfixOf "ok src/main.tnix" report `shouldBe` True
+          Just (Left err) ->
+            expectationFailure ("expected ok, got error: " <> err)
+          Nothing -> expectationFailure "check-project hung on symlink loop"
+
+    it "stops walking when the directory depth exceeds the budget"
+      $ withTempTree
+        [
+          ( "tnix.config.tnix"
+          , source
+              [ "{"
+              , "  name = \"deep\";"
+              , "  sourceDir = ./src;"
+              , "}"
+              ]
+          )
+        , ("src/main.tnix", "1")
+        ]
+      $ \root -> do
+        -- Create a deep nested layout below the configured source dir.
+        let deep = root </> "src" </> deepPath 80
+        createDirectoryIfMissing True deep
+        TextIO.writeFile (deep </> "leaf.tnix") "1"
+        result <- executeCommand (CheckProject (Just root) TextFormat)
+        case result of
+          Right report ->
+            Text.isInfixOf "ok src/main.tnix" report `shouldBe` True
+          Left err ->
+            expectationFailure ("expected ok, got error: " <> err)
  where
   parserInfo = info commandParser mempty
   parserPrefs :: ParserPrefs
@@ -372,6 +426,9 @@ expectLeftContaining result needle =
 
 source :: [Text] -> Text
 source = Text.unlines
+
+deepPath :: Int -> FilePath
+deepPath n = intercalate "/" (replicate n "deep")
 
 withTempTree :: [(FilePath, Text)] -> (FilePath -> IO a) -> IO a
 withTempTree files action = bracket createRoot removePathForcibly (\root -> writeTree root >> action root)
