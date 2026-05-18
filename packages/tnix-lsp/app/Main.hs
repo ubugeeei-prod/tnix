@@ -8,6 +8,12 @@
 -- to real editors without burying the logic inside an opaque event loop.
 module Main (main) where
 
+import AnalysisCache
+  ( AnalysisCache,
+    emptyAnalysisCache,
+    insertAnalysisCache,
+    lookupAnalysisCache,
+  )
 import Control.Exception (IOException, try)
 import Data.Aeson
 import Data.IORef
@@ -15,13 +21,13 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
+import Driver (Analysis (..), analyzeText)
 import Paths_tnix_lsp qualified as PackageInfo
+import Server (ReadOutcome (..), asText, clearDiagnostics, clientCapabilities, field, notify, publishDiagnostics, publishDiagnosticsWithContent, readMessageOutcome, respond)
+import Session qualified
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (BufferMode (NoBuffering), hPutStrLn, hSetBinaryMode, hSetBuffering, stderr, stdin, stdout)
-import Driver (Analysis (..), analyzeText)
-import Session qualified
-import Server (ReadOutcome (..), asText, clearDiagnostics, clientCapabilities, field, notify, publishDiagnostics, publishDiagnosticsWithContent, readMessageOutcome, respond)
 
 -- | Start the stdio event loop and keep the latest document text in memory.
 main :: IO ()
@@ -48,16 +54,31 @@ runServer = do
   hSetBuffering stdin NoBuffering
   hSetBuffering stdout NoBuffering
   ref <- newIORef mempty
-  loop ref
+  cacheRef <- newIORef emptyAnalysisCache
+  let analyze = cachedAnalyzeText cacheRef
+  loop ref analyze
  where
-  loop ref = do
+  loop ref analyze = do
     outcome <- readMessageOutcome stdin
     case outcome of
       ReadEof -> pure ()
-      ReadMessage msg -> handle ref msg >> loop ref
+      ReadMessage msg -> handle ref analyze msg >> loop ref analyze
       ReadError reason -> do
         hPutStrLn stderr ("tnix-lsp: " <> T.unpack reason)
-        loop ref
+        loop ref analyze
+
+-- | Wrap 'analyzeText' with the workspace-wide analysis cache so repeated
+-- hover / workspace-symbol / definition requests against unchanged content
+-- collapse to a single driver invocation.
+cachedAnalyzeText :: IORef AnalysisCache -> FilePath -> Text -> IO (Either String Analysis)
+cachedAnalyzeText cacheRef file content = do
+  cache <- readIORef cacheRef
+  case lookupAnalysisCache (file, content) cache of
+    Just result -> pure result
+    Nothing -> do
+      result <- analyzeText file content
+      modifyIORef' cacheRef (insertAnalysisCache (file, content) result)
+      pure result
 
 helpText :: String
 helpText =
@@ -73,33 +94,36 @@ helpText =
 versionText :: String
 versionText = "tnix-lsp " <> showVersion PackageInfo.version
 
+-- | Type alias for the cached analyzer threaded through every handler.
+type AnalyzeFn = FilePath -> Text -> IO (Either String Analysis)
+
 -- | Dispatch one incoming JSON-RPC message.
-handle :: IORef Session.Documents -> Value -> IO ()
-handle ref msg = case field "method" msg >>= asText of
+handle :: IORef Session.Documents -> AnalyzeFn -> Value -> IO ()
+handle ref analyze msg = case field "method" msg >>= asText of
   Just "initialize" -> respond stdout msg clientCapabilities
   Just "shutdown" -> respond stdout msg Null
   Just "exit" -> exitSuccess
-  Just "textDocument/didOpen" -> update ref msg >>= publish
-  Just "textDocument/didChange" -> update ref msg >>= publish
-  Just "textDocument/didSave" -> update ref msg >>= publish
+  Just "textDocument/didOpen" -> update ref analyze msg >>= publish
+  Just "textDocument/didChange" -> update ref analyze msg >>= publish
+  Just "textDocument/didSave" -> update ref analyze msg >>= publish
   Just "textDocument/didClose" -> closeDocument ref msg
-  Just "textDocument/hover" -> hover ref msg >>= respond stdout msg
-  Just "textDocument/completion" -> completion ref msg >>= respond stdout msg
-  Just "textDocument/definition" -> definition ref msg >>= respond stdout msg
-  Just "textDocument/declaration" -> definition ref msg >>= respond stdout msg
-  Just "textDocument/references" -> references ref msg >>= respond stdout msg
-  Just "textDocument/rename" -> rename ref msg >>= respond stdout msg
-  Just "textDocument/documentSymbol" -> documentSymbols ref msg >>= respond stdout msg
-  Just "workspace/symbol" -> workspaceSymbols ref msg >>= respond stdout msg
-  Just "textDocument/codeAction" -> codeActions ref msg >>= respond stdout msg
-  Just "textDocument/semanticTokens/full" -> semanticTokens ref msg >>= respond stdout msg
+  Just "textDocument/hover" -> hover ref analyze msg >>= respond stdout msg
+  Just "textDocument/completion" -> completion ref analyze msg >>= respond stdout msg
+  Just "textDocument/definition" -> definition ref analyze msg >>= respond stdout msg
+  Just "textDocument/declaration" -> definition ref analyze msg >>= respond stdout msg
+  Just "textDocument/references" -> references ref analyze msg >>= respond stdout msg
+  Just "textDocument/rename" -> rename ref analyze msg >>= respond stdout msg
+  Just "textDocument/documentSymbol" -> documentSymbols ref analyze msg >>= respond stdout msg
+  Just "workspace/symbol" -> workspaceSymbols ref analyze msg >>= respond stdout msg
+  Just "textDocument/codeAction" -> codeActions ref analyze msg >>= respond stdout msg
+  Just "textDocument/semanticTokens/full" -> semanticTokens ref analyze msg >>= respond stdout msg
   _ -> pure ()
 
 -- | Update the in-memory copy of a document and re-run analysis.
-update :: IORef Session.Documents -> Value -> IO (FilePath, Maybe Text, Either String Analysis)
-update ref msg = do
+update :: IORef Session.Documents -> AnalyzeFn -> Value -> IO (FilePath, Maybe Text, Either String Analysis)
+update ref analyze msg = do
   docs <- readIORef ref
-  (docs', file, result) <- Session.updateDocuments readFileSafe analyzeText docs msg
+  (docs', file, result) <- Session.updateDocuments readFileSafe analyze docs msg
   writeIORef ref docs'
   pure (file, Session.lookupDocumentText file docs', result)
 
@@ -122,52 +146,52 @@ closeDocument ref msg = do
     Nothing -> pure ()
 
 -- | Compute hover contents at the requested position.
-hover :: IORef Session.Documents -> Value -> IO Value
-hover ref msg = do
+hover :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+hover ref analyze msg = do
   docs <- readIORef ref
-  Session.hoverDocument readFileSafe analyzeText docs msg
+  Session.hoverDocument readFileSafe analyze docs msg
 
 -- | Compute completion results at the requested position.
-completion :: IORef Session.Documents -> Value -> IO Value
-completion ref msg = do
+completion :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+completion ref analyze msg = do
   docs <- readIORef ref
-  Session.completionDocument readFileSafe analyzeText docs msg
+  Session.completionDocument readFileSafe analyze docs msg
 
 -- | Resolve local or ambient definitions for the requested position.
-definition :: IORef Session.Documents -> Value -> IO Value
-definition ref msg = do
+definition :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+definition ref analyze msg = do
   docs <- readIORef ref
-  Session.definitionDocument readFileSafe analyzeText docs msg
+  Session.definitionDocument readFileSafe analyze docs msg
 
-references :: IORef Session.Documents -> Value -> IO Value
-references ref msg = do
+references :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+references ref analyze msg = do
   docs <- readIORef ref
-  Session.referencesDocument readFileSafe analyzeText docs msg
+  Session.referencesDocument readFileSafe analyze docs msg
 
-rename :: IORef Session.Documents -> Value -> IO Value
-rename ref msg = do
+rename :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+rename ref analyze msg = do
   docs <- readIORef ref
-  Session.renameDocument readFileSafe analyzeText docs msg
+  Session.renameDocument readFileSafe analyze docs msg
 
-documentSymbols :: IORef Session.Documents -> Value -> IO Value
-documentSymbols ref msg = do
+documentSymbols :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+documentSymbols ref analyze msg = do
   docs <- readIORef ref
-  Session.documentSymbolsDocument readFileSafe analyzeText docs msg
+  Session.documentSymbolsDocument readFileSafe analyze docs msg
 
-workspaceSymbols :: IORef Session.Documents -> Value -> IO Value
-workspaceSymbols ref msg = do
+workspaceSymbols :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+workspaceSymbols ref analyze msg = do
   docs <- readIORef ref
-  Session.workspaceSymbolsDocument readFileSafe analyzeText docs msg
+  Session.workspaceSymbolsDocument readFileSafe analyze docs msg
 
-codeActions :: IORef Session.Documents -> Value -> IO Value
-codeActions ref msg = do
+codeActions :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+codeActions ref analyze msg = do
   docs <- readIORef ref
-  Session.codeActionsDocument readFileSafe analyzeText docs msg
+  Session.codeActionsDocument readFileSafe analyze docs msg
 
-semanticTokens :: IORef Session.Documents -> Value -> IO Value
-semanticTokens ref msg = do
+semanticTokens :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+semanticTokens ref analyze msg = do
   docs <- readIORef ref
-  Session.semanticTokensDocument readFileSafe analyzeText docs msg
+  Session.semanticTokensDocument readFileSafe analyze docs msg
 
 readFileSafe :: FilePath -> IO (Either String Text)
 readFileSafe file = do

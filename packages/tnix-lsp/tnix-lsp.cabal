@@ -13,7 +13,8 @@ synopsis:           Minimal LSP server for tnix
 
 library
   exposed-modules:
-      Server
+      AnalysisCache
+    , Server
     , Session
     , SessionDiagnostics
     , SessionDocuments
@@ -70,6 +71,21 @@ test-suite tnix-lsp-spec
     , tnix-core
     , tnix-lsp
     , unix
+  default-language: GHC2021
+
+test-suite tnix-lsp-analysis-cache-spec
+  type: exitcode-stdio-1.0
+  main-is: AnalysisCache.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      AnalysisCache
+  build-depends:
+      base >=4.19 && <5
+    , containers
+    , hspec
+    , text
+    , tnix-core
+    , tnix-lsp
   default-language: GHC2021
 
 test-suite tnix-lsp-session-spec
