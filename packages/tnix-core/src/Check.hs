@@ -228,7 +228,11 @@ inferLet ctx env items = do
   placeholders <- Map.fromList <$> traverse placeholder bindNames
   let recursiveEnv = placeholders <> env
   inferred <- forM binds $ \(name, expr, inlineDirective) -> do
-    expected <- instantiate (recursiveEnv Map.! name)
+    -- `bindNames` and `binds` share the same source list, so a missing key
+    -- here is a checker bug rather than a user error; surface it as such.
+    expected <- case Map.lookup name recursiveEnv of
+      Just scheme -> instantiate scheme
+      Nothing -> lift (Left ("internal: missing placeholder for binding " <> show name))
     let directive = inlineDirective <|> Map.lookup name sigDirectives
     attempt <-
       catchInfer $ do
@@ -302,7 +306,9 @@ inferDynamicSelect ctx baseTy keyTy = do
                       case traverse (lookupRecordField aliases base') names of
                         Just fieldTypes -> do
                           instantiated <- traverse (instantiate . schemeFromAnnotation) fieldTypes
-                          pure (foldr1 (joinTypes aliases) instantiated)
+                          case instantiated of
+                            x : xs -> pure (foldRight1 (joinTypes aliases) x xs)
+                            [] -> pure tDynamic
                         Nothing -> lift $ Left ("missing field selected by dynamic key of type " <> showType key')
                     Nothing ->
                       if isSubtype aliases key' tString || isConsistent aliases key' tString
@@ -469,11 +475,12 @@ unify ctx left right = do
   where
     unifyRecord a b
       | Map.keysSet b `Set.isSubsetOf` Map.keysSet a =
-          TRecord <$> traverseWithKey (\name ty -> unify ctx ty (b Map.! name)) b
+          Map.traverseWithKey (\name bTy -> maybe (pure bTy) (\aTy -> unify ctx aTy bTy) (Map.lookup name a)) b
+            >>= pure . TRecord
       | Map.keysSet a `Set.isSubsetOf` Map.keysSet b =
-          TRecord <$> traverseWithKey (\name ty -> unify ctx ty (a Map.! name)) a
+          Map.traverseWithKey (\name aTy -> maybe (pure aTy) (\bTy -> unify ctx aTy bTy) (Map.lookup name b)) a
+            >>= pure . TRecord
       | otherwise = lift (Left ("record mismatch: " <> showRecord a <> " vs " <> showRecord b))
-    traverseWithKey f = fmap Map.fromList . traverse (\(k, v) -> f k v >>= \ty -> pure (k, ty)) . Map.toList
 
 -- | Bind one inference meta to a solved type, performing the occurs check.
 bindMeta :: Int -> Type -> InferM Type

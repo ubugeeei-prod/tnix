@@ -115,11 +115,16 @@ inferAll aliases = do
   traverse zonkKind aliasKinds
 
 inferAliasBody :: AliasKindEnv -> Map Name AliasPlaceholder -> TypeAlias -> KindM ()
-inferAliasBody env placeholders alias = do
-  let placeholder = placeholders Map.! typeAliasName alias
-      local = Map.fromList (zip (typeAliasParams alias) (placeholderParams placeholder))
-  bodyKind <- inferKind env local (typeAliasBody alias)
-  void (unifyKind bodyKind (placeholderResult placeholder))
+inferAliasBody env placeholders alias =
+  case Map.lookup (typeAliasName alias) placeholders of
+    Nothing ->
+      -- Placeholders are constructed from the same alias list passed in here,
+      -- so a missing entry signals an inference bug rather than a user error.
+      liftLeft ("internal: missing kind placeholder for alias " <> show (typeAliasName alias))
+    Just placeholder -> do
+      let local = Map.fromList (zip (typeAliasParams alias) (placeholderParams placeholder))
+      bodyKind <- inferKind env local (typeAliasBody alias)
+      void (unifyKind bodyKind (placeholderResult placeholder))
 
 inferKind :: AliasKindEnv -> Map Name Kind -> Type -> KindM Kind
 inferKind env local = \case
