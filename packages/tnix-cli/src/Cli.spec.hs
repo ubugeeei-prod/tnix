@@ -149,6 +149,18 @@ spec = do
         Text.isInfixOf "Hello from" entry `shouldBe` True
         Text.isInfixOf "tnix.config.tnix" output `shouldBe` True
 
+    it "escapes generated string literals during project initialization" $
+      withTempTree [] $ \root -> do
+        let projectRoot = root </> "quote\"and\\slash"
+        _ <- executeCommand (Init (Just projectRoot)) >>= expectRight
+        config <- TextIO.readFile (projectRoot </> "tnix.config.tnix")
+        entry <- TextIO.readFile (projectRoot </> "src/main.tnix")
+        Text.isInfixOf "name = \"quote\\\"and\\\\slash\";" config `shouldBe` True
+        Text.isInfixOf "greeting = \"Hello from quote\\\"and\\\\slash\";" entry `shouldBe` True
+        _ <- executeCommand (Scaffold (Just projectRoot)) >>= expectRight
+        _ <- executeCommand (Check (projectRoot </> "src/main.tnix") TextFormat) >>= expectRight
+        pure ()
+
     it "scaffolds from tnix.config.tnix path overrides without overwriting existing files"
       $ withTempTree
         [
