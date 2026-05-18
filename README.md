@@ -60,6 +60,7 @@ After compilation, type information is erased and only ordinary Nix code remains
 - [Roadmap](./docs/roadmap.md)
 - [Contributing](./CONTRIBUTING.md)
 - [Security Policy](./SECURITY.md)
+- [Support Matrix](./docs/support-matrix.md)
 
 ## Current Status
 
