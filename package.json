@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.8.0",
+  "scripts": {
+    "build": "vp run workspace:build",
+    "check": "vp run workspace:check",
+    "fmt": "vp run workspace:fmt",
+    "test": "vp run test:haskell && pnpm --filter tnix test && vp run test:zed"
+  },
   "devDependencies": {
     "vite-plus": "^0.1.14"
   }
