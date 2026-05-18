@@ -1,0 +1,28 @@
+# Configuration for lycheeverse/lychee, the broken-link checker used by the
+# Docs workflow. Tuned for offline runs in CI: the goal is to catch dangling
+# relative links inside the repository, not to probe the public internet.
+
+# Match links across markdown and select project metadata files.
+include_verbatim = false
+
+# Treat anchors that point to repo files but contain unresolvable fragments as
+# warnings rather than errors. Anchors inside generated GitHub UI pages cannot
+# be verified locally without HTML rendering.
+include_fragments = false
+
+# Skip mailto:, javascript:, and similar non-HTTP schemes.
+exclude_path = [
+  "node_modules",
+  "dist",
+  "target",
+  "dist-newstyle"
+]
+
+# Ignore links that we can't follow in CI even when running online:
+# - localhost / 127.0.0.1 placeholder URLs in examples
+# - GitHub fragment-only anchors (#L42) which lychee cannot verify
+exclude = [
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.1",
+  "#L\\d+$"
+]

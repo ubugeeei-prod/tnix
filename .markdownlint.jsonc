@@ -1,0 +1,38 @@
+{
+  // markdownlint configuration for tnix.
+  //
+  // Tuned so the existing docs / README / CHANGELOG corpus passes today and
+  // future contributions stay consistent. Adjust by widening or tightening
+  // individual rules in a focused PR — please do not blanket-disable rules.
+  "default": true,
+
+  // Allow longer lines: the existing docs use natural prose wrapping rather
+  // than hard wraps at 80 columns.
+  "MD013": false,
+
+  // Allow inline HTML for the small number of <details>/<sub>-style blocks
+  // we use for collapsible content and badges.
+  "MD033": false,
+
+  // Allow duplicate headings under different parent sections (CHANGELOG-style
+  // "Added/Changed/Fixed" blocks).
+  "MD024": {
+    "siblings_only": true
+  },
+
+  // CHANGELOG entries start with a top-level "# Changelog" then "## <version>"
+  // headings; that pattern is intentional and should not be flagged.
+  "MD025": {
+    "front_matter_title": ""
+  },
+
+  // Allow bare URLs in CHANGELOG-style entries and security notes.
+  "MD034": false,
+
+  // Allow no language tag inside terminal-output fenced blocks where there is
+  // no canonical highlighter.
+  "MD040": false,
+
+  // First line need not be a level-1 heading (some docs lead with a callout).
+  "MD041": false
+}
