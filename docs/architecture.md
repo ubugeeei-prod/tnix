@@ -22,6 +22,19 @@ Haskell is the core implementation language. Editor integrations stay thin and a
   - go to definition
   - declaration lookup
 
+  Internally split into focused modules. `Session.hs` is now a thin
+  request-dispatcher layer; the heavy lifting lives in:
+
+  - `AnalysisCache` — content-keyed memoization of driver runs
+  - `SessionTypes` — shared records (Documents, IndexedSymbol, etc.)
+  - `SessionDocuments` — didOpen/didChange/didClose + workspace loader
+  - `SessionWorkspace` — workspace traversal and marker discovery
+  - `SessionSymbols` — document / workspace symbol index
+  - `SessionReferences` — definition / references / rename resolution
+  - `SessionText` — pure span / boundary helpers
+  - `SessionDiagnostics` — diagnostic inspection and quick-fix builders
+  - `SessionSemanticTokens` — semantic-tokens provider
+
 ### Editor packages
 
 - `editors/vscode`
