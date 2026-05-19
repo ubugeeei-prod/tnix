@@ -15,6 +15,7 @@ library
   exposed-modules:
       AnalysisCache
     , Server
+    , ServerUri
     , Session
     , SessionDiagnostics
     , SessionDocuments
@@ -102,6 +103,20 @@ test-suite tnix-lsp-session-diagnostics-spec
     , hspec
     , text
     , tnix-core
+    , tnix-lsp
+  default-language: GHC2021
+
+test-suite tnix-lsp-server-uri-spec
+  type: exitcode-stdio-1.0
+  main-is: ServerUri.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      ServerUri
+  build-depends:
+      base >=4.19 && <5
+    , bytestring
+    , hspec
+    , text
     , tnix-lsp
   default-language: GHC2021
 
