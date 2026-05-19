@@ -12,6 +12,8 @@ module Session (
   codeActionsDocument,
   completionDocument,
   definitionDocument,
+  documentHighlightsDocument,
+  documentLinksDocument,
   documentsFromList,
   documentSymbolsDocument,
   foldingRangesDocument,
@@ -44,6 +46,7 @@ import Server (
   asInt,
   asText,
   completionResult,
+  documentHighlight,
   documentPath,
   field,
   findDefinitionRange,
@@ -78,6 +81,7 @@ import SessionDiagnostics
   )
 import SessionFolding (encodeFoldingRanges, foldingRangesFor)
 import SessionInlayHints (encodeInlayHints, inlayHintsFor)
+import SessionLinks (encodeDocumentLinks, findDocumentLinks)
 import SessionSemanticTokens (encodeSemanticTokens, semanticTokensFor)
 import SessionReferences
   ( resolveDefinitionLocation,
@@ -230,6 +234,37 @@ referencesDocument readDocument analyze docs msg = do
             , (foundLine, startChar, endChar) <- symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target)
             ]
 
+{- | Highlight occurrences of the selected symbol inside the active buffer.
+
+Unlike 'referencesDocument', the response is scoped to the current document
+so editors can paint quick same-file occurrences without paying for the
+workspace-wide scan. The symbol resolution itself still goes through the
+shared reference machinery so dotted selections (e.g. @record.foo@) light
+up the same matches we would jump or rename to.
+-}
+documentHighlightsDocument ::
+  (FilePath -> IO (Either String Text)) ->
+  (FilePath -> Text -> IO (Either String Analysis)) ->
+  Documents ->
+  Value ->
+  IO Value
+documentHighlightsDocument readDocument analyze docs msg = do
+  (file, lineNo, charNo, contentResult) <- requestDocument readDocument docs msg
+  case contentResult of
+    Left _ -> pure (toJSON ([] :: [Value]))
+    Right content -> do
+      result <- loadDocumentAnalysis readDocument analyze docs file
+      workspace <- loadWorkspaceDocuments readDocument analyze docs file
+      builtinsFile <- findBuiltinsFile file
+      pure . toJSON $
+        case resolveReferenceTarget file content workspace builtinsFile result lineNo charNo of
+          Nothing -> []
+          Just target ->
+            [ documentHighlight foundLine startChar endChar
+            | (foundLine, startChar, endChar) <-
+                symbolRanges content (referenceTargetNeedle target) (referenceTargetMode target)
+            ]
+
 {- | Produce a workspace edit that renames the selected symbol.
 
 The rename strategy mirrors 'referencesDocument': plain local names stay in
@@ -357,6 +392,28 @@ foldingRangesDocument readDocument docs msg = do
   pure $ case contentResult of
     Left _ -> toJSON ([] :: [Value])
     Right content -> toJSON (encodeFoldingRanges (foldingRangesFor content))
+
+{- | Surface every @import@ / @declare@ target inside the document as a
+clickable LSP DocumentLink.
+
+The scan is text-driven (see 'SessionLinks.findDocumentLinks') and
+resolves relative paths against the source file's directory so editors
+can jump straight to the referenced @.nix@ / @.tnix@ / @.d.tnix@ file.
+-}
+documentLinksDocument ::
+  (FilePath -> IO (Either String Text)) ->
+  Documents ->
+  Value ->
+  IO Value
+documentLinksDocument readDocument docs msg = do
+  let textDocument = field "params" msg >>= field "textDocument"
+      file = maybe "" (normalise . uriPath) (textDocument >>= field "uri" >>= asText)
+  contentResult <- loadDocumentContent readDocument docs file
+  pure $ case contentResult of
+    Left _ -> toJSON ([] :: [Value])
+    Right content ->
+      let baseDir = takeDirectory file
+       in toJSON (encodeDocumentLinks baseDir (findDocumentLinks content))
 
 {- | Surface inferred-type inlay hints for unannotated top-level @let@
 bindings.

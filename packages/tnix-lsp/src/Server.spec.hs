@@ -39,6 +39,8 @@ spec = do
                 , "documentSymbolProvider" .= True
                 , "workspaceSymbolProvider" .= True
                 , "codeActionProvider" .= True
+                , "documentHighlightProvider" .= True
+                , "documentLinkProvider" .= object ["resolveProvider" .= False]
                 , "foldingRangeProvider" .= True
                 , "inlayHintProvider" .= object ["resolveProvider" .= False]
                 , "semanticTokensProvider"

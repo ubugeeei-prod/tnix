@@ -13,6 +13,7 @@ module Server (
   contentLengthFromHeaders,
   contentChanges,
   diag,
+  documentHighlight,
   documentPath,
   field,
   findDefinitionRange,
@@ -89,6 +90,8 @@ clientCapabilities =
           , "documentSymbolProvider" .= True
           , "workspaceSymbolProvider" .= True
           , "codeActionProvider" .= True
+          , "documentHighlightProvider" .= True
+          , "documentLinkProvider" .= object ["resolveProvider" .= False]
           , "foldingRangeProvider" .= True
           , "inlayHintProvider" .= object ["resolveProvider" .= False]
           , "semanticTokensProvider"
@@ -208,6 +211,22 @@ location file lineNo startChar endChar =
           [ "start" .= object ["line" .= lineNo, "character" .= startChar]
           , "end" .= object ["line" .= lineNo, "character" .= endChar]
           ]
+    ]
+
+-- | Build an LSP @DocumentHighlight@ payload for a single in-file range.
+--
+-- We always emit kind 1 (Text); tnix does not distinguish read/write
+-- accesses at the symbol level, and editors fall back to the same
+-- highlight rendering when kind is omitted or set to Text.
+documentHighlight :: Int -> Int -> Int -> Value
+documentHighlight lineNo startChar endChar =
+  object
+    [ "range"
+        .= object
+          [ "start" .= object ["line" .= lineNo, "character" .= startChar]
+          , "end" .= object ["line" .= lineNo, "character" .= endChar]
+          ]
+    , "kind" .= (1 :: Int)
     ]
 
 publishDiagnostics :: FilePath -> Either String Analysis -> Value
