@@ -12,6 +12,7 @@ module Session (
   codeActionsDocument,
   completionDocument,
   definitionDocument,
+  documentHighlightsDocument,
   documentsFromList,
   documentSymbolsDocument,
   foldingRangesDocument,
@@ -43,6 +44,7 @@ import Server (
   asInt,
   asText,
   completionResult,
+  documentHighlight,
   documentPath,
   field,
   findDefinitionRange,
@@ -226,6 +228,37 @@ referencesDocument readDocument analyze docs msg = do
             | doc <- workspaceDocumentsForTarget workspace target
             , let path = workspaceDocumentFile doc
             , (foundLine, startChar, endChar) <- symbolRanges (workspaceDocumentContent doc) (referenceTargetNeedle target) (referenceTargetMode target)
+            ]
+
+{- | Highlight occurrences of the selected symbol inside the active buffer.
+
+Unlike 'referencesDocument', the response is scoped to the current document
+so editors can paint quick same-file occurrences without paying for the
+workspace-wide scan. The symbol resolution itself still goes through the
+shared reference machinery so dotted selections (e.g. @record.foo@) light
+up the same matches we would jump or rename to.
+-}
+documentHighlightsDocument ::
+  (FilePath -> IO (Either String Text)) ->
+  (FilePath -> Text -> IO (Either String Analysis)) ->
+  Documents ->
+  Value ->
+  IO Value
+documentHighlightsDocument readDocument analyze docs msg = do
+  (file, lineNo, charNo, contentResult) <- requestDocument readDocument docs msg
+  case contentResult of
+    Left _ -> pure (toJSON ([] :: [Value]))
+    Right content -> do
+      result <- loadDocumentAnalysis readDocument analyze docs file
+      workspace <- loadWorkspaceDocuments readDocument analyze docs file
+      builtinsFile <- findBuiltinsFile file
+      pure . toJSON $
+        case resolveReferenceTarget file content workspace builtinsFile result lineNo charNo of
+          Nothing -> []
+          Just target ->
+            [ documentHighlight foundLine startChar endChar
+            | (foundLine, startChar, endChar) <-
+                symbolRanges content (referenceTargetNeedle target) (referenceTargetMode target)
             ]
 
 {- | Produce a workspace edit that renames the selected symbol.

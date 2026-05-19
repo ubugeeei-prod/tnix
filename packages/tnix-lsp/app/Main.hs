@@ -113,6 +113,7 @@ handle ref analyze msg = case field "method" msg >>= asText of
   Just "textDocument/definition" -> definition ref analyze msg >>= respond stdout msg
   Just "textDocument/declaration" -> definition ref analyze msg >>= respond stdout msg
   Just "textDocument/references" -> references ref analyze msg >>= respond stdout msg
+  Just "textDocument/documentHighlight" -> documentHighlights ref analyze msg >>= respond stdout msg
   Just "textDocument/rename" -> rename ref analyze msg >>= respond stdout msg
   Just "textDocument/documentSymbol" -> documentSymbols ref analyze msg >>= respond stdout msg
   Just "workspace/symbol" -> workspaceSymbols ref analyze msg >>= respond stdout msg
@@ -169,6 +170,11 @@ references :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
 references ref analyze msg = do
   docs <- readIORef ref
   Session.referencesDocument readFileSafe analyze docs msg
+
+documentHighlights :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+documentHighlights ref analyze msg = do
+  docs <- readIORef ref
+  Session.documentHighlightsDocument readFileSafe analyze docs msg
 
 rename :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
 rename ref analyze msg = do
