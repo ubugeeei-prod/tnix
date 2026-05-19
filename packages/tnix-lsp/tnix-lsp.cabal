@@ -20,6 +20,7 @@ library
     , Session
     , SessionDiagnostics
     , SessionDocuments
+    , SessionFolding
     , SessionReferences
     , SessionSemanticTokens
     , SessionSymbols
@@ -148,6 +149,20 @@ test-suite tnix-lsp-session-workspace-spec
     , tnix-lsp
   default-language: GHC2021
 
+test-suite tnix-lsp-session-folding-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionFolding.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      SessionFolding
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , hspec
+    , text
+    , tnix-lsp
+  default-language: GHC2021
+
 test-suite tnix-lsp-session-spec
   type: exitcode-stdio-1.0
   main-is: Session.spec.hs
@@ -156,6 +171,7 @@ test-suite tnix-lsp-session-spec
       Session
     , SessionDiagnostics
     , SessionDocuments
+    , SessionFolding
     , SessionReferences
     , SessionSemanticTokens
     , SessionSymbols
