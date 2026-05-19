@@ -120,6 +120,7 @@ handle ref analyze msg = case field "method" msg >>= asText of
   Just "textDocument/codeAction" -> codeActions ref analyze msg >>= respond stdout msg
   Just "textDocument/semanticTokens/full" -> semanticTokens ref analyze msg >>= respond stdout msg
   Just "textDocument/foldingRange" -> foldingRanges ref msg >>= respond stdout msg
+  Just "textDocument/documentLink" -> documentLinks ref msg >>= respond stdout msg
   _ -> pure ()
 
 -- | Update the in-memory copy of a document and re-run analysis.
@@ -205,6 +206,11 @@ foldingRanges :: IORef Session.Documents -> Value -> IO Value
 foldingRanges ref msg = do
   docs <- readIORef ref
   Session.foldingRangesDocument readFileSafe docs msg
+
+documentLinks :: IORef Session.Documents -> Value -> IO Value
+documentLinks ref msg = do
+  docs <- readIORef ref
+  Session.documentLinksDocument readFileSafe docs msg
 
 readFileSafe :: FilePath -> IO (Either String Text)
 readFileSafe file = do

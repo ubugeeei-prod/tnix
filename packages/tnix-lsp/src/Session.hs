@@ -13,6 +13,7 @@ module Session (
   completionDocument,
   definitionDocument,
   documentHighlightsDocument,
+  documentLinksDocument,
   documentsFromList,
   documentSymbolsDocument,
   foldingRangesDocument,
@@ -78,6 +79,7 @@ import SessionDiagnostics
     workspaceEdit,
   )
 import SessionFolding (encodeFoldingRanges, foldingRangesFor)
+import SessionLinks (encodeDocumentLinks, findDocumentLinks)
 import SessionSemanticTokens (encodeSemanticTokens, semanticTokensFor)
 import SessionReferences
   ( resolveDefinitionLocation,
@@ -388,6 +390,28 @@ foldingRangesDocument readDocument docs msg = do
   pure $ case contentResult of
     Left _ -> toJSON ([] :: [Value])
     Right content -> toJSON (encodeFoldingRanges (foldingRangesFor content))
+
+{- | Surface every @import@ / @declare@ target inside the document as a
+clickable LSP DocumentLink.
+
+The scan is text-driven (see 'SessionLinks.findDocumentLinks') and
+resolves relative paths against the source file's directory so editors
+can jump straight to the referenced @.nix@ / @.tnix@ / @.d.tnix@ file.
+-}
+documentLinksDocument ::
+  (FilePath -> IO (Either String Text)) ->
+  Documents ->
+  Value ->
+  IO Value
+documentLinksDocument readDocument docs msg = do
+  let textDocument = field "params" msg >>= field "textDocument"
+      file = maybe "" (normalise . uriPath) (textDocument >>= field "uri" >>= asText)
+  contentResult <- loadDocumentContent readDocument docs file
+  pure $ case contentResult of
+    Left _ -> toJSON ([] :: [Value])
+    Right content ->
+      let baseDir = takeDirectory file
+       in toJSON (encodeDocumentLinks baseDir (findDocumentLinks content))
 
 -- | Return LSP semantic tokens for one document.
 semanticTokensDocument ::

@@ -40,6 +40,7 @@ spec = do
                 , "workspaceSymbolProvider" .= True
                 , "codeActionProvider" .= True
                 , "documentHighlightProvider" .= True
+                , "documentLinkProvider" .= object ["resolveProvider" .= False]
                 , "foldingRangeProvider" .= True
                 , "semanticTokensProvider"
                     .= object
