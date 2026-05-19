@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Stable diagnostic-code system: every parser, kind-checker, type-checker, and driver error is now tagged with a `[TPxxxx]` / `[TKxxxx]` / `[TCxxxx]` / `[TDxxxx]` prefix, catalogued in [`docs/diagnostics.md`](./docs/diagnostics.md).
+- Full EBNF grammar reference in [`docs/grammar.md`](./docs/grammar.md), cross-checked against the parser sources.
+- Project governance documentation in [`GOVERNANCE.md`](./GOVERNANCE.md) and platform-support tiers in [`docs/support-matrix.md`](./docs/support-matrix.md).
+- Structured parser errors via `Parser.parseProgramDetailed` returning a `ParseError` with 1-based `(line, column, message)` so editors can attach diagnostics to the exact span.
+- Workspace-wide analysis cache (`AnalysisCache`) that memoizes driver results by `(path, content)` with bounded FIFO eviction; cached entries are reused across `workspace/symbol`, `definition`, `references`, and `hover` requests.
+- VS Code extension surfaces LSP startup failures and exposes a `tnix.restartServer` command plus a status bar indicator (running / starting / error / stopped).
+- CycloneDX SBOMs published alongside every tagged release archive (`*-linux-x64.cdx.json`, `*-macos-arm64.cdx.json`, `tnix-vscode-*.cdx.json`) and attested with `actions/attest`.
+- Release smoke step now exercises packaged `tnix` against the in-tree `examples/` and `dogfood/` corpora and drives a minimal JSON-RPC handshake against packaged `tnix-lsp`.
+
+### Changed
+
+- `Session.hs` (1191 LOC) split into eight focused modules (`SessionTypes`, `SessionWorkspace`, `SessionText`, `SessionSymbols`, `SessionReferences`, `SessionDocuments`, `SessionSemanticTokens`, `SessionDiagnostics`) — Session.hs is now ~397 LOC of handler dispatchers.
+- Diagnostics are rendered through `Pretty` instead of `show`, so type / kind errors show surface syntax instead of internal AST constructors.
+- Every previously invariant-guarded partial function in `tnix-core` (`Map.!`, `foldl1`, `foldr1`) is replaced with a total form.
+- `tnix init` / `tnix scaffold` write scaffolded files via atomic tmp + rename so a crash mid-write cannot leave a half-populated `.tnix` / `.d.tnix` on disk.
+
+### Fixed
+
+- `tnix check-project` no longer hangs on directory symlink loops; the walker is cycle-safe and depth-bounded.
+- LSP-side `didSave` notifications are now handled instead of dropped, and JSON-RPC framing errors are logged.
+- `pnpm --filter tnix fmt` is no longer broken by including `.vscodeignore` (which has no prettier parser).
+
+### CI / Tooling
+
+- New `Lint (formatters)` CI job that runs prettier on the VS Code extension and `cargo fmt --check` on the Zed extension.
+- New `Docs` CI workflow that runs `markdownlint-cli2` and `lycheeverse/lychee-action` (offline) on every `.md` change.
+- Dependabot configuration covers GitHub Actions, the VS Code extension (npm), and the Zed extension (cargo).
+- `.github/CODEOWNERS` routes review requests automatically.
+- TypeScript bumped to 6.x; prettier to 3.8.3; `@vscode/vsce` to 3.9.1.
+
+### Tests
+
+- New unit suites for `Alias`, `Emit`, `AnalysisCache`, `SessionText`, `SessionWorkspace`, and `SessionDiagnostics` — `cabal test all` now runs 16 suites.
+
 ## v0.4.0 - 2026-05-18
 
 - Harden GitHub Actions with pinned third-party actions, least-privilege
