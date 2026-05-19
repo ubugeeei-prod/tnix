@@ -12,6 +12,7 @@
 - VS Code extension surfaces LSP startup failures and exposes a `tnix.restartServer` command plus a status bar indicator (running / starting / error / stopped).
 - CycloneDX SBOMs published alongside every tagged release archive (`*-linux-x64.cdx.json`, `*-macos-arm64.cdx.json`, `tnix-vscode-*.cdx.json`) and attested with `actions/attest`.
 - Release smoke step now exercises packaged `tnix` against the in-tree `examples/` and `dogfood/` corpora and drives a minimal JSON-RPC handshake against packaged `tnix-lsp`.
+- LSP folding-range provider (`textDocument/foldingRange`) that folds `let-in` blocks, attribute sets, list and parenthesised literals, multi-line indented strings, and runs of consecutive `#` comment lines. The scan is text-driven, so it keeps producing useful folds even when the buffer has type errors. Covered by `tnix-lsp-session-folding-spec`.
 
 ### Changed
 
