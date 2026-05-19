@@ -39,6 +39,7 @@ spec = do
                 , "documentSymbolProvider" .= True
                 , "workspaceSymbolProvider" .= True
                 , "codeActionProvider" .= True
+                , "documentLinkProvider" .= object ["resolveProvider" .= False]
                 , "semanticTokensProvider"
                     .= object
                       [ "legend"
