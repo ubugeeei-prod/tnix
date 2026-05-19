@@ -12,6 +12,7 @@
 - VS Code extension surfaces LSP startup failures and exposes a `tnix.restartServer` command plus a status bar indicator (running / starting / error / stopped).
 - CycloneDX SBOMs published alongside every tagged release archive (`*-linux-x64.cdx.json`, `*-macos-arm64.cdx.json`, `tnix-vscode-*.cdx.json`) and attested with `actions/attest`.
 - Release smoke step now exercises packaged `tnix` against the in-tree `examples/` and `dogfood/` corpora and drives a minimal JSON-RPC handshake against packaged `tnix-lsp`.
+- LSP inlay-hint provider (`textDocument/inlayHint`) that surfaces inferred `:: Scheme` annotations next to top-level `let` bindings whose author has not written an explicit signature. Pretty-printed through the shared `renderScheme`, so the displayed text matches hover. Covered by `tnix-lsp-session-inlay-hints-spec`.
 
 ### Changed
 

@@ -15,6 +15,7 @@ module Session (
   documentsFromList,
   documentSymbolsDocument,
   hoverDocument,
+  inlayHintsDocument,
   lookupDocumentText,
   referencesDocument,
   renameDocument,
@@ -74,6 +75,7 @@ import SessionDiagnostics
     textEdit,
     workspaceEdit,
   )
+import SessionInlayHints (encodeInlayHints, inlayHintsFor)
 import SessionSemanticTokens (encodeSemanticTokens, semanticTokensFor)
 import SessionReferences
   ( resolveDefinitionLocation,
@@ -335,6 +337,29 @@ codeActionsDocument readDocument analyze docs msg = do
               )
               diagnostics
       pure (toJSON actions)
+
+{- | Surface inferred-type inlay hints for unannotated top-level @let@
+bindings.
+
+The hint position is the UTF-16 column right after the bound name, and
+the label is @:: Scheme@ rendered through the shared 'Pretty' helpers
+so editors render the same text the hover already shows.
+-}
+inlayHintsDocument ::
+  (FilePath -> IO (Either String Text)) ->
+  (FilePath -> Text -> IO (Either String Analysis)) ->
+  Documents ->
+  Value ->
+  IO Value
+inlayHintsDocument readDocument analyze docs msg = do
+  let textDocument = field "params" msg >>= field "textDocument"
+      file = maybe "" (normalise . uriPath) (textDocument >>= field "uri" >>= asText)
+  contentResult <- loadDocumentContent readDocument docs file
+  case contentResult of
+    Left _ -> pure (toJSON ([] :: [Value]))
+    Right content -> do
+      result <- loadDocumentAnalysis readDocument analyze docs file
+      pure (toJSON (encodeInlayHints (inlayHintsFor content result)))
 
 -- | Return LSP semantic tokens for one document.
 semanticTokensDocument ::
