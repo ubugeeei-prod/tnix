@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.5.0 - 2026-05-19
+
 ### Added
 
 - Stable diagnostic-code system: every parser, kind-checker, type-checker, and driver error is now tagged with a `[TPxxxx]` / `[TKxxxx]` / `[TCxxxx]` / `[TDxxxx]` prefix, catalogued in [`docs/diagnostics.md`](./docs/diagnostics.md).
