@@ -89,6 +89,7 @@ clientCapabilities =
           , "documentSymbolProvider" .= True
           , "workspaceSymbolProvider" .= True
           , "codeActionProvider" .= True
+          , "foldingRangeProvider" .= True
           , "inlayHintProvider" .= object ["resolveProvider" .= False]
           , "semanticTokensProvider"
               .= object
