@@ -154,6 +154,22 @@ spec = do
       references <- referencesDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (definitionMessage "/tmp/main.tnix" 2 6)
       referenceLocations references `shouldBe` [("/tmp/main.tnix", 1, 16, 21), ("/tmp/main.tnix", 2, 3, 8)]
 
+  describe "documentHighlightsDocument" $ do
+    it "highlights every occurrence of the selected local binding" $ do
+      let content = Text.unlines ["let", "  value = 1;", "in value value"]
+      highlights <- documentHighlightsDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (definitionMessage "/tmp/main.tnix" 2 6)
+      documentHighlightRanges highlights `shouldBe` [(1, 2, 7, 1), (2, 3, 8, 1), (2, 9, 14, 1)]
+
+    it "returns an empty list when the cursor lands on whitespace" $ do
+      let content = Text.unlines ["let", "  value = 1;", "in value"]
+      highlights <- documentHighlightsDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (definitionMessage "/tmp/main.tnix" 1 0)
+      documentHighlightRanges highlights `shouldBe` []
+
+    it "returns UTF-16 highlight ranges after non-BMP text" $ do
+      let content = Text.unlines ["let", "  label = \"\x1f600\"; value = 1;", "in value"]
+      highlights <- documentHighlightsDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", content)]) (definitionMessage "/tmp/main.tnix" 2 6)
+      documentHighlightRanges highlights `shouldBe` [(1, 16, 21, 1), (2, 3, 8, 1)]
+
   describe "renameDocument" $
     it "builds workspace edits for local references" $ do
       let content = Text.unlines ["let", "  value = 1;", "in value"]
@@ -485,6 +501,24 @@ referenceLocations :: Value -> [(FilePath, Int, Int, Int)]
 referenceLocations value =
   case value of
     Array items -> mapMaybe definitionLocation (toList items)
+    _ -> []
+
+documentHighlightRanges :: Value -> [(Int, Int, Int, Int)]
+documentHighlightRanges value =
+  case value of
+    Array items ->
+      [ (floor lineNo, floor startChar, floor endChar, floor kind)
+      | Object item <- toList items
+      , Just (Object range) <- [KeyMap.lookup "range" item]
+      , Just (Object start) <- [KeyMap.lookup "start" range]
+      , Just (Object ending) <- [KeyMap.lookup "end" range]
+      , Just (Number lineNo) <- [KeyMap.lookup "line" start]
+      , Just (Number startChar) <- [KeyMap.lookup "character" start]
+      , Just (Number endChar) <- [KeyMap.lookup "character" ending]
+      , let kind = case KeyMap.lookup "kind" item of
+              Just (Number n) -> n
+              _ -> 1
+      ]
     _ -> []
 
 renameEdits :: Value -> [(FilePath, [(Int, Int, Int, Text)])]
