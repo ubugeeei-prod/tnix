@@ -93,6 +93,7 @@ clientCapabilities =
           , "documentHighlightProvider" .= True
           , "documentLinkProvider" .= object ["resolveProvider" .= False]
           , "foldingRangeProvider" .= True
+          , "inlayHintProvider" .= object ["resolveProvider" .= False]
           , "semanticTokensProvider"
               .= object
                 [ "legend"

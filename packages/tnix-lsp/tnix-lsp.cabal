@@ -21,6 +21,7 @@ library
     , SessionDiagnostics
     , SessionDocuments
     , SessionFolding
+    , SessionInlayHints
     , SessionLinks
     , SessionReferences
     , SessionSemanticTokens
@@ -184,6 +185,26 @@ test-suite tnix-lsp-session-links-spec
     , tnix-lsp
   default-language: GHC2021
 
+test-suite tnix-lsp-session-inlay-hints-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionInlayHints.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      SessionInlayHints
+    , Server
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tnix-core
+    , tnix-lsp
+  default-language: GHC2021
+
 test-suite tnix-lsp-session-spec
   type: exitcode-stdio-1.0
   main-is: Session.spec.hs
@@ -193,6 +214,7 @@ test-suite tnix-lsp-session-spec
     , SessionDiagnostics
     , SessionDocuments
     , SessionFolding
+    , SessionInlayHints
     , SessionLinks
     , SessionReferences
     , SessionSemanticTokens

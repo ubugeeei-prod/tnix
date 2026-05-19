@@ -121,6 +121,7 @@ handle ref analyze msg = case field "method" msg >>= asText of
   Just "textDocument/semanticTokens/full" -> semanticTokens ref analyze msg >>= respond stdout msg
   Just "textDocument/foldingRange" -> foldingRanges ref msg >>= respond stdout msg
   Just "textDocument/documentLink" -> documentLinks ref msg >>= respond stdout msg
+  Just "textDocument/inlayHint" -> inlayHints ref analyze msg >>= respond stdout msg
   _ -> pure ()
 
 -- | Update the in-memory copy of a document and re-run analysis.
@@ -211,6 +212,11 @@ documentLinks :: IORef Session.Documents -> Value -> IO Value
 documentLinks ref msg = do
   docs <- readIORef ref
   Session.documentLinksDocument readFileSafe docs msg
+
+inlayHints :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+inlayHints ref analyze msg = do
+  docs <- readIORef ref
+  Session.inlayHintsDocument readFileSafe analyze docs msg
 
 readFileSafe :: FilePath -> IO (Either String Text)
 readFileSafe file = do

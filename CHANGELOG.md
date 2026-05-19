@@ -15,6 +15,7 @@
 - LSP folding-range provider (`textDocument/foldingRange`) that folds `let-in` blocks, attribute sets, list and parenthesised literals, multi-line indented strings, and runs of consecutive `#` comment lines. The scan is text-driven, so it keeps producing useful folds even when the buffer has type errors. Covered by `tnix-lsp-session-folding-spec`.
 - LSP document-highlight provider (`textDocument/documentHighlight`) that paints every occurrence of the identifier under the cursor inside the active buffer. Symbol resolution goes through the same machinery as `references` and `rename`, so dotted selections light up the same matches editors would jump or rebind to.
 - LSP document-link provider (`textDocument/documentLink`) that turns every `import ./path` path literal and `declare "./path"` string literal into a clickable link. Relative paths are resolved against the source file's directory. The scan is text-driven so it keeps producing links even when the buffer fails to type-check. Covered by `tnix-lsp-session-links-spec`.
+- LSP inlay-hint provider (`textDocument/inlayHint`) that surfaces inferred `:: Scheme` annotations next to top-level `let` bindings whose author has not written an explicit signature. Pretty-printed through the shared `renderScheme`, so the displayed text matches hover. Covered by `tnix-lsp-session-inlay-hints-spec`.
 
 ### Changed
 
