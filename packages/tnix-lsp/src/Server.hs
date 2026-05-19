@@ -44,18 +44,17 @@ import Data.Aeson.KeyMap qualified as KeyMap
 import Data.ByteString qualified as BS
 import Data.ByteString.Char8 qualified as B8
 import Data.ByteString.Lazy qualified as LBS
-import Data.Char (digitToInt, isAsciiLower, isAsciiUpper, isDigit, isHexDigit, toLower, toUpper)
+import Data.Char (toLower)
 import Data.Foldable (toList)
 import Data.List (nub, sortOn, stripPrefix)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Text.Encoding qualified as TextEncoding
 import Data.Text.Read qualified as TextRead
 import Driver (Analysis (..), lookupSymbolType)
-import Numeric (showHex)
 import Pretty (renderScheme)
+import ServerUri (pathUri, uriPath)
 import Subtyping (lookupRecordField, resolveType)
 import System.IO (Handle, hFlush, hIsEOF)
 import Type (Multiplicity (..), Name, Scheme (..), Type (..), TypeAlias, schemeFromAnnotation, tDynamic, tPath)
@@ -556,11 +555,7 @@ wordAt lineNo charNo content =
   takeWordEnd = T.reverse . T.takeWhile ok . T.reverse
   takeWordStart = T.takeWhile ok
 
-pathUri :: FilePath -> Text
-pathUri file = "file://" <> percentEncode (T.pack file)
-
-uriPath :: Text -> FilePath
-uriPath text = T.unpack (percentDecode (stripAuthority (fromMaybe text (T.stripPrefix "file://" text))))
+-- pathUri / uriPath live in 'ServerUri'; re-imported below.
 
 documentPath :: Maybe Value -> Maybe FilePath
 documentPath params = do
@@ -664,31 +659,4 @@ readHeaders handle = go []
       then pure (reverse acc)
       else go (trimmed : acc)
 
-percentEncode :: Text -> Text
-percentEncode =
-  T.concatMap encodeChar
- where
-  encodeChar char
-    | isUnreserved char || char == '/' = T.singleton char
-    | otherwise = T.concat (map encodeByte (BS.unpack (TextEncoding.encodeUtf8 (T.singleton char))))
-  encodeByte byte =
-    let hex = showHex byte ""
-     in T.pack ['%', toUpper (pad hex !! 0), toUpper (pad hex !! 1)]
-  pad [digit] = ['0', digit]
-  pad digits = digits
-  isUnreserved char = isAsciiLower char || isAsciiUpper char || isDigit char || char `elem` ['-', '.', '_', '~']
-
-percentDecode :: Text -> Text
-percentDecode text =
-  case TextEncoding.decodeUtf8' (BS.pack (decodeBytes (T.unpack text))) of
-    Left _ -> text
-    Right decoded -> decoded
- where
-  decodeBytes ('%' : a : b : rest)
-    | isHexDigit a && isHexDigit b = fromIntegral (digitToInt a * 16 + digitToInt b) : decodeBytes rest
-  decodeBytes (char : rest) = BS.unpack (TextEncoding.encodeUtf8 (T.singleton char)) <> decodeBytes rest
-  decodeBytes [] = []
-
-stripAuthority :: Text -> Text
-stripAuthority path =
-  fromMaybe path (T.stripPrefix "localhost" path)
+-- percentEncode / percentDecode / stripAuthority live in 'ServerUri'.
