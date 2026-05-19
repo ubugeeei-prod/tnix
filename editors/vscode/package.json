@@ -1,6 +1,6 @@
 {
   "name": "tnix",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "ubugeeei",
   "displayName": "tnix",
   "description": "Gradual typing support for Nix via tnix-lsp.",
