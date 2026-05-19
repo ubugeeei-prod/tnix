@@ -15,6 +15,7 @@ module Session (
   documentHighlightsDocument,
   documentsFromList,
   documentSymbolsDocument,
+  foldingRangesDocument,
   hoverDocument,
   lookupDocumentText,
   referencesDocument,
@@ -76,6 +77,7 @@ import SessionDiagnostics
     textEdit,
     workspaceEdit,
   )
+import SessionFolding (encodeFoldingRanges, foldingRangesFor)
 import SessionSemanticTokens (encodeSemanticTokens, semanticTokensFor)
 import SessionReferences
   ( resolveDefinitionLocation,
@@ -368,6 +370,24 @@ codeActionsDocument readDocument analyze docs msg = do
               )
               diagnostics
       pure (toJSON actions)
+
+{- | Return LSP folding ranges for one document.
+
+The provider is text-driven so it keeps emitting folds even when the buffer
+has type errors or fails to parse cleanly.
+-}
+foldingRangesDocument ::
+  (FilePath -> IO (Either String Text)) ->
+  Documents ->
+  Value ->
+  IO Value
+foldingRangesDocument readDocument docs msg = do
+  let textDocument = field "params" msg >>= field "textDocument"
+      file = maybe "" (normalise . uriPath) (textDocument >>= field "uri" >>= asText)
+  contentResult <- loadDocumentContent readDocument docs file
+  pure $ case contentResult of
+    Left _ -> toJSON ([] :: [Value])
+    Right content -> toJSON (encodeFoldingRanges (foldingRangesFor content))
 
 -- | Return LSP semantic tokens for one document.
 semanticTokensDocument ::

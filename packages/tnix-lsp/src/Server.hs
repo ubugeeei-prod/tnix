@@ -91,6 +91,7 @@ clientCapabilities =
           , "workspaceSymbolProvider" .= True
           , "codeActionProvider" .= True
           , "documentHighlightProvider" .= True
+          , "foldingRangeProvider" .= True
           , "semanticTokensProvider"
               .= object
                 [ "legend"
