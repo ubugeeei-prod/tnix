@@ -34,6 +34,7 @@ Haskell is the core implementation language. Editor integrations stay thin and a
   - `SessionText` — pure span / boundary helpers
   - `SessionDiagnostics` — diagnostic inspection and quick-fix builders
   - `SessionSemanticTokens` — semantic-tokens provider
+  - `SessionFolding` — folding-range provider
   - `SessionLinks` — document-link provider
 
 ### Editor packages
