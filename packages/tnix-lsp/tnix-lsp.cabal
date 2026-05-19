@@ -88,6 +88,23 @@ test-suite tnix-lsp-analysis-cache-spec
     , tnix-lsp
   default-language: GHC2021
 
+test-suite tnix-lsp-session-diagnostics-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionDiagnostics.spec.hs
+  hs-source-dirs: src
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tnix-core
+    , tnix-lsp
+  default-language: GHC2021
+
 test-suite tnix-lsp-session-text-spec
   type: exitcode-stdio-1.0
   main-is: SessionText.spec.hs
