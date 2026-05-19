@@ -23,7 +23,8 @@ import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
 import Driver (Analysis (..), analyzeText)
 import Paths_tnix_lsp qualified as PackageInfo
-import Server (ReadOutcome (..), asText, clearDiagnostics, clientCapabilities, field, notify, publishDiagnostics, publishDiagnosticsWithContent, readMessageOutcome, respond)
+import Server (asText, clearDiagnostics, clientCapabilities, field, publishDiagnostics, publishDiagnosticsWithContent, respond)
+import ServerProtocol (ReadOutcome (..), notify, readMessageOutcome)
 import Session qualified
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)

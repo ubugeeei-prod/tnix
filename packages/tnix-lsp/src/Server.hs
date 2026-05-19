@@ -41,12 +41,8 @@ import Control.Monad (foldM)
 import Data.Aeson
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
-import Data.ByteString qualified as BS
-import Data.ByteString.Char8 qualified as B8
-import Data.ByteString.Lazy qualified as LBS
-import Data.Char (toLower)
 import Data.Foldable (toList)
-import Data.List (nub, sortOn, stripPrefix)
+import Data.List (nub, sortOn)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
@@ -54,9 +50,17 @@ import Data.Text qualified as T
 import Data.Text.Read qualified as TextRead
 import Driver (Analysis (..), lookupSymbolType)
 import Pretty (renderScheme)
+import ServerProtocol
+  ( ReadOutcome (..),
+    contentLengthFromHeaders,
+    notify,
+    readMessage,
+    readMessageOutcome,
+    send,
+  )
 import ServerUri (pathUri, uriPath)
 import Subtyping (lookupRecordField, resolveType)
-import System.IO (Handle, hFlush, hIsEOF)
+import System.IO (Handle)
 import Type (Multiplicity (..), Name, Scheme (..), Type (..), TypeAlias, schemeFromAnnotation, tDynamic, tPath)
 
 field :: Text -> Value -> Maybe Value
@@ -566,97 +570,15 @@ documentPath params = do
 clearDiagnostics :: FilePath -> Value
 clearDiagnostics file = object ["uri" .= pathUri file, "diagnostics" .= ([] :: [Value])]
 
-contentLengthFromHeaders :: [BS.ByteString] -> Maybe Int
-contentLengthFromHeaders headers =
-  listToMaybe $
-    mapMaybe parseHeader headers
- where
-  parseHeader header = do
-    value <- stripPrefixCI "content-length:" (B8.unpack header)
-    case reads (dropWhile (== ' ') value) of
-      [(len, "")] -> Just len
-      _ -> Nothing
-  stripPrefixCI needle haystack =
-    stripPrefix (map toLower needle) (map toLower haystack)
+-- JSON-RPC framing primitives (ReadOutcome, readMessageOutcome,
+-- readMessage, readHeaders, contentLengthFromHeaders, send, notify) live
+-- in 'ServerProtocol'.
 
--- | Result of attempting to read one JSON-RPC framed message from a handle.
-data ReadOutcome
-  = -- | The peer closed the stream cleanly.
-    ReadEof
-  | -- | A well-formed message was decoded.
-    ReadMessage Value
-  | -- | The framing or payload could not be parsed. The text describes the failure
-    --   so callers can log it without blowing up the event loop.
-    ReadError Text
-
--- | Read one JSON-RPC framed message, returning a tagged outcome.
---
--- This differentiates clean EOF (no log) from protocol-level decode errors
--- (which should surface on stderr) so the event loop can stay alive on a
--- malformed message instead of silently spinning.
-readMessageOutcome :: Handle -> IO ReadOutcome
-readMessageOutcome handle = do
-  eof <- hIsEOF handle
-  if eof
-    then pure ReadEof
-    else do
-      headers <- readHeaders handle
-      case contentLengthFromHeaders headers of
-        Nothing ->
-          pure (ReadError ("missing or malformed Content-Length header (got " <> renderHeaders headers <> ")"))
-        Just len -> do
-          body <- BS.hGet handle len
-          case decodeStrict' body of
-            Just value -> pure (ReadMessage value)
-            Nothing ->
-              pure
-                ( ReadError
-                    ( "failed to decode JSON-RPC body of "
-                        <> T.pack (show len)
-                        <> " bytes"
-                    )
-                )
- where
-  renderHeaders headers =
-    if null headers
-      then "no headers"
-      else T.intercalate "; " (map (T.pack . B8.unpack) headers)
-
--- | Backwards-compatible wrapper that flattens the outcome into 'Maybe'.
---
--- Treats every non-message outcome as 'Nothing'. New callers should prefer
--- 'readMessageOutcome' so they can log protocol errors.
-readMessage :: Handle -> IO (Maybe Value)
-readMessage handle = do
-  outcome <- readMessageOutcome handle
-  pure $ case outcome of
-    ReadMessage value -> Just value
-    _ -> Nothing
-
-send :: Handle -> Value -> IO ()
-send handle payload = do
-  let body = encode payload
-  B8.hPutStr handle ("Content-Length: " <> B8.pack (show (LBS.length body)) <> "\r\n\r\n")
-  LBS.hPutStr handle body
-  hFlush handle
-
+-- | Send a JSON-RPC response that mirrors the @id@ from the request.
 respond :: Handle -> Value -> Value -> IO ()
 respond handle request result =
   case field "id" request of
     Just ident -> send handle (object ["jsonrpc" .= ("2.0" :: Text), "id" .= ident, "result" .= result])
     Nothing -> pure ()
-
-notify :: Handle -> Text -> Value -> IO ()
-notify handle method params = send handle (object ["jsonrpc" .= ("2.0" :: Text), "method" .= method, "params" .= params])
-
-readHeaders :: Handle -> IO [BS.ByteString]
-readHeaders handle = go []
- where
-  go acc = do
-    line <- B8.hGetLine handle
-    let trimmed = B8.filter (/= '\r') line
-    if BS.null trimmed
-      then pure (reverse acc)
-      else go (trimmed : acc)
 
 -- percentEncode / percentDecode / stripAuthority live in 'ServerUri'.

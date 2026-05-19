@@ -15,6 +15,7 @@ library
   exposed-modules:
       AnalysisCache
     , Server
+    , ServerProtocol
     , ServerUri
     , Session
     , SessionDiagnostics
