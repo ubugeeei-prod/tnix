@@ -11,7 +11,7 @@ The notation is EBNF with these conventions:
 | Form | Meaning |
 | --- | --- |
 | `X Y` | `X` followed by `Y` |
-| `X | Y` | `X` or `Y` |
+| `` X \| Y `` | `X` or `Y` |
 | `X*` | zero or more `X` |
 | `X+` | one or more `X` |
 | `X?` | optional `X` |
@@ -250,7 +250,7 @@ Type-level precedence, from loosest to tightest:
 | 1 | `forall vars. T` | (binds tightest body) |
 | 1 | `T extends P ? A : B` | right |
 | 2 | `A -> B`, `A %1 -> B` | right |
-| 3 | `A | B` (union) | left |
+| 3 | `` A \| B `` (union) | left |
 | 4 | `F X` (type application) | left |
 | 5 | `(T)`, record / type-list / literal atoms | — |
 
