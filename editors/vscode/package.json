@@ -91,7 +91,7 @@
     "@vscode/vsce": "^3.9.1",
     "@types/node": "^25.9.0",
     "@types/vscode": "^1.110.0",
-    "esbuild": "^0.25.3",
+    "esbuild": "^0.28.0",
     "ovsx": "^0.10.12",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3"
