@@ -66,6 +66,16 @@
           "type": "string",
           "default": "",
           "description": "Optional working directory used when starting the tnix language server."
+        },
+        "tnix.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the JSON-RPC communication between VS Code and the tnix language server. Set to 'messages' or 'verbose' to debug the server in the tnix output channel."
         }
       }
     },

@@ -38,6 +38,9 @@ tokens are configured.
   Extra command-line arguments passed to the server.
 - `tnix.server.cwd`
   Optional working directory used to start the server.
+- `tnix.trace.server`
+  `off` (default), `messages`, or `verbose`. Logs the JSON-RPC traffic between
+  VS Code and `tnix-lsp` to the tnix output channel for debugging.
 
 ## Troubleshooting
 
