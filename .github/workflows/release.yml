@@ -129,7 +129,7 @@ jobs:
 
       - name: Generate SBOM for release archive
         id: sbom
-        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec # v0.20.5
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.20.5
         with:
           file: ${{ matrix.archive }}
           format: cyclonedx-json
@@ -205,7 +205,7 @@ jobs:
           nix develop --accept-flake-config --command pnpm --filter tnix exec vsce package --no-dependencies --out "../../tnix-vscode-$REF_NAME.vsix"
 
       - name: Generate SBOM for VS Code extension
-        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec # v0.20.5
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.20.5
         with:
           file: ./tnix-vscode-${{ env.REF_NAME }}.vsix
           format: cyclonedx-json
