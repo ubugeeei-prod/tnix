@@ -83,6 +83,10 @@ spec = describe "analysis" $ do
   it "reports missing fields" $
     analyzeText "main.tnix" "{ value = 1; }.missing" >>= (`expectLeftContaining` "missing field")
 
+  it "rejects applying a concrete non-function value" $ do
+    analyzeText "main.tnix" "1 2" >>= (`expectLeftContaining` "cannot call an integer as a function")
+    analyzeText "main.tnix" "{ x = 1; } 2" >>= (`expectLeftContaining` "cannot call an attribute set as a function")
+
   it "renders diagnostics with surface syntax and no raw AST constructors" $ do
     let assertHumanReadable input needle =
           analyzeText "main.tnix" input >>= \case

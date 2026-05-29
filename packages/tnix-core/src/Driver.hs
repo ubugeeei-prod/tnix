@@ -220,8 +220,8 @@ decodeDeclarationPackField root = \case
     case [expr | AttrField "declarationPacks" expr <- items] of
       [] -> Right []
       [expr] -> decodePathList root "declarationPacks" expr
-      _ -> Left "duplicate config field: declarationPacks"
-  _ -> Left "tnix.config.tnix must evaluate to an attrset"
+      _ -> Left (withCode TD0004ConfigDecodeError "duplicate config field: declarationPacks")
+  _ -> Left (withCode TD0004ConfigDecodeError "tnix.config.tnix must evaluate to an attrset")
 
 decodePathList :: FilePath -> Text -> Expr -> Either String [FilePath]
 decodePathList root label = \case
@@ -386,12 +386,15 @@ mergeAmbientWorlds = fmap snd . foldM step (Map.empty, Map.empty)
       case Map.lookup target sources of
         Just firstSource ->
           Left
-            ( "duplicate ambient declarations for target "
-                <> show target
-                <> " in "
-                <> firstSource
-                <> " and "
-                <> file
+            ( withCode
+                TD0002DuplicateAmbientDeclaration
+                ( "duplicate ambient declarations for target "
+                    <> show target
+                    <> " in "
+                    <> firstSource
+                    <> " and "
+                    <> file
+                )
             )
         Nothing ->
           Right (Map.insert target file sources, Map.insert target scheme ambient)
