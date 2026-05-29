@@ -141,7 +141,7 @@ writeOutput output content =
     Nothing -> TextIO.putStrLn content
     Just path -> do
       createDirectoryIfMissing True (takeDirectory path)
-      TextIO.writeFile path content
+      writeFileAtomic path content
 
 executeProjectCheck :: Maybe FilePath -> OutputFormat -> IO (Either String Text)
 executeProjectCheck target format = do
@@ -410,7 +410,7 @@ jsonText = TextEncoding.decodeUtf8 . LBS.toStrict . encode
 writeTextFile :: FilePath -> Text -> IO ()
 writeTextFile path content = do
   createDirectoryIfMissing True (takeDirectory path)
-  TextIO.writeFile path content
+  writeFileAtomic path content
 
 displaySourcePath :: ProjectConfig -> ProjectSource -> Text
 displaySourcePath config source =
