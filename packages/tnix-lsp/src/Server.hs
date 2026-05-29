@@ -30,6 +30,7 @@ module Server
     readMessage,
     readMessageOutcome,
     respond,
+    respondError,
     send,
     textOffsetToUtf16Column,
     textRangeToUtf16Columns,
@@ -82,7 +83,8 @@ clientCapabilities =
   object
     [ "capabilities"
         .= object
-          [ "hoverProvider" .= True,
+          [ "positionEncoding" .= ("utf-16" :: Text),
+            "hoverProvider" .= True,
             "completionProvider" .= object ["triggerCharacters" .= ["." :: Text]],
             "definitionProvider" .= True,
             "declarationProvider" .= True,
@@ -601,6 +603,25 @@ respond :: Handle -> Value -> Value -> IO ()
 respond handle request result =
   case field "id" request of
     Just ident -> send handle (object ["jsonrpc" .= ("2.0" :: Text), "id" .= ident, "result" .= result])
+    Nothing -> pure ()
+
+-- | Send a JSON-RPC error response mirroring the request @id@.
+--
+-- Requests carry an @id@ and must be answered, so an unknown method or an
+-- internal failure becomes an @error@ object rather than leaving the client
+-- waiting forever. Notifications (no @id@) get no response, per JSON-RPC.
+respondError :: Handle -> Value -> Int -> Text -> IO ()
+respondError handle request code message =
+  case field "id" request of
+    Just ident ->
+      send
+        handle
+        ( object
+            [ "jsonrpc" .= ("2.0" :: Text),
+              "id" .= ident,
+              "error" .= object ["code" .= code, "message" .= message]
+            ]
+        )
     Nothing -> pure ()
 
 -- percentEncode / percentDecode / stripAuthority live in 'ServerUri'.
