@@ -20,7 +20,7 @@ defaults:
 jobs:
   update-flake-lock:
     name: Update flake.lock
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: write

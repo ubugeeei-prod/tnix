@@ -31,7 +31,7 @@ concurrency:
 jobs:
   markdownlint:
     name: Lint markdown
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -54,7 +54,7 @@ jobs:
 
   links:
     name: Check links
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -74,7 +74,7 @@ jobs:
     name: Check links (online)
     # Scheduled / manual only: probes external URLs without blocking PRs.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -92,7 +92,7 @@ jobs:
 
   spelling:
     name: Spell check
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
