@@ -15,6 +15,7 @@ module Project
     projectBuildOutputPath,
     projectDeclarationOutputPath,
     scaffoldProject,
+    writeFileAtomic,
   )
 where
 
