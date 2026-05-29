@@ -29,7 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: blacksmith-4vcpu-ubuntu-2404
             label: linux-x64
             archive: tnix-${{ github.ref_name }}-linux-x64.tar.gz
             sha: tnix-${{ github.ref_name }}-linux-x64.sha256
@@ -159,7 +159,7 @@ jobs:
 
   build-vscode-extension:
     name: Build VS Code Extension
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:
       attestations: write
@@ -232,7 +232,7 @@ jobs:
 
   publish-release:
     name: Publish Release
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     needs:
       - build-assets
@@ -256,7 +256,7 @@ jobs:
 
   publish-vscode-marketplaces:
     name: Publish VS Code Extension
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     needs:
       - build-vscode-extension
