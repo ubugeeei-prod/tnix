@@ -2,6 +2,10 @@ version: 2
 
 # Automated dependency update PRs across the ecosystems used by tnix.
 # Reviews are requested via CODEOWNERS, so reviewers are not duplicated here.
+#
+# The Haskell toolchain and nixpkgs are pinned by the Nix flake, which
+# Dependabot cannot update. That surface is refreshed by the scheduled
+# `.github/workflows/flake-update.yml` workflow (weekly `nix flake update` PR).
 updates:
   - package-ecosystem: github-actions
     directory: /
