@@ -115,12 +115,40 @@ async function verifyChecksumFile(checksumPath: string): Promise<void> {
   }
 }
 
+// Maps the supported release-target labels to the (platform, arch) of a host
+// that can produce them. `cabal list-bin` returns host-native binaries, so the
+// requested target must match the runner or the archive would be mislabeled.
+const TARGET_HOSTS: Record<string, { platform: NodeJS.Platform; arch: string }> = {
+  "linux-x64": { platform: "linux", arch: "x64" },
+  "linux-arm64": { platform: "linux", arch: "arm64" },
+  "macos-arm64": { platform: "darwin", arch: "arm64" },
+  "macos-x64": { platform: "darwin", arch: "x64" },
+};
+
+function assertTargetMatchesHost(target: string): void {
+  const expected = TARGET_HOSTS[target];
+  if (!expected) {
+    throw new Error(
+      `Unknown release target "${target}". Expected one of: ${Object.keys(TARGET_HOSTS).join(", ")}.`,
+    );
+  }
+  if (process.platform !== expected.platform || process.arch !== expected.arch) {
+    throw new Error(
+      `Refusing to build a "${target}" archive on ${process.platform}/${process.arch}: ` +
+        `cabal produces host-native binaries, so this would mislabel the archive. ` +
+        `Run this target on a ${expected.platform}/${expected.arch} host.`,
+    );
+  }
+}
+
 async function packageRelease(
   version: string,
   target: string,
   archiveName: string,
   shaName: string,
 ): Promise<void> {
+  assertTargetMatchesHost(target);
+
   const stageDir = join(tmpdir(), `tnix-release-${process.pid}-${Date.now()}`);
   const releaseDir = join(stageDir, `tnix-${version.replace(/^v/, "")}-${target}`);
 

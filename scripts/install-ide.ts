@@ -57,8 +57,24 @@ function buildZedWasm(): void {
   run("nix", ["shell", "--accept-flake-config", "nixpkgs#rustup", "-c", "bash", "-lc", script]);
 }
 
+// Resolve Zed's per-OS support directory (where installed extensions live).
+function resolveZedSupportDir(): string {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+  switch (process.platform) {
+    case "darwin":
+      return join(home, "Library", "Application Support", "Zed");
+    case "win32":
+      return join(process.env.LOCALAPPDATA ?? join(home, "AppData", "Local"), "Zed");
+    default: {
+      // Linux / other XDG platforms.
+      const dataHome = process.env.XDG_DATA_HOME ?? join(home, ".local", "share");
+      return join(dataHome, "zed");
+    }
+  }
+}
+
 function installZed(): void {
-  const zedSupportDir = join(process.env.HOME ?? "", "Library", "Application Support", "Zed");
+  const zedSupportDir = resolveZedSupportDir();
   const installedDir = join(zedSupportDir, "extensions", "installed");
   const nixGrammarSource = join(installedDir, "nix", "grammars", "nix.wasm");
 

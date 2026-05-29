@@ -11,14 +11,41 @@ const cabalPaths = [
 
 const errors: string[] = [];
 
+// Parse a dotted version into its numeric components, ignoring any
+// pre-release/build suffix. Returns null when no leading numeric version is
+// present.
+function parseVersionComponents(raw: string): number[] | null {
+  const match = raw.trim().match(/^([0-9]+(?:\.[0-9]+)*)/);
+  if (!match) {
+    return null;
+  }
+  return match[1].split(".").map((part) => Number.parseInt(part, 10));
+}
+
+// Compare the first `count` components of two versions (default 3 = the semver
+// major.minor.patch triple), tolerating extra trailing components such as the
+// cabal four-segment form.
+function sameVersionPrefix(left: number[], right: number[], count = 3): boolean {
+  for (let index = 0; index < count; index += 1) {
+    if ((left[index] ?? 0) !== (right[index] ?? 0)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 const rootPackage = JSON.parse(await readFile(rootPackagePath, "utf8")) as { version: string };
 const vscodePackage = JSON.parse(await readFile(vscodePackagePath, "utf8")) as { version: string };
 const changelog = await readFile(changelogPath, "utf8");
 const cabalFiles = await Promise.all(cabalPaths.map((path) => readFile(path, "utf8")));
 
 const workspaceVersion = rootPackage.version;
-const cabalVersion = `${workspaceVersion}.0`;
+const workspaceComponents = parseVersionComponents(workspaceVersion);
 const changelogMatch = changelog.match(/^## v([0-9]+\.[0-9]+\.[0-9]+) - /m);
+
+if (!workspaceComponents) {
+  errors.push(`root package.json version "${workspaceVersion}" is not a parseable version.`);
+}
 
 if (vscodePackage.version !== workspaceVersion) {
   errors.push(
@@ -27,7 +54,7 @@ if (vscodePackage.version !== workspaceVersion) {
 }
 
 for (const [index, content] of cabalFiles.entries()) {
-  const match = content.match(/^version:\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\s*$/m);
+  const match = content.match(/^version:\s*(\S+)\s*$/m);
   const path = cabalPaths[index].pathname;
 
   if (!match) {
@@ -35,8 +62,16 @@ for (const [index, content] of cabalFiles.entries()) {
     continue;
   }
 
-  if (match[1] !== cabalVersion) {
-    errors.push(`${path} version ${match[1]} does not match expected ${cabalVersion}.`);
+  const cabalComponents = parseVersionComponents(match[1]);
+  if (!cabalComponents) {
+    errors.push(`${path} version "${match[1]}" is not a parseable version.`);
+    continue;
+  }
+
+  if (workspaceComponents && !sameVersionPrefix(cabalComponents, workspaceComponents)) {
+    errors.push(
+      `${path} version ${match[1]} does not match the workspace version ${workspaceVersion} (first three components must agree).`,
+    );
   }
 }
 
@@ -55,5 +90,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `Version metadata OK: workspace=${workspaceVersion}, vscode=${vscodePackage.version}, cabal=${cabalVersion}, changelog=${changelogMatch[1]}`,
+  `Version metadata OK: workspace=${workspaceVersion}, vscode=${vscodePackage.version}, cabal matches major.minor.patch, changelog=${changelogMatch[1]}`,
 );
