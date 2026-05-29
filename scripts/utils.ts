@@ -52,21 +52,49 @@ export function tryRun(command: string, args: string[], options: SpawnSyncOption
 
 export function findExecutable(name: string): string | undefined {
   const pathValue = process.env.PATH ?? "";
+  const isWindows = process.platform === "win32";
+
+  // On Windows, executables are resolved by appending one of the PATHEXT
+  // extensions (unless the name already carries one). Elsewhere the name is
+  // used verbatim.
+  const candidateNames = (() => {
+    if (!isWindows) {
+      return [name];
+    }
+    const hasExtension = /\.[^./\\]+$/.test(name);
+    if (hasExtension) {
+      return [name];
+    }
+    const pathext = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+      .split(";")
+      .map((ext) => ext.trim())
+      .filter((ext) => ext.length > 0);
+    return [name, ...pathext.map((ext) => name + ext)];
+  })();
+
   for (const entry of pathValue.split(delimiter)) {
     if (!entry) {
       continue;
     }
 
-    const candidate = join(entry, name);
-    if (!existsSync(candidate)) {
-      continue;
-    }
+    for (const candidateName of candidateNames) {
+      const candidate = join(entry, candidateName);
+      if (!existsSync(candidate)) {
+        continue;
+      }
 
-    try {
-      accessSync(candidate, constants.X_OK);
-      return candidate;
-    } catch {
-      continue;
+      // The execute bit is not meaningful on Windows; existence on PATH is
+      // sufficient there.
+      if (isWindows) {
+        return candidate;
+      }
+
+      try {
+        accessSync(candidate, constants.X_OK);
+        return candidate;
+      } catch {
+        continue;
+      }
     }
   }
 
