@@ -30,7 +30,8 @@ spec = do
         `shouldBe` object
           [ "capabilities"
               .= object
-                [ "hoverProvider" .= True,
+                [ "positionEncoding" .= ("utf-16" :: String),
+                  "hoverProvider" .= True,
                   "completionProvider" .= object ["triggerCharacters" .= ["." :: String]],
                   "definitionProvider" .= True,
                   "declarationProvider" .= True,
@@ -69,6 +70,37 @@ spec = do
                       ]
                 ]
           ]
+
+  describe "respondError" $ do
+    it "answers a request id with a JSON-RPC error object" $
+      withTempHandle $ \handle -> do
+        respondError
+          handle
+          (object ["jsonrpc" .= ("2.0" :: String), "id" .= (7 :: Int), "method" .= ("textDocument/unknown" :: String)])
+          (-32601)
+          "method not found: textDocument/unknown"
+        hSeek handle AbsoluteSeek 0
+        payload <- BS.hGetContents handle
+        let body = BS.drop 4 (snd (BS.breakSubstring "\r\n\r\n" payload))
+        decodeStrict' body
+          `shouldBe` Just
+            ( object
+                [ "jsonrpc" .= ("2.0" :: String),
+                  "id" .= (7 :: Int),
+                  "error" .= object ["code" .= (-32601 :: Int), "message" .= ("method not found: textDocument/unknown" :: String)]
+                ]
+            )
+
+    it "stays silent for a notification with no id" $
+      withTempHandle $ \handle -> do
+        respondError
+          handle
+          (object ["jsonrpc" .= ("2.0" :: String), "method" .= ("$/cancelRequest" :: String)])
+          (-32601)
+          "method not found"
+        hSeek handle AbsoluteSeek 0
+        payload <- BS.hGetContents handle
+        BS.null payload `shouldBe` True
 
   describe "contentLengthFromHeaders" $ do
     it "finds content length regardless of header order or casing" $
