@@ -374,6 +374,11 @@ declare "./current-file.nix" {
 };
 ```
 
+The `declare` target is not a literal string: `tnix emit` derives it from the
+source path by replacing the `.tnix` extension with `.nix`, expressed relative
+to the emitted `.d.tnix` file's directory. So emitting `widget.tnix` produces
+`declare "./widget.nix" { … }`.
+
 ## Suggested Learning Path
 
 1. Start with plain annotations on `let` bindings and function parameters.

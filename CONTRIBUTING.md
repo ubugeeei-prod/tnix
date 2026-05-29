@@ -18,8 +18,7 @@ task runner used by CI.
 ## Common Commands
 
 ```bash
-vp run check
-pnpm run check
+vp run workspace:check
 nix flake check --accept-flake-config
 ```
 
@@ -53,6 +52,20 @@ Bug fixes should include a regression test near the affected surface:
   `editors/neovim`.
 
 When a test is not practical, explain the residual risk in the PR body.
+
+## Adding a Diagnostic Code
+
+Every user-visible error has a stable code (e.g. `[TC0013]`) catalogued in
+[`docs/diagnostics.md`](docs/diagnostics.md). When you add a new diagnostic:
+
+1. Pick the next free number for its phase prefix — `TP` (parser), `TK` (kind
+   checker), `TC` (type checker / semantic analysis), or `TD` (driver / project
+   / IO).
+2. Emit it through the shared `withCode` helper so the code prefixes the message.
+3. Add an entry to `docs/diagnostics.md` describing the cause and a fix.
+
+Codes are stable once assigned: to retire one, leave its entry and stop emitting
+it — never reuse a number.
 
 ## Project Governance
 
