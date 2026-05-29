@@ -45,9 +45,9 @@ spec = do
   describe "expandAliases" $ do
     let env =
           mkAliasEnv
-            [ TypeAlias {typeAliasName = "Id", typeAliasParams = [], typeAliasBody = tInt}
-            , TypeAlias {typeAliasName = "Pair", typeAliasParams = ["a", "b"], typeAliasBody = TRecord (Map.fromList [("fst", TVar "a"), ("snd", TVar "b")])}
-            , TypeAlias {typeAliasName = "Forever", typeAliasParams = [], typeAliasBody = TCon "Forever"}
+            [ TypeAlias{typeAliasName = "Id", typeAliasParams = [], typeAliasBody = tInt},
+              TypeAlias{typeAliasName = "Pair", typeAliasParams = ["a", "b"], typeAliasBody = TRecord (Map.fromList [("fst", TVar "a"), ("snd", TVar "b")])},
+              TypeAlias{typeAliasName = "Forever", typeAliasParams = [], typeAliasBody = TCon "Forever"}
             ]
 
     it "leaves unrelated types untouched" $

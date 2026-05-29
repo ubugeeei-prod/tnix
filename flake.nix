@@ -135,6 +135,8 @@
             pkgs.cabal-install
             pkgs.haskell-language-server
             pkgs.fourmolu
+            pkgs.hlint
+            pkgs.typos
             pkgs.neovim
             pkgs.pkg-config
             pkgs.zlib

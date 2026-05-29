@@ -34,9 +34,9 @@ module Subtyping
   )
 where
 
-import Data.Map.Strict qualified as Map
-import Data.Maybe (mapMaybe)
 import Alias
+import Data.Map.Strict qualified as Map
+import Data.Maybe (isJust, mapMaybe)
 import Indexed
 import Type
 
@@ -384,7 +384,7 @@ nonNegativeIntegerBounds lowerTy upperTy =
 
 -- | Recognize numeric singleton types.
 numericLiteralType :: Type -> Bool
-numericLiteralType = maybe False (const True) . numericLiteralTypeValue
+numericLiteralType = isJust . numericLiteralTypeValue
 
 -- | Decode a singleton numeric literal into the internal comparison domain.
 numericLiteralTypeValue :: Type -> Maybe NumericBound

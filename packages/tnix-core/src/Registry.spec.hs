@@ -13,7 +13,7 @@ import Parser (parseProgram)
 import Pretty (renderScheme)
 import Syntax (Program (programAliases, programExpr))
 import System.Directory (doesFileExist, getCurrentDirectory)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
 import Test.Hspec
 import TestSupport (expectRight, source, withTempTree)
 
@@ -46,34 +46,34 @@ spec = describe "bundled registry" $ do
                      "  builtins = true;",
                      "}"
                    ]
-             ),
-             ( "flake.nix",
-               source
-                 [ "{",
-                   "  description = \"demo flake\";",
-                   "  inputs = {",
-                   "    nixpkgs = { url = \"github:NixOS/nixpkgs\"; };",
-                   "    flake-utils = { url = \"github:numtide/flake-utils\"; };",
-                   "  };",
-                   "  outputs = inputs: {",
-                   "    formatter = {",
-                   "      x86_64-linux = 1;",
-                   "      aarch64-linux = 1;",
-                   "      x86_64-darwin = 1;",
-                   "      aarch64-darwin = 1;",
-                   "    };",
-                   "    devShells = {",
-                   "      x86_64-linux = { default = 1; };",
-                   "      aarch64-linux = { default = 1; };",
-                   "      x86_64-darwin = { default = 1; };",
-                   "      aarch64-darwin = { default = 1; };",
-                   "    };",
-                   "  };",
-                   "}"
-                 ]
-             ),
-             ("src/main.tnix", "let cfg = import ../tnix.config.tnix; flake = import ../flake.nix; in [cfg.builtins flake.description]")
-           ]
+               ),
+               ( "flake.nix",
+                 source
+                   [ "{",
+                     "  description = \"demo flake\";",
+                     "  inputs = {",
+                     "    nixpkgs = { url = \"github:NixOS/nixpkgs\"; };",
+                     "    flake-utils = { url = \"github:numtide/flake-utils\"; };",
+                     "  };",
+                     "  outputs = inputs: {",
+                     "    formatter = {",
+                     "      x86_64-linux = 1;",
+                     "      aarch64-linux = 1;",
+                     "      x86_64-darwin = 1;",
+                     "      aarch64-darwin = 1;",
+                     "    };",
+                     "    devShells = {",
+                     "      x86_64-linux = { default = 1; };",
+                     "      aarch64-linux = { default = 1; };",
+                     "      x86_64-darwin = { default = 1; };",
+                     "      aarch64-darwin = { default = 1; };",
+                     "    };",
+                     "  };",
+                     "}"
+                   ]
+               ),
+               ("src/main.tnix", "let cfg = import ../tnix.config.tnix; flake = import ../flake.nix; in [cfg.builtins flake.description]")
+             ]
       )
       ( \tmp -> do
           analysis <- analyzeFile (tmp </> "src/main.tnix") >>= expectRight

@@ -1,0 +1,8 @@
+# HLint configuration for tnix.
+#
+# The Haskell sources are kept hlint-clean and CI gates on `hlint packages`.
+# Default hints are enabled. Add focused `- ignore:` entries here (with a
+# rationale) rather than scattering `{-# ANN #-}` pragmas through the source.
+
+# Tests favor explicit, readable assertions over the most point-free form.
+- ignore: { name: "Reduce duplication", within: [] }

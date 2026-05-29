@@ -1,0 +1,10 @@
+# Fourmolu style configuration for tnix.
+#
+# These values reproduce the formatting the Haskell sources were originally
+# written in, so `fourmolu --mode check` (run in CI) and `fourmolu --mode
+# inplace` (the `fmt:haskell` task) agree with the committed tree.
+indentation: 2
+comma-style: trailing
+haddock-style: single-line
+import-export-style: trailing
+indent-wheres: true

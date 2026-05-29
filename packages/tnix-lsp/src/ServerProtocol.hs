@@ -54,14 +54,14 @@ contentLengthFromHeaders :: [BS.ByteString] -> Maybe Int
 contentLengthFromHeaders headers =
   listToMaybe $
     mapMaybe parseHeader headers
- where
-  parseHeader header = do
-    value <- stripPrefixCI "content-length:" (B8.unpack header)
-    case reads (dropWhile (== ' ') value) of
-      [(len, "")] -> Just len
-      _ -> Nothing
-  stripPrefixCI needle haystack =
-    stripPrefix (map toLower needle) (map toLower haystack)
+  where
+    parseHeader header = do
+      value <- stripPrefixCI "content-length:" (B8.unpack header)
+      case reads (dropWhile (== ' ') value) of
+        [(len, "")] -> Just len
+        _ -> Nothing
+    stripPrefixCI needle haystack =
+      stripPrefix (map toLower needle) (map toLower haystack)
 
 -- | Read one JSON-RPC framed message, returning a tagged outcome.
 readMessageOutcome :: Handle -> IO ReadOutcome
@@ -86,11 +86,11 @@ readMessageOutcome handle = do
                         <> " bytes"
                     )
                 )
- where
-  renderHeaders headers =
-    if null headers
-      then "no headers"
-      else T.intercalate "; " (map (T.pack . B8.unpack) headers)
+  where
+    renderHeaders headers =
+      if null headers
+        then "no headers"
+        else T.intercalate "; " (map (T.pack . B8.unpack) headers)
 
 -- | Backwards-compatible wrapper that flattens the outcome into 'Maybe'.
 --
@@ -107,13 +107,13 @@ readMessage handle = do
 -- line that separates the headers from the body.
 readHeaders :: Handle -> IO [BS.ByteString]
 readHeaders handle = go []
- where
-  go acc = do
-    line <- B8.hGetLine handle
-    let trimmed = B8.filter (/= '\r') line
-    if BS.null trimmed
-      then pure (reverse acc)
-      else go (trimmed : acc)
+  where
+    go acc = do
+      line <- B8.hGetLine handle
+      let trimmed = B8.filter (/= '\r') line
+      if BS.null trimmed
+        then pure (reverse acc)
+        else go (trimmed : acc)
 
 -- | Frame a JSON value as a single LSP message and write it to a handle.
 send :: Handle -> Value -> IO ()

@@ -58,11 +58,11 @@ documentsFromList =
     . Map.fromList
     . map
       ( \(file, text) ->
-          ( normalise file
-          , CachedDocument
-              { cachedDocumentText = text
-              , cachedDocumentAnalysis = Nothing
-              , cachedDocumentLastGoodAnalysis = Nothing
+          ( normalise file,
+            CachedDocument
+              { cachedDocumentText = text,
+                cachedDocumentAnalysis = Nothing,
+                cachedDocumentLastGoodAnalysis = Nothing
               }
           )
       )
@@ -85,19 +85,19 @@ insertDocument file content analysis (Documents docs) =
     ( Map.insert
         normalizedFile
         CachedDocument
-          { cachedDocumentText = content
-          , cachedDocumentAnalysis = analysis
-          , cachedDocumentLastGoodAnalysis = newLastGood
+          { cachedDocumentText = content,
+            cachedDocumentAnalysis = analysis,
+            cachedDocumentLastGoodAnalysis = newLastGood
           }
         docs
     )
- where
-  normalizedFile = normalise file
-  previousLastGood = cachedDocumentLastGoodAnalysis =<< Map.lookup normalizedFile docs
-  newLastGood =
-    case analysis of
-      Just (Right result) -> Just result
-      _ -> previousLastGood
+  where
+    normalizedFile = normalise file
+    previousLastGood = cachedDocumentLastGoodAnalysis =<< Map.lookup normalizedFile docs
+    newLastGood =
+      case analysis of
+        Just (Right result) -> Just result
+        _ -> previousLastGood
 
 -- | Remove a document from the cache.
 deleteDocument :: FilePath -> Documents -> Documents
@@ -203,9 +203,9 @@ loadWorkspaceDocuments readDocument analyze docs currentFile = do
             Nothing -> analyze path (cachedDocumentText cached)
         pure
           WorkspaceDocument
-            { workspaceDocumentFile = path
-            , workspaceDocumentContent = cachedDocumentText cached
-            , workspaceDocumentAnalysis = result
+            { workspaceDocumentFile = path,
+              workspaceDocumentContent = cachedDocumentText cached,
+              workspaceDocumentAnalysis = result
             }
       Nothing -> do
         contentResult <- readDocument path
@@ -213,17 +213,17 @@ loadWorkspaceDocuments readDocument analyze docs currentFile = do
           Left err ->
             pure
               WorkspaceDocument
-                { workspaceDocumentFile = path
-                , workspaceDocumentContent = ""
-                , workspaceDocumentAnalysis = Left err
+                { workspaceDocumentFile = path,
+                  workspaceDocumentContent = "",
+                  workspaceDocumentAnalysis = Left err
                 }
           Right content -> do
             result <- analyze path content
             pure
               WorkspaceDocument
-                { workspaceDocumentFile = path
-                , workspaceDocumentContent = content
-                , workspaceDocumentAnalysis = result
+                { workspaceDocumentFile = path,
+                  workspaceDocumentContent = content,
+                  workspaceDocumentAnalysis = result
                 }
 
 -- | Pick a file to use as the workspace seed when the request did not

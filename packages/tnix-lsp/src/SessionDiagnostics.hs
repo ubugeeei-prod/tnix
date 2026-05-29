@@ -49,8 +49,8 @@ diagnosticPayloads msg =
   case field "params" msg >>= field "context" >>= field "diagnostics" of
     Just (Array diagnostics) -> toList diagnostics
     _ -> []
- where
-  toList = foldr (:) []
+  where
+    toList = foldr (:) []
 
 -- | Extract the (line, startChar, endChar) range from one diagnostic.
 diagnosticRange :: Value -> Maybe (Int, Int, Int)
@@ -83,8 +83,8 @@ directiveActions file content diagnostic =
   case diagnosticRange diagnostic of
     Just (lineNo, _, _)
       | not (lineHasDirective "# @tnix-ignore" lineNo content) ->
-          [ quickFixAction "Add `# @tnix-ignore`" file [insertLineEdit lineNo "# @tnix-ignore\n"]
-          , quickFixAction "Add `# @tnix-expected`" file [insertLineEdit lineNo "# @tnix-expected\n"]
+          [ quickFixAction "Add `# @tnix-ignore`" file [insertLineEdit lineNo "# @tnix-ignore\n"],
+            quickFixAction "Add `# @tnix-expected`" file [insertLineEdit lineNo "# @tnix-expected\n"]
           ]
       | otherwise -> []
     Nothing -> []
@@ -94,9 +94,9 @@ directiveActions file content diagnostic =
 quickFixAction :: Text -> FilePath -> [Value] -> Value
 quickFixAction title file edits =
   object
-    [ "title" .= title
-    , "kind" .= ("quickfix" :: Text)
-    , "edit" .= workspaceEdit [(file, edits)]
+    [ "title" .= title,
+      "kind" .= ("quickfix" :: Text),
+      "edit" .= workspaceEdit [(file, edits)]
     ]
 
 -- | True if the line immediately above @lineNo@ already starts with the
@@ -111,16 +111,16 @@ lineHasDirective directive lineNo content =
 textEdit :: Int -> Int -> Int -> Text -> Value
 textEdit lineNo startChar endChar newText =
   object
-    [ "range" .= rangeValue lineNo startChar endChar
-    , "newText" .= newText
+    [ "range" .= rangeValue lineNo startChar endChar,
+      "newText" .= newText
     ]
 
 -- | Build a single-line `Range` value used by `textEdit` / `Location`.
 rangeValue :: Int -> Int -> Int -> Value
 rangeValue lineNo startChar endChar =
   object
-    [ "start" .= object ["line" .= lineNo, "character" .= startChar]
-    , "end" .= object ["line" .= lineNo, "character" .= endChar]
+    [ "start" .= object ["line" .= lineNo, "character" .= startChar],
+      "end" .= object ["line" .= lineNo, "character" .= endChar]
     ]
 
 -- | Build an insert-at-line-start edit. Used to prepend `# @tnix-*`
@@ -130,10 +130,10 @@ insertLineEdit lineNo newText =
   object
     [ "range"
         .= object
-          [ "start" .= object ["line" .= lineNo, "character" .= (0 :: Int)]
-          , "end" .= object ["line" .= lineNo, "character" .= (0 :: Int)]
-          ]
-    , "newText" .= newText
+          [ "start" .= object ["line" .= lineNo, "character" .= (0 :: Int)],
+            "end" .= object ["line" .= lineNo, "character" .= (0 :: Int)]
+          ],
+      "newText" .= newText
     ]
 
 -- | Bundle per-file edits into a `WorkspaceEdit.changes` map.
@@ -164,14 +164,14 @@ closestCandidate candidates needle =
 -- quick-fix ranking.
 nameDistance :: Text -> Text -> Int
 nameDistance left right = last (foldl' step [0 .. length rightChars] (zip [1 ..] leftChars))
- where
-  leftChars = map toLower (Text.unpack left)
-  rightChars = map toLower (Text.unpack right)
-  step previousRow (rowIndex, leftChar) =
-    scanl
-      (\leftCost (columnIndex, rightChar) -> minimum [leftCost + 1, previousRow !! columnIndex + 1, previousRow !! (columnIndex - 1) + substitutionCost leftChar rightChar])
-      rowIndex
-      (zip [1 ..] rightChars)
-  substitutionCost leftChar rightChar
-    | leftChar == rightChar = 0
-    | otherwise = 1
+  where
+    leftChars = map toLower (Text.unpack left)
+    rightChars = map toLower (Text.unpack right)
+    step previousRow (rowIndex, leftChar) =
+      scanl
+        (\leftCost (columnIndex, rightChar) -> minimum [leftCost + 1, previousRow !! columnIndex + 1, previousRow !! (columnIndex - 1) + substitutionCost leftChar rightChar])
+        rowIndex
+        (zip [1 ..] rightChars)
+    substitutionCost leftChar rightChar
+      | leftChar == rightChar = 0
+      | otherwise = 1

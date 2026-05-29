@@ -27,7 +27,7 @@ where
 import Control.Monad (forM)
 import Data.List (isPrefixOf, isSuffixOf, nub, sortOn)
 import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
-import System.FilePath ((</>), normalise, takeDirectory)
+import System.FilePath (normalise, takeDirectory, (</>))
 
 -- | All @.tnix@ / @.d.tnix@ files relevant to the buffer at @file@.
 --
@@ -44,21 +44,21 @@ workspaceFilesFor file
       if marked
         then sortOn id . nub <$> go root
         else pure [normalise file]
- where
-  go dir = do
-    names <- sortOn id <$> listDirectory dir
-    fmap concat . forM names $ \name -> do
-      let path = normalise (dir </> name)
-      isDir <- doesDirectoryExist path
-      if isDir
-        then
-          if ignoredDirectory name
-            then pure []
-            else go path
-        else
-          if isSourceFile name
-            then pure [path]
-            else pure []
+  where
+    go dir = do
+      names <- sortOn id <$> listDirectory dir
+      fmap concat . forM names $ \name -> do
+        let path = normalise (dir </> name)
+        isDir <- doesDirectoryExist path
+        if isDir
+          then
+            if ignoredDirectory name
+              then pure []
+              else go path
+          else
+            if isSourceFile name
+              then pure [path]
+              else pure []
 
 -- | Walk parent directories until a workspace marker is found.
 --
@@ -66,17 +66,17 @@ workspaceFilesFor file
 -- ever reached, matching the previous behavior in `Session.hs`.
 findWorkspaceRoot :: FilePath -> IO FilePath
 findWorkspaceRoot path = go start
- where
-  start = normalise (takeDirectory path)
-  go dir = do
-    marked <- hasWorkspaceMarker dir
-    let parent = normalise (takeDirectory dir)
-    if marked
-      then pure dir
-      else
-        if parent == dir
-          then pure start
-          else go parent
+  where
+    start = normalise (takeDirectory path)
+    go dir = do
+      marked <- hasWorkspaceMarker dir
+      let parent = normalise (takeDirectory dir)
+      if marked
+        then pure dir
+        else
+          if parent == dir
+            then pure start
+            else go parent
 
 -- | A directory is treated as a workspace root if it carries one of the
 -- well-known project markers: a flake, cabal-project, pnpm workspace,
@@ -85,11 +85,11 @@ hasWorkspaceMarker :: FilePath -> IO Bool
 hasWorkspaceMarker dir =
   or
     <$> sequence
-      [ doesFileExist (dir </> "flake.nix")
-      , doesFileExist (dir </> "cabal.project")
-      , doesFileExist (dir </> "pnpm-workspace.yaml")
-      , doesFileExist (dir </> "tnix.config.tnix")
-      , doesDirectoryExist (dir </> ".git")
+      [ doesFileExist (dir </> "flake.nix"),
+        doesFileExist (dir </> "cabal.project"),
+        doesFileExist (dir </> "pnpm-workspace.yaml"),
+        doesFileExist (dir </> "tnix.config.tnix"),
+        doesDirectoryExist (dir </> ".git")
       ]
 
 -- | Climb the parent chain looking for a @builtins.d.tnix@ next to the
@@ -97,17 +97,17 @@ hasWorkspaceMarker dir =
 -- root of the filesystem is reached.
 findBuiltinsFile :: FilePath -> IO (Maybe FilePath)
 findBuiltinsFile file = go (normalise (takeDirectory file))
- where
-  go dir = do
-    let candidate = dir </> "builtins.d.tnix"
-        parent = normalise (takeDirectory dir)
-    exists <- doesFileExist candidate
-    if exists
-      then pure (Just candidate)
-      else
-        if parent == dir
-          then pure Nothing
-          else go parent
+  where
+    go dir = do
+      let candidate = dir </> "builtins.d.tnix"
+          parent = normalise (takeDirectory dir)
+      exists <- doesFileExist candidate
+      if exists
+        then pure (Just candidate)
+        else
+          if parent == dir
+            then pure Nothing
+            else go parent
 
 -- | Directory names that the workspace walker skips entirely.
 --

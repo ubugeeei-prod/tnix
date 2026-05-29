@@ -35,8 +35,8 @@ spec = do
             object
               [ "range"
                   .= object
-                    [ "start" .= object ["line" .= (3 :: Int), "character" .= (5 :: Int)]
-                    , "end" .= object ["line" .= (3 :: Int), "character" .= (9 :: Int)]
+                    [ "start" .= object ["line" .= (3 :: Int), "character" .= (5 :: Int)],
+                      "end" .= object ["line" .= (3 :: Int), "character" .= (9 :: Int)]
                     ]
               ]
       diagnosticRange d `shouldBe` Just (3, 5, 9)
@@ -58,16 +58,16 @@ spec = do
     it "renders an LSP range from line + start/end columns" $
       rangeValue 2 4 9
         `shouldBe` object
-          [ "start" .= object ["line" .= (2 :: Int), "character" .= (4 :: Int)]
-          , "end" .= object ["line" .= (2 :: Int), "character" .= (9 :: Int)]
+          [ "start" .= object ["line" .= (2 :: Int), "character" .= (4 :: Int)],
+            "end" .= object ["line" .= (2 :: Int), "character" .= (9 :: Int)]
           ]
 
   describe "textEdit" $
     it "renders a TextEdit value with the right range and replacement" $
       textEdit 5 1 4 "tnix"
         `shouldBe` object
-          [ "range" .= rangeValue 5 1 4
-          , "newText" .= ("tnix" :: Text)
+          [ "range" .= rangeValue 5 1 4,
+            "newText" .= ("tnix" :: Text)
           ]
 
   describe "insertLineEdit" $
@@ -76,10 +76,10 @@ spec = do
         `shouldBe` object
           [ "range"
               .= object
-                [ "start" .= object ["line" .= (7 :: Int), "character" .= (0 :: Int)]
-                , "end" .= object ["line" .= (7 :: Int), "character" .= (0 :: Int)]
-                ]
-          , "newText" .= ("# @tnix-ignore\n" :: Text)
+                [ "start" .= object ["line" .= (7 :: Int), "character" .= (0 :: Int)],
+                  "end" .= object ["line" .= (7 :: Int), "character" .= (0 :: Int)]
+                ],
+            "newText" .= ("# @tnix-ignore\n" :: Text)
           ]
 
   describe "lineHasDirective" $ do
@@ -106,8 +106,8 @@ spec = do
             object
               [ "range"
                   .= object
-                    [ "start" .= object ["line" .= (1 :: Int), "character" .= (0 :: Int)]
-                    , "end" .= object ["line" .= (1 :: Int), "character" .= (10 :: Int)]
+                    [ "start" .= object ["line" .= (1 :: Int), "character" .= (0 :: Int)],
+                      "end" .= object ["line" .= (1 :: Int), "character" .= (10 :: Int)]
                     ]
               ]
       length (directiveActions "/tmp/x.tnix" "let\nvalue = missing;\nin value\n" diag) `shouldBe` 2
@@ -117,8 +117,8 @@ spec = do
             object
               [ "range"
                   .= object
-                    [ "start" .= object ["line" .= (2 :: Int), "character" .= (0 :: Int)]
-                    , "end" .= object ["line" .= (2 :: Int), "character" .= (10 :: Int)]
+                    [ "start" .= object ["line" .= (2 :: Int), "character" .= (0 :: Int)],
+                      "end" .= object ["line" .= (2 :: Int), "character" .= (10 :: Int)]
                     ]
               ]
           body = "let\n# @tnix-ignore\nvalue = missing;\nin value\n"

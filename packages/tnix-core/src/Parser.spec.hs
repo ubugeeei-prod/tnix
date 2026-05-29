@@ -4,9 +4,9 @@ module Main (main) where
 
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
-import Test.Hspec
 import Parser (ParseError (..), parseProgram, parseProgramDetailed)
 import Syntax
+import Test.Hspec
 import TestSupport (expectRight, source)
 import Type
 
@@ -16,13 +16,14 @@ main = hspec spec
 spec :: Spec
 spec = describe "parseProgram" $ do
   it "parses aliases, ambient declarations, and a root expression" $ do
-    program <- expectRight $
-      parseProgram "main.tnix" $
-        source
-          [ "type Box t = { value :: t; };",
-            "declare \"./lib.nix\" { default :: Box Int; };",
-            "let box = import ./lib.nix; in box.value"
-          ]
+    program <-
+      expectRight $
+        parseProgram "main.tnix" $
+          source
+            [ "type Box t = { value :: t; };",
+              "declare \"./lib.nix\" { default :: Box Int; };",
+              "let box = import ./lib.nix; in box.value"
+            ]
     programAliases program
       `shouldBe` [TypeAlias "Box" ["t"] (TRecord (Map.fromList [("value", TVar "t")]))]
     programAmbient program
@@ -62,23 +63,21 @@ spec = describe "parseProgram" $ do
   it "parses indexed container types and tensor shapes" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Grid t = Matrix 2 3 t; type Cube t = Tensor [2 3 4] t;"
     programAliases program
-      `shouldBe`
-        [ TypeAlias "Grid" ["t"] (TApp (TApp (TApp (TCon "Matrix") (TLit (LInt 2))) (TLit (LInt 3))) (TVar "t")),
-          TypeAlias
-            "Cube"
-            ["t"]
-            (TApp (TApp (TCon "Tensor") (TTypeList [TLit (LInt 2), TLit (LInt 3), TLit (LInt 4)])) (TVar "t"))
-        ]
+      `shouldBe` [ TypeAlias "Grid" ["t"] (TApp (TApp (TApp (TCon "Matrix") (TLit (LInt 2))) (TLit (LInt 3))) (TVar "t")),
+                   TypeAlias
+                     "Cube"
+                     ["t"]
+                     (TApp (TApp (TCon "Tensor") (TTypeList [TLit (LInt 2), TLit (LInt 3), TLit (LInt 4)])) (TVar "t"))
+                 ]
 
   it "parses float literals together with range and unit types" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Timeout = Unit \"ms\" (Range 0 5000 Nat); 1.5"
     programAliases program
-      `shouldBe`
-        [ TypeAlias
-            "Timeout"
-            []
-            (TApp (TApp (TCon "Unit") (TLit (LString "ms"))) (TApp (TApp (TApp (TCon "Range") (TLit (LInt 0))) (TLit (LInt 5000))) tNat))
-        ]
+      `shouldBe` [ TypeAlias
+                     "Timeout"
+                     []
+                     (TApp (TApp (TCon "Unit") (TLit (LString "ms"))) (TApp (TApp (TApp (TCon "Range") (TLit (LInt 0))) (TLit (LInt 5000))) tNat))
+                 ]
     programExpr program `shouldBe` Just (plain (EFloat 1.5))
 
   it "parses any and unknown as distinct built-in gradual types" $ do
@@ -89,23 +88,22 @@ spec = describe "parseProgram" $ do
   it "parses parenthesized refinements and unions inside tensor shapes" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Batch t = Tensor [(Range 0 2 Nat) (1 | 2) 4] t;"
     programAliases program
-      `shouldBe`
-        [ TypeAlias
-            "Batch"
-            ["t"]
-            ( TApp
-                ( TApp
-                    (TCon "Tensor")
-                    ( TTypeList
-                        [ TApp (TApp (TApp (TCon "Range") (TLit (LInt 0))) (TLit (LInt 2))) tNat,
-                          TUnion [TLit (LInt 1), TLit (LInt 2)],
-                          TLit (LInt 4)
-                        ]
-                    )
-                )
-                (TVar "t")
-            )
-        ]
+      `shouldBe` [ TypeAlias
+                     "Batch"
+                     ["t"]
+                     ( TApp
+                         ( TApp
+                             (TCon "Tensor")
+                             ( TTypeList
+                                 [ TApp (TApp (TApp (TCon "Range") (TLit (LInt 0))) (TLit (LInt 2))) tNat,
+                                   TUnion [TLit (LInt 1), TLit (LInt 2)],
+                                   TLit (LInt 4)
+                                 ]
+                             )
+                         )
+                         (TVar "t")
+                     )
+                 ]
 
   it "parses tuple types as type-only heterogeneous sequences" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Pair = Tuple [Int String];"
@@ -115,10 +113,9 @@ spec = describe "parseProgram" $ do
   it "parses linear function arrows alongside ordinary arrows" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Consume a = a %1 -> a; type Endo a = a -> a;"
     programAliases program
-      `shouldBe`
-        [ TypeAlias "Consume" ["a"] (TFun One (TVar "a") (TVar "a")),
-          TypeAlias "Endo" ["a"] (TFun Many (TVar "a") (TVar "a"))
-        ]
+      `shouldBe` [ TypeAlias "Consume" ["a"] (TFun One (TVar "a") (TVar "a")),
+                   TypeAlias "Endo" ["a"] (TFun Many (TVar "a") (TVar "a"))
+                 ]
 
   it "parses typed lambda binders" $ do
     program <- expectRight $ parseProgram "main.tnix" "(x :: Int): x"
@@ -174,32 +171,30 @@ spec = describe "parseProgram" $ do
     quotedProgram <- expectRight $ parseProgram "main.tnix" "{ \"aarch64-darwin\" = 1; }.\"aarch64-darwin\""
     dynamicProgram <- expectRight $ parseProgram "main.tnix" "self.packages.${system}.default"
     quotedProgram
-      `shouldSatisfy`
-        ( \program ->
-            programExpr program
-              == Just
-                ( plain
-                    ( ESelect
-                        (EAttrSet [AttrField "aarch64-darwin" (EInt 1)])
-                        [SelectName "aarch64-darwin"]
-                    )
-                )
-        )
+      `shouldSatisfy` ( \program ->
+                          programExpr program
+                            == Just
+                              ( plain
+                                  ( ESelect
+                                      (EAttrSet [AttrField "aarch64-darwin" (EInt 1)])
+                                      [SelectName "aarch64-darwin"]
+                                  )
+                              )
+                      )
     dynamicProgram
-      `shouldSatisfy`
-        ( \program ->
-            programExpr program
-              == Just
-                ( plain
-                    ( ESelect
-                        (EVar "self")
-                        [ SelectName "packages",
-                          SelectDynamic (EVar "system"),
-                          SelectName "default"
-                        ]
-                    )
-                )
-        )
+      `shouldSatisfy` ( \program ->
+                          programExpr program
+                            == Just
+                              ( plain
+                                  ( ESelect
+                                      (EVar "self")
+                                      [ SelectName "packages",
+                                        SelectDynamic (EVar "system"),
+                                        SelectName "default"
+                                      ]
+                                  )
+                              )
+                      )
 
   it "parses indented strings as executable literals" $ do
     program <-

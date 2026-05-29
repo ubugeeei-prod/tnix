@@ -63,10 +63,9 @@ spec = do
               "import ./body.tnix"
             ]
         )
-        `shouldBe`
-          [ DocumentLink 0 9 22 "./shim.d.tnix"
-          , DocumentLink 3 7 18 "./body.tnix"
-          ]
+        `shouldBe` [ DocumentLink 0 9 22 "./shim.d.tnix",
+                     DocumentLink 3 7 18 "./body.tnix"
+                   ]
 
   describe "resolveLinkTarget" $ do
     it "resolves a relative path against the source file's directory" $

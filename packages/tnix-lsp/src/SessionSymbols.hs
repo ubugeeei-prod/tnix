@@ -63,91 +63,91 @@ documentIndexedSymbols file content result =
           <> ambientEntrySymbols analysis
           <> bindingSymbols analysis
           <> rootExportSymbols analysis
- where
-  aliasSymbols analysis =
-    mapMaybe
-      ( \alias -> do
-          range <- findDefinitionRange content (typeAliasName alias)
-          pure
-            IndexedSymbol
-              { indexedSymbolName = typeAliasName alias
-              , indexedSymbolKind = 23
-              , indexedSymbolFile = file
-              , indexedSymbolRange = range
-              , indexedSymbolContainer = Just "type"
-              }
-      )
-      (programAliases (analysisProgram analysis))
+  where
+    aliasSymbols analysis =
+      mapMaybe
+        ( \alias -> do
+            range <- findDefinitionRange content (typeAliasName alias)
+            pure
+              IndexedSymbol
+                { indexedSymbolName = typeAliasName alias,
+                  indexedSymbolKind = 23,
+                  indexedSymbolFile = file,
+                  indexedSymbolRange = range,
+                  indexedSymbolContainer = Just "type"
+                }
+        )
+        (programAliases (analysisProgram analysis))
 
-  ambientModuleSymbols analysis =
-    mapMaybe
-      ( \decl -> do
-          range <- findDeclareRange content (ambientPath decl)
-          pure
-            IndexedSymbol
-              { indexedSymbolName = Text.pack (ambientPath decl)
-              , indexedSymbolKind = 2
-              , indexedSymbolFile = file
-              , indexedSymbolRange = range
-              , indexedSymbolContainer = Nothing
-              }
-      )
-      (programAmbient (analysisProgram analysis))
+    ambientModuleSymbols analysis =
+      mapMaybe
+        ( \decl -> do
+            range <- findDeclareRange content (ambientPath decl)
+            pure
+              IndexedSymbol
+                { indexedSymbolName = Text.pack (ambientPath decl),
+                  indexedSymbolKind = 2,
+                  indexedSymbolFile = file,
+                  indexedSymbolRange = range,
+                  indexedSymbolContainer = Nothing
+                }
+        )
+        (programAmbient (analysisProgram analysis))
 
-  ambientEntrySymbols analysis =
-    concatMap
-      ( \decl ->
-          mapMaybe
-            ( \entry -> do
-                range <- findDefinitionRange content (ambientEntryName entry)
-                pure
-                  IndexedSymbol
-                    { indexedSymbolName = ambientEntryName entry
-                    , indexedSymbolKind = kindForType (ambientEntryType entry)
-                    , indexedSymbolFile = file
-                    , indexedSymbolRange = range
-                    , indexedSymbolContainer = Just (Text.pack (ambientPath decl))
-                    }
-            )
-            (ambientEntries decl)
-      )
-      (programAmbient (analysisProgram analysis))
-
-  bindingSymbols analysis =
-    mapMaybe
-      ( \(name, scheme) -> do
-          range <- findDefinitionRange content name
-          pure
-            IndexedSymbol
-              { indexedSymbolName = name
-              , indexedSymbolKind = kindForType (schemeType scheme)
-              , indexedSymbolFile = file
-              , indexedSymbolRange = range
-              , indexedSymbolContainer = Just "let"
-              }
-      )
-      (Map.toList (analysisBindings analysis))
-
-  rootExportSymbols analysis =
-    case analysisRoot analysis of
-      Nothing -> []
-      Just scheme ->
-        case resolveType (analysisAliases analysis) (schemeType scheme) of
-          TRecord fields ->
+    ambientEntrySymbols analysis =
+      concatMap
+        ( \decl ->
             mapMaybe
-              ( \(name, fieldTy) -> do
-                  range <- findFieldRange content name <|> findDefinitionRange content name
+              ( \entry -> do
+                  range <- findDefinitionRange content (ambientEntryName entry)
                   pure
                     IndexedSymbol
-                      { indexedSymbolName = name
-                      , indexedSymbolKind = kindForType fieldTy
-                      , indexedSymbolFile = file
-                      , indexedSymbolRange = range
-                      , indexedSymbolContainer = Just "default"
+                      { indexedSymbolName = ambientEntryName entry,
+                        indexedSymbolKind = kindForType (ambientEntryType entry),
+                        indexedSymbolFile = file,
+                        indexedSymbolRange = range,
+                        indexedSymbolContainer = Just (Text.pack (ambientPath decl))
                       }
               )
-              (Map.toList fields)
-          _ -> []
+              (ambientEntries decl)
+        )
+        (programAmbient (analysisProgram analysis))
+
+    bindingSymbols analysis =
+      mapMaybe
+        ( \(name, scheme) -> do
+            range <- findDefinitionRange content name
+            pure
+              IndexedSymbol
+                { indexedSymbolName = name,
+                  indexedSymbolKind = kindForType (schemeType scheme),
+                  indexedSymbolFile = file,
+                  indexedSymbolRange = range,
+                  indexedSymbolContainer = Just "let"
+                }
+        )
+        (Map.toList (analysisBindings analysis))
+
+    rootExportSymbols analysis =
+      case analysisRoot analysis of
+        Nothing -> []
+        Just scheme ->
+          case resolveType (analysisAliases analysis) (schemeType scheme) of
+            TRecord fields ->
+              mapMaybe
+                ( \(name, fieldTy) -> do
+                    range <- findFieldRange content name <|> findDefinitionRange content name
+                    pure
+                      IndexedSymbol
+                        { indexedSymbolName = name,
+                          indexedSymbolKind = kindForType fieldTy,
+                          indexedSymbolFile = file,
+                          indexedSymbolRange = range,
+                          indexedSymbolContainer = Just "default"
+                        }
+                )
+                (Map.toList fields)
+            _ -> []
 
 -- | Aggregate every symbol across the workspace, sorted by name + location
 -- so 'workspace/symbol' picks a deterministic order.
@@ -163,9 +163,9 @@ workspaceIndexedSymbols workspace =
 indexedSymbolInformation :: IndexedSymbol -> Value
 indexedSymbolInformation symbol =
   object $
-    [ "name" .= indexedSymbolName symbol
-    , "kind" .= indexedSymbolKind symbol
-    , "location" .= locationFromRange (indexedSymbolFile symbol) (indexedSymbolRange symbol)
+    [ "name" .= indexedSymbolName symbol,
+      "kind" .= indexedSymbolKind symbol,
+      "location" .= locationFromRange (indexedSymbolFile symbol) (indexedSymbolRange symbol)
     ]
       <> maybe [] (\container -> ["containerName" .= container]) (indexedSymbolContainer symbol)
 
@@ -191,16 +191,16 @@ findDeclareRange content path =
     mapMaybe
       ( \(lineNo, line) ->
           let needles =
-                [ "declare \"" <> Text.pack path <> "\""
-                , "declare " <> Text.pack path
+                [ "declare \"" <> Text.pack path <> "\"",
+                  "declare " <> Text.pack path
                 ]
            in listToMaybe
                 [ let (startColumn, endColumn) = textRangeToUtf16Columns line (startOffset + 8) (startOffset + 8 + Text.length (Text.pack path))
                    in (lineNo, startColumn, endColumn)
-                | needle <- needles
-                , (prefix, suffix) <- Text.breakOnAll needle line
-                , not (Text.null suffix)
-                , let startOffset = Text.length prefix
+                | needle <- needles,
+                  (prefix, suffix) <- Text.breakOnAll needle line,
+                  not (Text.null suffix),
+                  let startOffset = Text.length prefix
                 ]
       )
       (zip [0 ..] (Text.lines content))

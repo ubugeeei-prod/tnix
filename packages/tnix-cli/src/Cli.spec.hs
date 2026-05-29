@@ -50,11 +50,11 @@ spec = do
     it "renders root schemes before named bindings" $ do
       let analysis =
             Analysis
-              { analysisProgram = error "unused in cli tests"
-              , analysisRoot = Just (Scheme [] tInt)
-              , analysisBindings = Map.fromList [("box", Scheme [] tString), ("id", Scheme ["a"] (TFun Many (TVar "a") (TVar "a")))]
-              , analysisAliases = mempty
-              , analysisAmbient = mempty
+              { analysisProgram = error "unused in cli tests",
+                analysisRoot = Just (Scheme [] tInt),
+                analysisBindings = Map.fromList [("box", Scheme [] tString), ("id", Scheme ["a"] (TFun Many (TVar "a") (TVar "a")))],
+                analysisAliases = mempty,
+                analysisAmbient = mempty
               }
       renderAnalysis analysis
         `shouldBe` Text.unlines ["root: Int", "box :: String", "id :: forall a. a -> a"]
@@ -79,13 +79,12 @@ spec = do
   describe "executeCommand" $ do
     it "compiles source files through the driver end-to-end" $
       withTempTree
-        [
-          ( "main.tnix"
-          , source
-              [ "let"
-              , "  value :: Int;"
-              , "  value = 1;"
-              , "in value"
+        [ ( "main.tnix",
+            source
+              [ "let",
+                "  value :: Int;",
+                "  value = 1;",
+                "in value"
               ]
           )
         ]
@@ -96,13 +95,12 @@ spec = do
 
     it "renders check output for analyzed files" $
       withTempTree
-        [
-          ( "main.tnix"
-          , source
-              [ "let"
-              , "  id :: forall a. a -> a;"
-              , "  id = x: x;"
-              , "in id"
+        [ ( "main.tnix",
+            source
+              [ "let",
+                "  id :: forall a. a -> a;",
+                "  id = x: x;",
+                "in id"
               ]
           )
         ]
@@ -184,19 +182,18 @@ spec = do
 
     it "scaffolds from tnix.config.tnix path overrides without overwriting existing files"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"demo\";"
-              , "  sourceDir = ./app;"
-              , "  entry = ./app/custom.tnix;"
-              , "  declarationDir = \"./decls\";"
-              , "  builtins = true;"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"demo\";",
+                "  sourceDir = ./app;",
+                "  entry = ./app/custom.tnix;",
+                "  declarationDir = \"./decls\";",
+                "  builtins = true;",
+                "}"
               ]
-          )
-        , ("app/custom.tnix", "existing")
+          ),
+          ("app/custom.tnix", "existing")
         ]
       $ \root -> do
         output <- executeCommand (Scaffold (Just root)) >>= expectRight
@@ -209,13 +206,12 @@ spec = do
 
     it "respects builtins = false when scaffolding"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"demo\";"
-              , "  builtins = false;"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"demo\";",
+                "  builtins = false;",
+                "}"
               ]
           )
         ]
@@ -232,19 +228,18 @@ spec = do
 
     it "checks every discovered source file in a project"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"demo\";"
-              , "  sourceDir = ./src;"
-              , "  exclude = [ ./src/skip ];"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"demo\";",
+                "  sourceDir = ./src;",
+                "  exclude = [ ./src/skip ];",
+                "}"
               ]
-          )
-        , ("src/main.tnix", "1")
-        , ("src/lib/util.tnix", "\"ok\"")
-        , ("src/skip/ignored.tnix", "missing")
+          ),
+          ("src/main.tnix", "1"),
+          ("src/lib/util.tnix", "\"ok\""),
+          ("src/skip/ignored.tnix", "missing")
         ]
       $ \root -> do
         output <- executeCommand (CheckProject (Just root) TextFormat) >>= expectRight
@@ -254,24 +249,22 @@ spec = do
 
     it "builds a project into compiled nix and generated declarations"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"demo\";"
-              , "  sourceDir = ./src;"
-              , "  buildDir = ./artifacts;"
-              , "  generatedDeclarationDir = ./artifacts/types;"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"demo\";",
+                "  sourceDir = ./src;",
+                "  buildDir = ./artifacts;",
+                "  generatedDeclarationDir = ./artifacts/types;",
+                "}"
               ]
-          )
-        ,
-          ( "src/main.tnix"
-          , source
-              [ "let"
-              , "  value :: Int;"
-              , "  value = 1;"
-              , "in value"
+          ),
+          ( "src/main.tnix",
+            source
+              [ "let",
+                "  value :: Int;",
+                "  value = 1;",
+                "in value"
               ]
           )
         ]
@@ -285,19 +278,18 @@ spec = do
 
     it "does not write project build outputs when any source fails"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"demo\";"
-              , "  sourceDir = ./src;"
-              , "  buildDir = ./artifacts;"
-              , "  generatedDeclarationDir = ./artifacts/types;"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"demo\";",
+                "  sourceDir = ./src;",
+                "  buildDir = ./artifacts;",
+                "  generatedDeclarationDir = ./artifacts/types;",
+                "}"
               ]
-          )
-        , ("src/a.tnix", "1")
-        , ("src/b.tnix", "missing")
+          ),
+          ("src/a.tnix", "1"),
+          ("src/b.tnix", "missing")
         ]
       $ \root -> do
         result <- executeCommand (BuildProject (Just root) TextFormat)
@@ -313,18 +305,17 @@ spec = do
 
     it "does not write project declaration outputs when any source fails"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"demo\";"
-              , "  sourceDir = ./src;"
-              , "  generatedDeclarationDir = ./generated;"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"demo\";",
+                "  sourceDir = ./src;",
+                "  generatedDeclarationDir = ./generated;",
+                "}"
               ]
-          )
-        , ("src/a.tnix", "{ value = 1; }")
-        , ("src/b.tnix", "missing")
+          ),
+          ("src/a.tnix", "{ value = 1; }"),
+          ("src/b.tnix", "missing")
         ]
       $ \root -> do
         result <- executeCommand (EmitProject (Just root) TextFormat)
@@ -338,16 +329,15 @@ spec = do
 
     it "emits project declarations as json"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"demo\";"
-              , "  sourceDir = ./src;"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"demo\";",
+                "  sourceDir = ./src;",
+                "}"
               ]
-          )
-        , ("src/main.tnix", "{ value = 1; }")
+          ),
+          ("src/main.tnix", "{ value = 1; }")
         ]
       $ \root -> do
         output <- executeCommand (EmitProject (Just root) JsonFormat) >>= expectRight
@@ -364,16 +354,15 @@ spec = do
   describe "check-project against pathological filesystems" $ do
     it "terminates on a directory symlink loop without hanging"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"loop\";"
-              , "  sourceDir = ./src;"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"loop\";",
+                "  sourceDir = ./src;",
+                "}"
               ]
-          )
-        , ("src/main.tnix", "1")
+          ),
+          ("src/main.tnix", "1")
         ]
       $ \root -> do
         -- Create src/loop -> src so a naive walker would recurse forever.
@@ -391,16 +380,15 @@ spec = do
 
     it "stops walking when the directory depth exceeds the budget"
       $ withTempTree
-        [
-          ( "tnix.config.tnix"
-          , source
-              [ "{"
-              , "  name = \"deep\";"
-              , "  sourceDir = ./src;"
-              , "}"
+        [ ( "tnix.config.tnix",
+            source
+              [ "{",
+                "  name = \"deep\";",
+                "  sourceDir = ./src;",
+                "}"
               ]
-          )
-        , ("src/main.tnix", "1")
+          ),
+          ("src/main.tnix", "1")
         ]
       $ \root -> do
         -- Create a deep nested layout below the configured source dir.
@@ -413,12 +401,12 @@ spec = do
             Text.isInfixOf "ok src/main.tnix" report `shouldBe` True
           Left err ->
             expectationFailure ("expected ok, got error: " <> err)
- where
-  parserInfo = info commandParser mempty
-  parserPrefs :: ParserPrefs
-  parserPrefs = defaultPrefs
-  parse = getParseResult . execParserPure parserPrefs parserInfo
-  parserResult = execParserPure parserPrefs parserInfo
+  where
+    parserInfo = info commandParser mempty
+    parserPrefs :: ParserPrefs
+    parserPrefs = defaultPrefs
+    parse = getParseResult . execParserPure parserPrefs parserInfo
+    parserResult = execParserPure parserPrefs parserInfo
 
 expectRight :: (Show e) => Either e a -> IO a
 expectRight (Right value) = pure value
@@ -439,16 +427,16 @@ deepPath n = intercalate "/" (replicate n "deep")
 
 withTempTree :: [(FilePath, Text)] -> (FilePath -> IO a) -> IO a
 withTempTree files action = bracket createRoot removePathForcibly (\root -> writeTree root >> action root)
- where
-  createRoot = do
-    tmp <- getTemporaryDirectory
-    (path, handle) <- openTempFile tmp "tnix-cli-spec"
-    hClose handle
-    removeFile path
-    createDirectory path
-    pure path
-  writeTree root =
-    forM_ files $ \(relative, content) -> do
-      let path = root </> relative
-      createDirectoryIfMissing True (takeDirectory path)
-      TextIO.writeFile path content
+  where
+    createRoot = do
+      tmp <- getTemporaryDirectory
+      (path, handle) <- openTempFile tmp "tnix-cli-spec"
+      hClose handle
+      removeFile path
+      createDirectory path
+      pure path
+    writeTree root =
+      forM_ files $ \(relative, content) -> do
+        let path = root </> relative
+        createDirectoryIfMissing True (takeDirectory path)
+        TextIO.writeFile path content

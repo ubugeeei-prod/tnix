@@ -10,8 +10,8 @@ module ParserType (typeParser) where
 import Data.Char (isUpper)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
-import Text.Megaparsec
 import ParserLexer
+import Text.Megaparsec
 import Type
 
 -- | Entry point for type parsing.
@@ -36,8 +36,7 @@ conditionalParser = do
     _ <- symbol "?"
     yesTy <- typeParser
     _ <- symbol ":"
-    noTy <- typeParser
-    pure (TConditional lhs rhs yesTy noTy)
+    TConditional lhs rhs yesTy <$> typeParser
 
 -- | Parse right-associative function arrows.
 functionParser :: Parser Type
@@ -45,8 +44,7 @@ functionParser = do
   lhs <- unionParser
   option lhs $ do
     mult <- arrowMultiplicityParser
-    rhs <- functionParser
-    pure (TFun mult lhs rhs)
+    TFun mult lhs <$> functionParser
 
 arrowMultiplicityParser :: Parser Multiplicity
 arrowMultiplicityParser =

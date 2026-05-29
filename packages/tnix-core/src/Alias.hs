@@ -66,19 +66,19 @@ expandAliases env = go 0
     go depth ty
       | depth > 32 = ty
       | otherwise =
-        case ty of
-          TCon name
-            | Just alias <- Map.lookup name env,
-              null (typeAliasParams alias) ->
-                go (depth + 1) (typeAliasBody alias)
-          TTypeList items -> TTypeList (map (go (depth + 1)) items)
-          TFun mult a b -> TFun mult (go (depth + 1) a) (go (depth + 1) b)
-          TRecord fields -> TRecord (fmap (go (depth + 1)) fields)
-          TUnion members -> flattenUnion (TUnion (map (go (depth + 1)) members))
-          TApp f x -> reduce depth (go (depth + 1) f) (go (depth + 1) x)
-          TForall vars body -> TForall vars (go (depth + 1) body)
-          TConditional a b c d -> TConditional (go (depth + 1) a) (go (depth + 1) b) (go (depth + 1) c) (go (depth + 1) d)
-          other -> other
+          case ty of
+            TCon name
+              | Just alias <- Map.lookup name env,
+                null (typeAliasParams alias) ->
+                  go (depth + 1) (typeAliasBody alias)
+            TTypeList items -> TTypeList (map (go (depth + 1)) items)
+            TFun mult a b -> TFun mult (go (depth + 1) a) (go (depth + 1) b)
+            TRecord fields -> TRecord (fmap (go (depth + 1)) fields)
+            TUnion members -> flattenUnion (TUnion (map (go (depth + 1)) members))
+            TApp f x -> reduce depth (go (depth + 1) f) (go (depth + 1) x)
+            TForall vars body -> TForall vars (go (depth + 1) body)
+            TConditional a b c d -> TConditional (go (depth + 1) a) (go (depth + 1) b) (go (depth + 1) c) (go (depth + 1) d)
+            other -> other
 
     reduce :: Int -> Type -> Type -> Type
     reduce depth f x =
@@ -97,7 +97,7 @@ expandAliases env = go 0
 -- This is the structural heart of conditional types: when a pattern matches, we
 -- recover the inferred bindings and substitute them into the `true` branch.
 matchPattern :: Type -> Type -> Maybe (Map Name Type)
-matchPattern actual patternTy = go Map.empty actual patternTy
+matchPattern = go Map.empty
   where
     go env value (TInfer name) =
       case Map.lookup name env of

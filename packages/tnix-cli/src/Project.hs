@@ -20,6 +20,7 @@ where
 
 import Control.Exception (IOException, bracketOnError, try)
 import Control.Monad (forM)
+import Data.Either (fromRight)
 import Data.List (group, isPrefixOf, nub, partition, sort)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
@@ -30,7 +31,7 @@ import Data.Text.IO qualified as TextIO
 import Parser (parseProgram)
 import Syntax
 import System.Directory (canonicalizePath, createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory, makeAbsolute, removeFile, renameFile)
-import System.FilePath (addTrailingPathSeparator, (</>), isAbsolute, makeRelative, normalise, replaceExtension, takeBaseName, takeDirectory, takeFileName)
+import System.FilePath (addTrailingPathSeparator, isAbsolute, makeRelative, normalise, replaceExtension, takeBaseName, takeDirectory, takeFileName, (</>))
 import System.IO (hClose, hFlush, openTempFile)
 
 data ProjectConfig = ProjectConfig
@@ -182,16 +183,16 @@ writeFileAtomic target content =
     (openTempFile (takeDirectory target) (takeFileName target <> ".tmp"))
     cleanupOnError
     writeAndCommit
- where
-  writeAndCommit (tmpPath, handle) = do
-    TextIO.hPutStr handle content
-    hFlush handle
-    hClose handle
-    renameFile tmpPath target
-  cleanupOnError (tmpPath, handle) = do
-    _ <- try @IOException (hClose handle)
-    _ <- try @IOException (removeFile tmpPath)
-    pure ()
+  where
+    writeAndCommit (tmpPath, handle) = do
+      TextIO.hPutStr handle content
+      hFlush handle
+      hClose handle
+      renameFile tmpPath target
+    cleanupOnError (tmpPath, handle) = do
+      _ <- try @IOException (hClose handle)
+      _ <- try @IOException (removeFile tmpPath)
+      pure ()
 
 discoverProjectSources :: ProjectConfig -> IO [ProjectSource]
 discoverProjectSources config = do
@@ -202,10 +203,10 @@ discoverProjectSources config = do
       else pure explicit
   let filtered =
         [ path
-          | path <- nub (sort (map normalise discovered)),
-            isSourceFile path,
-            passesInclude path,
-            not (isExcluded path)
+        | path <- nub (sort (map normalise discovered)),
+          isSourceFile path,
+          passesInclude path,
+          not (isExcluded path)
         ]
   pure (map toProjectSource filtered)
   where
@@ -255,7 +256,7 @@ walkTnixFilesMaxDepth :: Int
 walkTnixFilesMaxDepth = 64
 
 walkTnixFiles :: FilePath -> IO [FilePath]
-walkTnixFiles root = walkTnixFilesWithLimit walkTnixFilesMaxDepth Set.empty root
+walkTnixFiles = walkTnixFilesWithLimit walkTnixFilesMaxDepth Set.empty
 
 -- | Cycle-safe, depth-bounded directory walk.
 --
@@ -278,8 +279,8 @@ walkTnixFilesWithLimit remaining visited root
               names <- sort <$> listDirectory root
               let visited' = Set.insert canonical visited
                   next = remaining - 1
-              fmap concat $
-                traverse
+              concat
+                <$> traverse
                   ( \name -> do
                       let path = root </> name
                       isDir <- doesDirectoryExist path
@@ -292,7 +293,7 @@ walkTnixFilesWithLimit remaining visited root
 canonicalizePathSafe :: FilePath -> IO FilePath
 canonicalizePathSafe path = do
   result <- try @IOException (canonicalizePath path)
-  pure (either (const (normalise path)) id result)
+  pure (fromRight (normalise path) result)
 
 loadProjectConfig :: FilePath -> IO (Either String ProjectConfig)
 loadProjectConfig configPath = do
@@ -473,7 +474,7 @@ readTextFileSafe path = do
       Left err -> Left ("failed to read " <> path <> ": " <> show err)
       Right input -> Right input
 
-duplicateNames :: Ord a => [a] -> [a]
+duplicateNames :: (Ord a) => [a] -> [a]
 duplicateNames = foldr step [] . group . sort
   where
     step values acc =

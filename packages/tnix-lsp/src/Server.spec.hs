@@ -30,42 +30,42 @@ spec = do
         `shouldBe` object
           [ "capabilities"
               .= object
-                [ "hoverProvider" .= True
-                , "completionProvider" .= object ["triggerCharacters" .= ["." :: String]]
-                , "definitionProvider" .= True
-                , "declarationProvider" .= True
-                , "referencesProvider" .= True
-                , "renameProvider" .= True
-                , "documentSymbolProvider" .= True
-                , "workspaceSymbolProvider" .= True
-                , "codeActionProvider" .= True
-                , "documentHighlightProvider" .= True
-                , "documentLinkProvider" .= object ["resolveProvider" .= False]
-                , "foldingRangeProvider" .= True
-                , "inlayHintProvider" .= object ["resolveProvider" .= False]
-                , "semanticTokensProvider"
+                [ "hoverProvider" .= True,
+                  "completionProvider" .= object ["triggerCharacters" .= ["." :: String]],
+                  "definitionProvider" .= True,
+                  "declarationProvider" .= True,
+                  "referencesProvider" .= True,
+                  "renameProvider" .= True,
+                  "documentSymbolProvider" .= True,
+                  "workspaceSymbolProvider" .= True,
+                  "codeActionProvider" .= True,
+                  "documentHighlightProvider" .= True,
+                  "documentLinkProvider" .= object ["resolveProvider" .= False],
+                  "foldingRangeProvider" .= True,
+                  "inlayHintProvider" .= object ["resolveProvider" .= False],
+                  "semanticTokensProvider"
                     .= object
                       [ "legend"
                           .= object
                             [ "tokenTypes"
-                                .= [ "keyword" :: String
-                                   , "type"
-                                   , "function"
-                                   , "variable"
-                                   , "property"
-                                   , "string"
-                                   , "number"
-                                   , "operator"
-                                   ]
-                            , "tokenModifiers" .= ([] :: [String])
-                            ]
-                      , "full" .= True
-                      ]
-                , "textDocumentSync"
+                                .= [ "keyword" :: String,
+                                     "type",
+                                     "function",
+                                     "variable",
+                                     "property",
+                                     "string",
+                                     "number",
+                                     "operator"
+                                   ],
+                              "tokenModifiers" .= ([] :: [String])
+                            ],
+                        "full" .= True
+                      ],
+                  "textDocumentSync"
                     .= object
-                      [ "openClose" .= True
-                      , "change" .= (2 :: Int)
-                      , "save" .= object ["includeText" .= True]
+                      [ "openClose" .= True,
+                        "change" .= (2 :: Int),
+                        "save" .= object ["includeText" .= True]
                       ]
                 ]
           ]
@@ -121,18 +121,18 @@ spec = do
                     .= [ object
                            [ "range"
                                .= object
-                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (4 :: Int)]
-                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (9 :: Int)]
-                                 ]
-                           , "text" .= ("result" :: String)
-                           ]
-                       , object
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (4 :: Int)],
+                                   "end" .= object ["line" .= (0 :: Int), "character" .= (9 :: Int)]
+                                 ],
+                             "text" .= ("result" :: String)
+                           ],
+                         object
                            [ "range"
                                .= object
-                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (13 :: Int)]
-                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (14 :: Int)]
-                                 ]
-                           , "text" .= ("2" :: String)
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (13 :: Int)],
+                                   "end" .= object ["line" .= (0 :: Int), "character" .= (14 :: Int)]
+                                 ],
+                             "text" .= ("2" :: String)
                            ]
                        ]
                 ]
@@ -149,10 +149,10 @@ spec = do
                     .= [ object
                            [ "range"
                                .= object
-                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (3 :: Int)]
-                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (6 :: Int)]
-                                 ]
-                           , "text" .= ("xyz" :: String)
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (3 :: Int)],
+                                   "end" .= object ["line" .= (0 :: Int), "character" .= (6 :: Int)]
+                                 ],
+                             "text" .= ("xyz" :: String)
                            ]
                        ]
                 ]
@@ -169,10 +169,10 @@ spec = do
                     .= [ object
                            [ "range"
                                .= object
-                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (2 :: Int)]
-                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (3 :: Int)]
-                                 ]
-                           , "text" .= ("y" :: String)
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (2 :: Int)],
+                                   "end" .= object ["line" .= (0 :: Int), "character" .= (3 :: Int)]
+                                 ],
+                             "text" .= ("y" :: String)
                            ]
                        ]
                 ]
@@ -189,10 +189,10 @@ spec = do
                     .= [ object
                            [ "range"
                                .= object
-                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (1 :: Int)]
-                                 , "end" .= object ["line" .= (0 :: Int), "character" .= (1 :: Int)]
-                                 ]
-                           , "text" .= ("!" :: String)
+                                 [ "start" .= object ["line" .= (0 :: Int), "character" .= (1 :: Int)],
+                                   "end" .= object ["line" .= (0 :: Int), "character" .= (1 :: Int)]
+                                 ],
+                             "text" .= ("!" :: String)
                            ]
                        ]
                 ]
@@ -251,8 +251,8 @@ spec = do
         `shouldBe` object
           [ "contents"
               .= object
-                [ "kind" .= ("markdown" :: String)
-                , "value"
+                [ "kind" .= ("markdown" :: String),
+                  "value"
                     .= ("```tnix\n{\n  map :: Int -> String;\n}\n```" :: String)
                 ]
           ]
@@ -336,35 +336,34 @@ spec = do
 successAnalysis :: Analysis
 successAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests"
-    , analysisRoot = Just (Scheme [] tInt)
-    , analysisBindings = Map.fromList [("box", Scheme [] tString)]
-    , analysisAliases = mempty
-    , analysisAmbient = mempty
+    { analysisProgram = error "unused in server tests",
+      analysisRoot = Just (Scheme [] tInt),
+      analysisBindings = Map.fromList [("box", Scheme [] tString)],
+      analysisAliases = mempty,
+      analysisAmbient = mempty
     }
 
 rootOnlyAnalysis :: Analysis
 rootOnlyAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests"
-    , analysisRoot = Just (Scheme [] tInt)
-    , analysisBindings = Map.empty
-    , analysisAliases = mempty
-    , analysisAmbient = mempty
+    { analysisProgram = error "unused in server tests",
+      analysisRoot = Just (Scheme [] tInt),
+      analysisBindings = Map.empty,
+      analysisAliases = mempty,
+      analysisAmbient = mempty
     }
 
 builtinsAnalysis :: Analysis
 builtinsAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests"
-    , analysisRoot = Just (Scheme [] (tList tString))
-    , analysisBindings = Map.empty
-    , analysisAliases = mempty
-    , analysisAmbient =
+    { analysisProgram = error "unused in server tests",
+      analysisRoot = Just (Scheme [] (tList tString)),
+      analysisBindings = Map.empty,
+      analysisAliases = mempty,
+      analysisAmbient =
         Map.fromList
-          [
-            ( "builtins"
-            , Scheme
+          [ ( "builtins",
+              Scheme
                 []
                 ( TRecord
                     ( Map.fromList
@@ -379,35 +378,32 @@ builtinsAnalysis =
 completionAnalysis :: Analysis
 completionAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests"
-    , analysisRoot = Just (Scheme [] tInt)
-    , analysisBindings =
+    { analysisProgram = error "unused in server tests",
+      analysisRoot = Just (Scheme [] tInt),
+      analysisBindings =
         Map.fromList
-          [
-            ( "box"
-            , Scheme
+          [ ( "box",
+              Scheme
                 []
                 ( TRecord
                     ( Map.fromList
-                        [ ("alpha", tInt)
-                        , ("beta", tString)
+                        [ ("alpha", tInt),
+                          ("beta", tString)
                         ]
                     )
                 )
             )
-          ]
-    , analysisAliases = mempty
-    , analysisAmbient =
+          ],
+      analysisAliases = mempty,
+      analysisAmbient =
         Map.fromList
-          [
-            ( "builtins"
-            , Scheme
+          [ ( "builtins",
+              Scheme
                 []
                 ( TRecord
                     ( Map.fromList
-                        [
-                          ( "map"
-                          , TForall
+                        [ ( "map",
+                            TForall
                               ["a", "b"]
                               (TFun Many (TFun Many (TVar "a") (TVar "b")) (TFun Many (tList (TVar "a")) (tList (TVar "b"))))
                           )
@@ -421,22 +417,22 @@ completionAnalysis =
 rootFieldCompletionAnalysis :: Analysis
 rootFieldCompletionAnalysis =
   Analysis
-    { analysisProgram = error "unused in server tests"
-    , analysisRoot =
+    { analysisProgram = error "unused in server tests",
+      analysisRoot =
         Just
           ( Scheme
               []
               ( TRecord
                   ( Map.fromList
-                      [ ("inc", TFun Many tInt tInt)
-                      , ("twice", TFun Many tInt tInt)
+                      [ ("inc", TFun Many tInt tInt),
+                        ("twice", TFun Many tInt tInt)
                       ]
                   )
               )
-          )
-    , analysisBindings = Map.empty
-    , analysisAliases = mempty
-    , analysisAmbient = mempty
+          ),
+      analysisBindings = Map.empty,
+      analysisAliases = mempty,
+      analysisAmbient = mempty
     }
 
 withTempHandle :: (Handle -> IO a) -> IO a
@@ -451,15 +447,15 @@ withTempHandle action = do
 withPipeHandles :: (Handle -> Handle -> IO a) -> IO a
 withPipeHandles action =
   bracket open close (uncurry action)
- where
-  open = do
-    (readFd, writeFd) <- createPipe
-    readHandle <- fdToHandle readFd
-    writeHandle <- fdToHandle writeFd
-    hSetBinaryMode readHandle True
-    hSetBinaryMode writeHandle True
-    pure (readHandle, writeHandle)
-  close (readHandle, writeHandle) = hClose readHandle >> hClose writeHandle
+  where
+    open = do
+      (readFd, writeFd) <- createPipe
+      readHandle <- fdToHandle readFd
+      writeHandle <- fdToHandle writeFd
+      hSetBinaryMode readHandle True
+      hSetBinaryMode writeHandle True
+      pure (readHandle, writeHandle)
+    close (readHandle, writeHandle) = hClose readHandle >> hClose writeHandle
 
 describeOutcome :: ReadOutcome -> String
 describeOutcome ReadEof = "ReadEof"
@@ -473,8 +469,8 @@ completionLabels value =
       case KeyMap.lookup "items" obj of
         Just (Array items) ->
           [ label
-          | Object item <- toList items
-          , Just (String label) <- [KeyMap.lookup "label" item]
+          | Object item <- toList items,
+            Just (String label) <- [KeyMap.lookup "label" item]
           ]
         _ -> []
     _ -> []

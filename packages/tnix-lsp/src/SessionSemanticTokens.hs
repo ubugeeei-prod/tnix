@@ -39,8 +39,8 @@ semanticTokensFor content result =
         Left _ -> []
         Right analysis ->
           [ name
-          | (name, scheme) <- Map.toList (analysisBindings analysis)
-          , case schemeType scheme of
+          | (name, scheme) <- Map.toList (analysisBindings analysis),
+            case schemeType scheme of
               TFun{} -> True
               _ -> False
           ]
@@ -56,41 +56,41 @@ semanticTokensFor content result =
                 TRecord fields -> Map.keys fields
                 _ -> []
             Nothing -> []
-   in concatMap (\(lineNo, line) -> semanticTokensForLine functionNames typeNames rootFieldNames lineNo line) (zip [0 ..] (Text.lines content))
+   in concatMap (uncurry (semanticTokensForLine functionNames typeNames rootFieldNames)) (zip [0 ..] (Text.lines content))
 
 semanticTokensForLine :: [Text] -> [Text] -> [Text] -> Int -> Text -> [SemanticToken]
 semanticTokensForLine functionNames typeNames rootFieldNames lineNo line = go 0 []
- where
-  go index acc
-    | index >= Text.length line = reverse acc
-    | "#" `Text.isPrefixOf` Text.drop index line = reverse acc
-    | otherwise =
-        case Text.drop index line of
-          rest
-            | Just token <- stringToken index rest ->
-                go (index + semanticTokenLength token) (clientToken token : acc)
-            | Just token <- numberToken index rest ->
-                go (index + semanticTokenLength token) (clientToken token : acc)
-            | Just token <- operatorToken index rest ->
-                go (index + semanticTokenLength token) (clientToken token : acc)
-            | Just (tokenText, width) <- identifierToken rest ->
-                let token =
-                      SemanticToken
-                        { semanticTokenLine = lineNo
-                        , semanticTokenStart = index
-                        , semanticTokenLength = width
-                        , semanticTokenType = classifyIdentifier functionNames typeNames rootFieldNames line index tokenText
-                        }
-                 in go (index + width) (clientToken token : acc)
-            | otherwise -> go (index + 1) acc
-  clientToken token =
-    let startColumn = textOffsetToUtf16Column line (semanticTokenStart token)
-        endColumn = textOffsetToUtf16Column line (semanticTokenStart token + semanticTokenLength token)
-     in token
-          { semanticTokenLine = lineNo
-          , semanticTokenStart = startColumn
-          , semanticTokenLength = endColumn - startColumn
-          }
+  where
+    go index acc
+      | index >= Text.length line = reverse acc
+      | "#" `Text.isPrefixOf` Text.drop index line = reverse acc
+      | otherwise =
+          case Text.drop index line of
+            rest
+              | Just token <- stringToken index rest ->
+                  go (index + semanticTokenLength token) (clientToken token : acc)
+              | Just token <- numberToken index rest ->
+                  go (index + semanticTokenLength token) (clientToken token : acc)
+              | Just token <- operatorToken index rest ->
+                  go (index + semanticTokenLength token) (clientToken token : acc)
+              | Just (tokenText, width) <- identifierToken rest ->
+                  let token =
+                        SemanticToken
+                          { semanticTokenLine = lineNo,
+                            semanticTokenStart = index,
+                            semanticTokenLength = width,
+                            semanticTokenType = classifyIdentifier functionNames typeNames rootFieldNames line index tokenText
+                          }
+                   in go (index + width) (clientToken token : acc)
+              | otherwise -> go (index + 1) acc
+    clientToken token =
+      let startColumn = textOffsetToUtf16Column line (semanticTokenStart token)
+          endColumn = textOffsetToUtf16Column line (semanticTokenStart token + semanticTokenLength token)
+       in token
+            { semanticTokenLine = lineNo,
+              semanticTokenStart = startColumn,
+              semanticTokenLength = endColumn - startColumn
+            }
 
 stringToken :: Int -> Text -> Maybe SemanticToken
 stringToken index rest = do
@@ -110,15 +110,15 @@ numberToken index rest = do
       let width = Text.length (Text.takeWhile numberChar rest)
        in Just SemanticToken{semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = width, semanticTokenType = 6}
     else Nothing
- where
-  numberChar c = isDigit c || c `elem` (".eE+-" :: String)
+  where
+    numberChar c = isDigit c || c `elem` (".eE+-" :: String)
 
 operatorToken :: Int -> Text -> Maybe SemanticToken
 operatorToken index rest =
   listToMaybe
     [ SemanticToken{semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = Text.length operator, semanticTokenType = 7}
-    | operator <- ["::", "->", "%1", ".", "=", "+", "|", "?", ":"]
-    , operator `Text.isPrefixOf` rest
+    | operator <- ["::", "->", "%1", ".", "=", "+", "|", "?", ":"],
+      operator `Text.isPrefixOf` rest
     ]
 
 identifierToken :: Text -> Maybe (Text, Int)
@@ -142,7 +142,7 @@ classifyIdentifier functionNames typeNames rootFieldNames line index token
         else if token `elem` functionNames then 2 else 4
   | nextOperator line (index + Text.length token) == Just "=" =
       if token `elem` functionNames then 2 else 3
-  | Text.any isUpper token && maybe False isUpper (fst <$> Text.uncons token) = 1
+  | Text.any isUpper token && maybe False (isUpper . fst) (Text.uncons token) = 1
   | token `elem` functionNames = 2
   | otherwise = 3
 
@@ -150,8 +150,8 @@ previousNonSpace :: Text -> Int -> Maybe Char
 previousNonSpace line index =
   listToMaybe
     [ char
-    | char <- reverse (Text.unpack (Text.take index line))
-    , not (char `elem` [' ', '\t'])
+    | char <- reverse (Text.unpack (Text.take index line)),
+      char `notElem` [' ', '\t']
     ]
 
 nextOperator :: Text -> Int -> Maybe Text
@@ -159,8 +159,8 @@ nextOperator line index =
   let suffix = Text.dropWhile (`elem` [' ', '\t']) (Text.drop index line)
    in listToMaybe
         [ operator
-        | operator <- ["::", "=", ":"]
-        , operator `Text.isPrefixOf` suffix
+        | operator <- ["::", "=", ":"],
+          operator `Text.isPrefixOf` suffix
         ]
 
 lineStartsWithType :: Text -> Bool
@@ -180,20 +180,20 @@ reservedWords =
 -- spec requires.
 encodeSemanticTokens :: [SemanticToken] -> [Int]
 encodeSemanticTokens tokens = snd (foldl step (Nothing, []) (sortOn (\token -> (semanticTokenLine token, semanticTokenStart token)) tokens))
- where
-  step (previous, acc) token =
-    let deltaLine = maybe (semanticTokenLine token) (\prev -> semanticTokenLine token - semanticTokenLine prev) previous
-        deltaStart =
-          case previous of
-            Just prev
-              | semanticTokenLine prev == semanticTokenLine token ->
-                  semanticTokenStart token - semanticTokenStart prev
-            _ -> semanticTokenStart token
-        encoded =
-          [ deltaLine
-          , deltaStart
-          , semanticTokenLength token
-          , semanticTokenType token
-          , 0
-          ]
-     in (Just token, acc <> encoded)
+  where
+    step (previous, acc) token =
+      let deltaLine = maybe (semanticTokenLine token) (\prev -> semanticTokenLine token - semanticTokenLine prev) previous
+          deltaStart =
+            case previous of
+              Just prev
+                | semanticTokenLine prev == semanticTokenLine token ->
+                    semanticTokenStart token - semanticTokenStart prev
+              _ -> semanticTokenStart token
+          encoded =
+            [ deltaLine,
+              deltaStart,
+              semanticTokenLength token,
+              semanticTokenType token,
+              0
+            ]
+       in (Just token, acc <> encoded)

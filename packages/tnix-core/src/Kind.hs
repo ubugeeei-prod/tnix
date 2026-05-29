@@ -15,12 +15,12 @@ module Kind
   )
 where
 
+import Alias (mkAliasEnv)
 import Control.Monad (foldM, replicateM, void)
 import Control.Monad.State.Strict (StateT, evalStateT, get, lift, modify', put)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
-import Alias (mkAliasEnv)
 import Diagnostics (DiagnosticCode (..), withCode)
 import Pretty (renderKind, renderType)
 import Syntax
@@ -51,7 +51,7 @@ inferAliasKinds :: [TypeAlias] -> Either String AliasKindEnv
 inferAliasKinds aliases =
   evalStateT (inferAll (Map.elems (mkAliasEnv aliases))) initialState
   where
-    initialState = KindState {nextKindMeta = 0, kindSubstitutions = Map.empty, flexibleKinds = Map.empty}
+    initialState = KindState{nextKindMeta = 0, kindSubstitutions = Map.empty, flexibleKinds = Map.empty}
 
 -- | Infer the kind of one type under a known alias environment.
 --
@@ -85,7 +85,7 @@ validateProgramKinds aliases program = do
           }
   void $
     evalStateT
-      (do
+      ( do
           traverse_ (validateKind env "ambient entry" . ambientEntryType) ambientDeclEntries
           traverse_ (validateKind env "term annotation") annotationTypes
       )
@@ -94,14 +94,14 @@ validateProgramKinds aliases program = do
   where
     ambientDeclEntries = concatMap ambientEntriesFromDecl (programAmbient program)
     annotationTypes = maybe [] (exprAnnotations . markedValue) (programExpr program)
-    ambientEntriesFromDecl decl = ambientEntries decl
+    ambientEntriesFromDecl = ambientEntries
 
 inferAll :: [TypeAlias] -> KindM AliasKindEnv
 inferAll aliases = do
   placeholders <-
-    fmap Map.fromList $
-      traverse
-        (\alias -> do
+    Map.fromList
+      <$> traverse
+        ( \alias -> do
             params <- replicateM (length (typeAliasParams alias)) freshKindMeta
             result <- freshKindMeta
             pure (typeAliasName alias, AliasPlaceholder params result)
@@ -187,14 +187,14 @@ validateResolvedKind kind = do
   finalKind <- zonkKind kind
   case finalKind of
     KMeta n -> do
-      modify' (\st -> st {kindSubstitutions = Map.insert n KType (kindSubstitutions st)})
+      modify' (\st -> st{kindSubstitutions = Map.insert n KType (kindSubstitutions st)})
       pure KType
     other -> pure other
 
 freshKindMeta :: KindM Kind
 freshKindMeta = do
   st <- get
-  put st {nextKindMeta = nextKindMeta st + 1}
+  put st{nextKindMeta = nextKindMeta st + 1}
   pure (KMeta (nextKindMeta st))
 
 flexibleKind :: Name -> KindM Kind
@@ -204,7 +204,7 @@ flexibleKind name = do
     Just kind -> pure kind
     Nothing -> do
       kind <- freshKindMeta
-      modify' (\state -> state {flexibleKinds = Map.insert name kind (flexibleKinds state)})
+      modify' (\state -> state{flexibleKinds = Map.insert name kind (flexibleKinds state)})
       pure kind
 
 zonkKind :: Kind -> KindM Kind
@@ -235,7 +235,7 @@ bindKindMeta n kind = do
   if resolved == KMeta n || occursKind n resolved
     then liftLeft (withCode TK0002KindOccursCheck "kind occurs check failed")
     else do
-      modify' (\st -> st {kindSubstitutions = Map.insert n resolved (kindSubstitutions st)})
+      modify' (\st -> st{kindSubstitutions = Map.insert n resolved (kindSubstitutions st)})
       pure resolved
 
 occursKind :: Int -> Kind -> Bool
@@ -316,8 +316,8 @@ maximumMaybe :: [Int] -> Maybe Int
 maximumMaybe [] = Nothing
 maximumMaybe values = Just (maximum values)
 
-traverse_ :: Foldable f => (a -> KindM b) -> f a -> KindM ()
-traverse_ step = foldM (\() item -> step item >> pure ()) ()
+traverse_ :: (Foldable f) => (a -> KindM b) -> f a -> KindM ()
+traverse_ step = foldM (\() item -> void (step item)) ()
 
 liftLeft :: String -> KindM a
 liftLeft = lift . Left

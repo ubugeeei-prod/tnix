@@ -73,7 +73,7 @@ parseProgramDetailed path input = do
 mapDirectiveError :: Text -> Either Text a -> Either ParseError a
 mapDirectiveError _ (Right a) = Right a
 mapDirectiveError _ (Left message) =
-  Left ParseError {parseErrorLine = 1, parseErrorColumn = 1, parseErrorMessage = message}
+  Left ParseError{parseErrorLine = 1, parseErrorColumn = 1, parseErrorMessage = message}
 
 -- | Lift the first error in a Megaparsec bundle into our structured form,
 -- recovering the offending source line/column from the parser's PosState.

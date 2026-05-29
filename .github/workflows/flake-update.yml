@@ -1,0 +1,60 @@
+name: Flake update
+
+# Dependabot does not support the Nix flake (which pins the Haskell toolchain
+# and nixpkgs). This workflow refreshes flake.lock on a cadence and opens a PR,
+# so the Haskell/Nix dependency surface stays current alongside the
+# dependabot-managed github-actions / npm / cargo ecosystems.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  update-flake-lock:
+    name: Update flake.lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update flake.lock
+        run: nix flake update --accept-flake-config
+
+      - name: Open pull request if flake.lock changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- flake.lock; then
+            echo "flake.lock is already up to date."
+            exit 0
+          fi
+          branch="automation/flake-update-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add flake.lock
+          git commit -m "chore(deps): update flake.lock"
+          git push --set-upstream origin "$branch"
+          gh pr create \
+            --title "chore(deps): update flake.lock" \
+            --body "Automated weekly \`nix flake update\`. Review the input revision changes before merging." \
+            --label dependencies \
+            --base "${GITHUB_REF_NAME}"

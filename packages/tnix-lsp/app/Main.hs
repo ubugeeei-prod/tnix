@@ -58,15 +58,15 @@ runServer = do
   cacheRef <- newIORef emptyAnalysisCache
   let analyze = cachedAnalyzeText cacheRef
   loop ref analyze
- where
-  loop ref analyze = do
-    outcome <- readMessageOutcome stdin
-    case outcome of
-      ReadEof -> pure ()
-      ReadMessage msg -> handle ref analyze msg >> loop ref analyze
-      ReadError reason -> do
-        hPutStrLn stderr ("tnix-lsp: " <> T.unpack reason)
-        loop ref analyze
+  where
+    loop ref analyze = do
+      outcome <- readMessageOutcome stdin
+      case outcome of
+        ReadEof -> pure ()
+        ReadMessage msg -> handle ref analyze msg >> loop ref analyze
+        ReadError reason -> do
+          hPutStrLn stderr ("tnix-lsp: " <> T.unpack reason)
+          loop ref analyze
 
 -- | Wrap 'analyzeText' with the workspace-wide analysis cache so repeated
 -- hover / workspace-symbol / definition requests against unchanged content

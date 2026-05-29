@@ -17,11 +17,11 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import System.Directory (copyFile, createDirectory, createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getCurrentDirectory, getTemporaryDirectory, listDirectory, removeFile, removePathForcibly)
-import System.FilePath ((</>), normalise, takeDirectory)
+import System.FilePath (normalise, takeDirectory, (</>))
 import System.IO (hClose, openTempFile)
 import Test.Hspec (Expectation, expectationFailure)
 
-expectRight :: Show e => Either e a -> IO a
+expectRight :: (Show e) => Either e a -> IO a
 expectRight (Right value) = pure value
 expectRight (Left err) = expectationFailure ("expected Right, got Left: " <> show err) >> fail "expected Right"
 

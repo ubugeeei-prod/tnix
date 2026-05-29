@@ -298,6 +298,29 @@ jobs:
       - name: Check Zed extension formatting
         run: nix develop --accept-flake-config --command cargo fmt --manifest-path editors/zed/Cargo.toml --all --check
 
+  haskell-lint:
+    name: Haskell Lint (fourmolu + hlint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Haskell formatting (fourmolu)
+        run: nix develop --accept-flake-config --command fourmolu --mode check packages
+
+      - name: Lint Haskell (hlint)
+        run: nix develop --accept-flake-config --command hlint packages
+
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
@@ -313,6 +336,7 @@ jobs:
       - zed
       - neovim
       - lint
+      - haskell-lint
     if: ${{ always() }}
     steps:
       - name: Fail if any split check failed
