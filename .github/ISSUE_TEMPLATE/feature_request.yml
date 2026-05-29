@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a new capability or improvement for tnix.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the proposal. tnix intentionally complements Nix rather than replacing it,
+        so proposals that preserve `.nix` semantics and incremental adoption are easiest to accept.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI (tnix)
+        - Language server (tnix-lsp)
+        - Editor integrations
+        - Type system / language surface
+        - Tooling / CI / release
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that tnix makes hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you'd like tnix to do. Include example `.tnix` syntax or CLI/LSP behavior where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

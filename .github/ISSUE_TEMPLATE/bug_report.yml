@@ -1,0 +1,63 @@
+name: Bug report
+description: Report incorrect behavior in the tnix CLI, language server, or editor integrations.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. A small, reproducible example helps us fix it quickly.
+        Please do **not** report security vulnerabilities here — see [SECURITY.md](../blob/main/SECURITY.md).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of tnix is affected?
+      options:
+        - CLI (tnix)
+        - Language server (tnix-lsp)
+        - VS Code extension
+        - Zed extension
+        - Neovim plugin
+        - Parser / type checker
+        - Docs / examples
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: tnix version
+      description: Output of `tnix --version` (or the commit you built from).
+      placeholder: "0.5.0"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS and architecture, and installation method (release archive, flake, source).
+      placeholder: "macOS arm64, nix profile install"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: The smallest `.tnix`/`.d.tnix` snippet and the exact command(s) that trigger the bug.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      description: What you expected to happen, and what actually happened (include diagnostic codes like `[TC0013]` if shown).
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Logs, screenshots, or anything else that helps.
+    validations:
+      required: false

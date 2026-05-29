@@ -62,7 +62,7 @@ Run the full workspace verification before release:
 ```bash
 nix develop
 pnpm install --frozen-lockfile
-vp run check
+vp run workspace:check
 nix flake check --accept-flake-config
 ```
 

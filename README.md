@@ -53,6 +53,8 @@ After compilation, type information is erased and only ordinary Nix code remains
 ## Design Docs
 
 - [Getting Started](./docs/getting-started.md)
+- [Adopting tnix (Migration)](./docs/migration.md)
+- [Troubleshooting](./docs/troubleshooting.md)
 - [Language Reference](./docs/language-reference.md)
 - [Grammar](./docs/grammar.md)
 - [Language Design](./docs/language-design.md)

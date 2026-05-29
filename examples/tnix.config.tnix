@@ -3,6 +3,7 @@
   sourceDir = ./basics;
   entry = ./main.tnix;
   declarationDir = ./support;
+  declarationPacks = [];
   buildDir = ./dist;
   generatedDeclarationDir = ./dist/types;
   entries = [
