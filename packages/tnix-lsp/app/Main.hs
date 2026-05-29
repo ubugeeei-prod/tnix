@@ -14,7 +14,7 @@ import AnalysisCache
     insertAnalysisCache,
     lookupAnalysisCache,
   )
-import Control.Exception (IOException, try)
+import Control.Exception (IOException, SomeException, fromException, throwIO, try)
 import Data.Aeson
 import Data.IORef
 import Data.Text (Text)
@@ -23,12 +23,22 @@ import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
 import Driver (Analysis (..), analyzeText)
 import Paths_tnix_lsp qualified as PackageInfo
-import Server (asText, clearDiagnostics, clientCapabilities, field, publishDiagnostics, publishDiagnosticsWithContent, respond)
+import Server (asText, clearDiagnostics, clientCapabilities, field, publishDiagnostics, publishDiagnosticsWithContent, respond, respondError)
 import ServerProtocol (ReadOutcome (..), notify, readMessageOutcome)
 import Session qualified
 import System.Environment (getArgs)
-import System.Exit (exitFailure, exitSuccess)
-import System.IO (BufferMode (NoBuffering), hPutStrLn, hSetBinaryMode, hSetBuffering, stderr, stdin, stdout)
+import System.Exit (ExitCode (..), exitFailure, exitSuccess, exitWith)
+import System.IO
+  ( BufferMode (LineBuffering, NoBuffering),
+    IOMode (AppendMode),
+    hPutStrLn,
+    hSetBinaryMode,
+    hSetBuffering,
+    openFile,
+    stderr,
+    stdin,
+    stdout,
+  )
 
 -- | Start the stdio event loop and keep the latest document text in memory.
 main :: IO ()
@@ -40,33 +50,92 @@ handleArgs :: [String] -> IO ()
 handleArgs args
   | any (`elem` ["--help", "-h"]) args = putStrLn helpText
   | any (`elem` ["--version", "-v"]) args = putStrLn versionText
-  | null filteredArgs = runServer
-  | otherwise = do
-      hPutStrLn stderr ("tnix-lsp: unsupported arguments: " <> unwords filteredArgs)
-      hPutStrLn stderr "Use --stdio, --version, or --help."
-      exitFailure
-  where
-    filteredArgs = filter (/= "--stdio") args
+  | otherwise = case parseServerArgs args of
+      Left err -> do
+        hPutStrLn stderr ("tnix-lsp: " <> err)
+        hPutStrLn stderr "Use --stdio, --log-file PATH, --version, or --help."
+        exitFailure
+      Right logFile -> runServer logFile
 
-runServer :: IO ()
-runServer = do
+-- | Parse the supported server flags. Recognizes @--stdio@ (the implicit
+-- default) and an optional @--log-file PATH@ / @--log-file=PATH@; anything
+-- else is rejected so typos do not silently start a misconfigured server.
+parseServerArgs :: [String] -> Either String (Maybe FilePath)
+parseServerArgs = go Nothing
+  where
+    go logFile [] = Right logFile
+    go logFile ("--stdio" : rest) = go logFile rest
+    go _ ("--log-file" : path : rest) = go (Just path) rest
+    go _ ["--log-file"] = Left "--log-file requires a path argument"
+    go _ (arg : rest)
+      | Just path <- stripPrefix' "--log-file=" arg = go (Just path) rest
+      | otherwise = Left ("unsupported argument: " <> arg)
+    stripPrefix' prefix value =
+      if prefix == take (length prefix) value
+        then Just (drop (length prefix) value)
+        else Nothing
+
+-- | A logging sink. Diagnostics always reach stderr and, when @--log-file@ is
+-- configured, are also appended to that file.
+type Logger = Text -> IO ()
+
+runServer :: Maybe FilePath -> IO ()
+runServer logFile = do
   hSetBinaryMode stdin True
   hSetBinaryMode stdout True
   hSetBuffering stdin NoBuffering
   hSetBuffering stdout NoBuffering
+  logHandle <- traverse openLogHandle logFile
+  let logger = makeLogger logHandle
   ref <- newIORef mempty
   cacheRef <- newIORef emptyAnalysisCache
+  shutdownRef <- newIORef False
   let analyze = cachedAnalyzeText cacheRef
-  loop ref analyze
+  loop logger shutdownRef ref analyze
   where
-    loop ref analyze = do
+    openLogHandle path = do
+      h <- openFile path AppendMode
+      hSetBuffering h LineBuffering
+      pure h
+    makeLogger logHandle message = do
+      hPutStrLn stderr ("tnix-lsp: " <> T.unpack message)
+      case logHandle of
+        Just h -> hPutStrLn h ("tnix-lsp: " <> T.unpack message)
+        Nothing -> pure ()
+    loop logger shutdownRef ref analyze = do
       outcome <- readMessageOutcome stdin
       case outcome of
         ReadEof -> pure ()
-        ReadMessage msg -> handle ref analyze msg >> loop ref analyze
+        ReadMessage msg ->
+          safeHandle logger shutdownRef ref analyze msg >> loop logger shutdownRef ref analyze
         ReadError reason -> do
-          hPutStrLn stderr ("tnix-lsp: " <> T.unpack reason)
-          loop ref analyze
+          logger reason
+          loop logger shutdownRef ref analyze
+
+-- | Run one handler, isolating crashes so a single bad document or a partial
+-- function deep in the checker cannot take down the whole session.
+--
+-- 'ExitCode' (raised by @exit@/@shutdown@ handling) is re-thrown so the server
+-- can still terminate; any other exception is logged, surfaced to the client
+-- via @window/logMessage@, and—if the failing message was a request—answered
+-- with a JSON-RPC internal error so the client is never left waiting.
+safeHandle :: Logger -> IORef Bool -> IORef Session.Documents -> AnalyzeFn -> Value -> IO ()
+safeHandle logger shutdownRef ref analyze msg = do
+  result <- try (handle shutdownRef ref analyze msg)
+  case result of
+    Right () -> pure ()
+    Left err
+      | Just code <- fromException err -> throwIO (code :: ExitCode)
+      | otherwise -> do
+          let detail = T.pack (show (err :: SomeException))
+          logger ("handler error: " <> detail)
+          notify
+            stdout
+            "window/logMessage"
+            (object ["type" .= (1 :: Int), "message" .= ("tnix-lsp internal error: " <> detail)])
+          case field "id" msg of
+            Just _ -> respondError stdout msg (-32603) ("internal error: " <> detail)
+            Nothing -> pure ()
 
 -- | Wrap 'analyzeText' with the workspace-wide analysis cache so repeated
 -- hover / workspace-symbol / definition requests against unchanged content
@@ -99,11 +168,19 @@ versionText = "tnix-lsp " <> showVersion PackageInfo.version
 type AnalyzeFn = FilePath -> Text -> IO (Either String Analysis)
 
 -- | Dispatch one incoming JSON-RPC message.
-handle :: IORef Session.Documents -> AnalyzeFn -> Value -> IO ()
-handle ref analyze msg = case field "method" msg >>= asText of
+handle :: IORef Bool -> IORef Session.Documents -> AnalyzeFn -> Value -> IO ()
+handle shutdownRef ref analyze msg = case field "method" msg >>= asText of
   Just "initialize" -> respond stdout msg clientCapabilities
-  Just "shutdown" -> respond stdout msg Null
-  Just "exit" -> exitSuccess
+  Just "initialized" -> pure ()
+  Just "shutdown" -> writeIORef shutdownRef True >> respond stdout msg Null
+  -- Per the LSP spec, `exit` returns code 0 only when a `shutdown` request
+  -- preceded it, and 1 otherwise.
+  Just "exit" -> do
+    didShutdown <- readIORef shutdownRef
+    if didShutdown then exitSuccess else exitWith (ExitFailure 1)
+  -- Requests are processed synchronously, so by the time a cancellation
+  -- arrives its target has already been answered; acknowledge and ignore.
+  Just "$/cancelRequest" -> pure ()
   Just "textDocument/didOpen" -> update ref analyze msg >>= publish
   Just "textDocument/didChange" -> update ref analyze msg >>= publish
   Just "textDocument/didSave" -> update ref analyze msg >>= publish
@@ -122,7 +199,16 @@ handle ref analyze msg = case field "method" msg >>= asText of
   Just "textDocument/foldingRange" -> foldingRanges ref msg >>= respond stdout msg
   Just "textDocument/documentLink" -> documentLinks ref msg >>= respond stdout msg
   Just "textDocument/inlayHint" -> inlayHints ref analyze msg >>= respond stdout msg
-  _ -> pure ()
+  -- A request (carries an `id`) for a method we do not implement must be
+  -- answered with MethodNotFound; unknown notifications are ignored.
+  method -> case field "id" msg of
+    Just _ ->
+      respondError
+        stdout
+        msg
+        (-32601)
+        (maybe "method not found" ("method not found: " <>) method)
+    Nothing -> pure ()
 
 -- | Update the in-memory copy of a document and re-run analysis.
 update :: IORef Session.Documents -> AnalyzeFn -> Value -> IO (FilePath, Maybe Text, Either String Analysis)
