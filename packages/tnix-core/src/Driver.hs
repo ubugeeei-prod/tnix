@@ -24,6 +24,9 @@ module Driver
   )
 where
 
+import Alias
+import Check
+import Compile
 import Control.Applicative ((<|>))
 import Control.Exception (IOException, displayException, try)
 import Control.Monad (foldM, forM)
@@ -33,11 +36,6 @@ import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
-import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
-import System.FilePath ((</>), isAbsolute, joinPath, normalise, replaceExtension, splitDirectories, takeDirectory)
-import Alias
-import Check
-import Compile
 import Diagnostics (DiagnosticCode (..), withCode)
 import Emit
 import Indexed
@@ -45,6 +43,8 @@ import Kind
 import Parser
 import Pretty (renderExpr)
 import Syntax
+import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
+import System.FilePath (isAbsolute, joinPath, normalise, replaceExtension, splitDirectories, takeDirectory, (</>))
 import Type
 
 -- | End-to-end analysis result for one file.
@@ -76,7 +76,7 @@ analyzeText path input = do
     localAmbient <- collectAmbient path program
     let aliases = mkAliasEnv (programAliases program <> worldAliases supportWorld)
         ambient = localAmbient <> worldAmbient supportWorld
-        context = CheckContext {checkAliases = aliases, checkAmbient = ambient, checkFile = path}
+        context = CheckContext{checkAliases = aliases, checkAmbient = ambient, checkFile = path}
     result <- checkProgram context program
     pure
       Analysis
@@ -279,7 +279,7 @@ dropDotSlash path =
 mergeLoadedWorlds :: [DeclarationSupportFile] -> [World] -> Either String World
 mergeLoadedWorlds files loaded = do
   ambient <- mergeAmbientWorlds (zip (map declarationLoadPath files) (map worldAmbient loaded))
-  pure World {worldAliases = concatMap worldAliases loaded, worldAmbient = ambient}
+  pure World{worldAliases = concatMap worldAliases loaded, worldAmbient = ambient}
 
 loadDeclarationFile :: DeclarationSupportFile -> IO (Either String World)
 loadDeclarationFile file = do
@@ -294,7 +294,7 @@ loadDeclarationFile file = do
         _ <- validateProgramKinds (programAliases program) program
         _ <- validateProgramIndexedTypes program
         ambient <- collectAmbientWithBase path (declarationResolvePath file) program
-        pure World {worldAliases = programAliases program, worldAmbient = ambient}
+        pure World{worldAliases = programAliases program, worldAmbient = ambient}
 
 collectAmbient :: FilePath -> Program -> Either String (Map FilePath Scheme)
 collectAmbient file = collectAmbientWithBase file file
@@ -396,7 +396,7 @@ mergeAmbientWorlds = fmap snd . foldM step (Map.empty, Map.empty)
         Nothing ->
           Right (Map.insert target file sources, Map.insert target scheme ambient)
 
-duplicateNames :: Ord a => [a] -> [a]
+duplicateNames :: (Ord a) => [a] -> [a]
 duplicateNames = foldr step [] . group . sort
   where
     step xs acc =

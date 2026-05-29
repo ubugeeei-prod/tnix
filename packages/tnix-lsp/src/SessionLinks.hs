@@ -29,9 +29,9 @@ where
 
 import Data.Aeson (Value, object, (.=))
 import Data.Char (isAlphaNum, isDigit, isLetter)
+import Data.List (foldl')
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.List (foldl')
 import Server (pathUri, textRangeToUtf16Columns)
 import System.FilePath (isAbsolute, joinPath, normalise, splitDirectories, (</>))
 
@@ -40,10 +40,10 @@ import System.FilePath (isAbsolute, joinPath, normalise, splitDirectories, (</>)
 -- @documentLinkStartChar@ / @documentLinkEndChar@ are UTF-16 columns so
 -- the encoded LSP payload matches the protocol's character index model.
 data DocumentLink = DocumentLink
-  { documentLinkLine :: !Int
-  , documentLinkStartChar :: !Int
-  , documentLinkEndChar :: !Int
-  , documentLinkPath :: !Text
+  { documentLinkLine :: !Int,
+    documentLinkStartChar :: !Int,
+    documentLinkEndChar :: !Int,
+    documentLinkPath :: !Text
   }
   deriving (Eq, Show)
 
@@ -59,10 +59,10 @@ encodeDocumentLink baseDir link =
   object
     [ "range"
         .= object
-          [ "start" .= object ["line" .= documentLinkLine link, "character" .= documentLinkStartChar link]
-          , "end" .= object ["line" .= documentLinkLine link, "character" .= documentLinkEndChar link]
-          ]
-    , "target" .= pathUri (resolveLinkTarget baseDir (Text.unpack (documentLinkPath link)))
+          [ "start" .= object ["line" .= documentLinkLine link, "character" .= documentLinkStartChar link],
+            "end" .= object ["line" .= documentLinkLine link, "character" .= documentLinkEndChar link]
+          ],
+      "target" .= pathUri (resolveLinkTarget baseDir (Text.unpack (documentLinkPath link)))
     ]
 
 -- | Combine a base directory with a possibly-relative link path. Absolute
@@ -78,13 +78,13 @@ resolveLinkTarget baseDir path
 -- stays pure for unit tests.
 collapseDotDot :: FilePath -> FilePath
 collapseDotDot = joinPath . reverse . foldl' step [] . splitDirectories
- where
-  step acc ".." = case acc of
-    (top : tops) | not (isAnchor top) && top /= ".." -> tops
-    _ -> ".." : acc
-  step acc "." = acc
-  step acc s = s : acc
-  isAnchor s = s == "/" || s == "" || s == "."
+  where
+    step acc ".." = case acc of
+      (top : tops) | not (isAnchor top) && top /= ".." -> tops
+      _ -> ".." : acc
+    step acc "." = acc
+    step acc s = s : acc
+    isAnchor s = s == "/" || s == "" || s == "."
 
 -- | Scan @content@ and return one 'DocumentLink' per @import@ path
 -- literal or @declare@ string literal.
@@ -99,38 +99,42 @@ findDocumentLinks content =
 
 scanLine :: (Int, Text) -> [DocumentLink]
 scanLine (lineNo, line) = go 0 False False []
- where
-  len = Text.length line
-  go ix inDQuote escaped acc
-    | ix >= len = reverse acc
-    | otherwise =
-        let c = Text.index line ix
-         in case c of
-              '\\' | inDQuote && not escaped ->
-                go (ix + 1) inDQuote True acc
-              '"' | not escaped ->
-                go (ix + 1) (not inDQuote) False acc
-              '#' | not inDQuote ->
-                reverse acc
-              _ | inDQuote ->
-                go (ix + 1) inDQuote False acc
-              _
-                | isKeywordAt "import" line ix ->
-                    case scanPathLiteralAt line (ix + 6) of
-                      Just (pathStart, pathEnd, pathText) ->
-                        let (sc, ec) = textRangeToUtf16Columns line pathStart pathEnd
-                         in go pathEnd inDQuote False (DocumentLink lineNo sc ec pathText : acc)
-                      Nothing -> go (ix + 6) inDQuote False acc
-                | isKeywordAt "declare" line ix ->
-                    case scanQuotedStringAt line (ix + 7) of
-                      Just (pathStart, pathEnd, pathText) ->
-                        let (sc, ec) = textRangeToUtf16Columns line pathStart pathEnd
-                         in go pathEnd inDQuote False (DocumentLink lineNo sc ec pathText : acc)
-                      Nothing -> go (ix + 7) inDQuote False acc
-                | isIdentChar c ->
-                    let identLen = Text.length (Text.takeWhile isIdentChar (Text.drop ix line))
-                     in go (ix + identLen) inDQuote False acc
-                | otherwise -> go (ix + 1) inDQuote False acc
+  where
+    len = Text.length line
+    go ix inDQuote escaped acc
+      | ix >= len = reverse acc
+      | otherwise =
+          let c = Text.index line ix
+           in case c of
+                '\\'
+                  | inDQuote && not escaped ->
+                      go (ix + 1) inDQuote True acc
+                '"'
+                  | not escaped ->
+                      go (ix + 1) (not inDQuote) False acc
+                '#'
+                  | not inDQuote ->
+                      reverse acc
+                _
+                  | inDQuote ->
+                      go (ix + 1) inDQuote False acc
+                _
+                  | isKeywordAt "import" line ix ->
+                      case scanPathLiteralAt line (ix + 6) of
+                        Just (pathStart, pathEnd, pathText) ->
+                          let (sc, ec) = textRangeToUtf16Columns line pathStart pathEnd
+                           in go pathEnd inDQuote False (DocumentLink lineNo sc ec pathText : acc)
+                        Nothing -> go (ix + 6) inDQuote False acc
+                  | isKeywordAt "declare" line ix ->
+                      case scanQuotedStringAt line (ix + 7) of
+                        Just (pathStart, pathEnd, pathText) ->
+                          let (sc, ec) = textRangeToUtf16Columns line pathStart pathEnd
+                           in go pathEnd inDQuote False (DocumentLink lineNo sc ec pathText : acc)
+                        Nothing -> go (ix + 7) inDQuote False acc
+                  | isIdentChar c ->
+                      let identLen = Text.length (Text.takeWhile isIdentChar (Text.drop ix line))
+                       in go (ix + identLen) inDQuote False acc
+                  | otherwise -> go (ix + 1) inDQuote False acc
 
 -- | True when @line@ contains @keyword@ at position @ix@ with a word
 -- boundary on the right (start-of-line on the left is guaranteed by the

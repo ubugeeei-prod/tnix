@@ -16,7 +16,7 @@ compileProgram = renderProgramAsNix . eraseProgram
 eraseProgram :: Program -> Program
 eraseProgram program =
   program
-    { programExpr = fmap (\marked -> marked {markedValue = eraseExpr (markedValue marked)}) (programExpr program)
+    { programExpr = fmap (\marked -> marked{markedValue = eraseExpr (markedValue marked)}) (programExpr program)
     }
 
 eraseExpr :: Expr -> Expr
@@ -25,7 +25,7 @@ eraseExpr expr =
     ELambda pattern' body -> ELambda (erasePattern pattern') (eraseExpr body)
     EApp fun arg -> EApp (eraseExpr fun) (eraseExpr arg)
     EAdd left right -> EAdd (eraseExpr left) (eraseExpr right)
-    ELet items body -> ELet (map eraseMarkedLetItem [item | item <- items, isLetBinding (markedValue item)]) (eraseExpr body)
+    ELet items body -> ELet [eraseMarkedLetItem item | item <- items, isLetBinding (markedValue item)] (eraseExpr body)
     EAttrSet items -> EAttrSet (map eraseAttrItem items)
     ESelect base fields -> ESelect (eraseExpr base) (map eraseSelectStep fields)
     EIf cond yesExpr noExpr -> EIf (eraseExpr cond) (eraseExpr yesExpr) (eraseExpr noExpr)
@@ -42,10 +42,10 @@ eraseLetItem (LetBinding name expr) = LetBinding name (eraseExpr expr)
 eraseLetItem item = item
 
 eraseMarkedLetItem :: Marked LetItem -> Marked LetItem
-eraseMarkedLetItem marked = marked {markedValue = eraseLetItem (markedValue marked)}
+eraseMarkedLetItem marked = marked{markedValue = eraseLetItem (markedValue marked)}
 
 isLetBinding :: LetItem -> Bool
-isLetBinding LetBinding {} = True
+isLetBinding LetBinding{} = True
 isLetBinding _ = False
 
 eraseAttrItem :: AttrItem -> AttrItem

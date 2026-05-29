@@ -121,8 +121,9 @@ stringLiteralText = \case
 -- tnix currently supports variable binders with an optional annotation. The
 -- syntax is deliberately Haskell-like while remaining valid-looking to Nix
 -- users.
-data Pattern = PVar Name (Maybe Type)
-             | PAttrSet [Name] Bool
+data Pattern
+  = PVar Name (Maybe Type)
+  | PAttrSet [Name] Bool
   deriving (Eq, Show)
 
 -- | One step in an attribute selection chain.

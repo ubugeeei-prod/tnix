@@ -24,7 +24,7 @@ module SessionReferences
 where
 
 import Control.Applicative ((<|>))
-import Data.List (isSuffixOf, nub, sortOn)
+import Data.List (find, isSuffixOf, nub, sortOn)
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -134,7 +134,7 @@ resolveDefinitionLocation file content workspace builtinsFile result lineNo char
    in case parts of
         ["builtins", member] ->
           builtinsFile >>= \targetFile ->
-            let targetDoc = listToMaybe (filter (\doc -> workspaceDocumentFile doc == targetFile) workspace)
+            let targetDoc = find (\doc -> workspaceDocumentFile doc == targetFile) workspace
              in case targetDoc of
                   Just doc ->
                     (\(targetLine, startChar, endChar) -> (targetFile, targetLine, startChar, endChar))
@@ -170,9 +170,9 @@ resolveReferenceTarget file content workspace builtinsFile result lineNo charNo 
       workspaceField name =
         Just
           ReferenceTarget
-            { referenceTargetFiles = map workspaceDocumentFile workspace
-            , referenceTargetNeedle = name
-            , referenceTargetMode = FieldWordMatch
+            { referenceTargetFiles = map workspaceDocumentFile workspace,
+              referenceTargetNeedle = name,
+              referenceTargetMode = FieldWordMatch
             }
       uniqueWorkspace name =
         case filter (\entry -> indexedSymbolName entry == name) workspaceSymbols of

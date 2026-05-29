@@ -29,9 +29,9 @@ import Type (Name, Scheme)
 
 -- | Internal inlay-hint value. Coordinates are line and UTF-16 column.
 data InlayHint = InlayHint
-  { inlayHintLine :: !Int
-  , inlayHintCharacter :: !Int
-  , inlayHintLabel :: !Text
+  { inlayHintLine :: !Int,
+    inlayHintCharacter :: !Int,
+    inlayHintLabel :: !Text
   }
   deriving (Eq, Show)
 
@@ -41,14 +41,14 @@ data InlayHint = InlayHint
 -- @:: T@ payload sits one space to the right of the identifier.
 encodeInlayHints :: [InlayHint] -> [Value]
 encodeInlayHints = map encode1
- where
-  encode1 (InlayHint line ch label) =
-    object
-      [ "position" .= object ["line" .= line, "character" .= ch]
-      , "label" .= label
-      , "kind" .= (1 :: Int)
-      , "paddingLeft" .= True
-      ]
+  where
+    encode1 (InlayHint line ch label) =
+      object
+        [ "position" .= object ["line" .= line, "character" .= ch],
+          "label" .= label,
+          "kind" .= (1 :: Int),
+          "paddingLeft" .= True
+        ]
 
 -- | Compute inlay hints for one document.
 --
@@ -71,11 +71,11 @@ topLevelLetItems prog = case programExpr prog of
 collectHints :: Text -> Map.Map Name Scheme -> [LetItem] -> [InlayHint]
 collectHints content bindings items =
   [ InlayHint line endChar (":: " <> renderScheme scheme)
-  | item <- items
-  , Just name <- [bindingName item]
-  , not (hasSignature name items)
-  , Just scheme <- [Map.lookup name bindings]
-  , Just (line, _, endChar) <- [findDefinitionRange content name]
+  | item <- items,
+    Just name <- [bindingName item],
+    not (hasSignature name items),
+    Just scheme <- [Map.lookup name bindings],
+    Just (line, _, endChar) <- [findDefinitionRange content name]
   ]
 
 bindingName :: LetItem -> Maybe Name
@@ -85,6 +85,6 @@ bindingName = \case
 
 hasSignature :: Name -> [LetItem] -> Bool
 hasSignature name = any sameSignature
- where
-  sameSignature (LetSignature n _) = n == name
-  sameSignature _ = False
+  where
+    sameSignature (LetSignature n _) = n == name
+    sameSignature _ = False

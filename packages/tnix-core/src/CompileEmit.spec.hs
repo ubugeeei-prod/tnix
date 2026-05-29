@@ -5,10 +5,10 @@ module Main (main) where
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
-import System.FilePath ((</>))
-import Test.Hspec
 import Driver (compileFile, compileText, emitFile, emitFileTo, emitText, parseText)
 import Syntax
+import System.FilePath ((</>))
+import Test.Hspec
 import TestSupport (expectLeftContaining, expectRight, fixturePathCandidates, source, withCopiedFixtureTree, withTempTree)
 import Type
 
@@ -103,13 +103,12 @@ spec = describe "compile and emit" $ do
     output <- emitText "main.tnix" "{ name = \"tnix\"; count = 1; }" >>= expectRight
     program <- expectRight (parseDecl "main.d.tnix" output)
     programAmbient program
-      `shouldBe`
-        [ AmbientDecl
-            "./main.nix"
-            [ AmbientEntry "count" (TLit (LInt 1)),
-              AmbientEntry "name" (TLit (LString "tnix"))
-            ]
-        ]
+      `shouldBe` [ AmbientDecl
+                     "./main.nix"
+                     [ AmbientEntry "count" (TLit (LInt 1)),
+                       AmbientEntry "name" (TLit (LString "tnix"))
+                     ]
+                 ]
 
   it "matches the exact emitted declaration text for record roots" $ do
     output <- emitText "main.tnix" "{ name = \"tnix\"; count = 1; }" >>= expectRight
@@ -190,11 +189,10 @@ spec = describe "compile and emit" $ do
         >>= expectRight
     program <- expectRight (parseDecl "main.d.tnix" output)
     programAmbient program
-      `shouldBe`
-        [ AmbientDecl
-            "./main.nix"
-            [AmbientEntry "default" (TForall ["t0"] (TFun Many (TVar "t0") (TVar "t0")))]
-        ]
+      `shouldBe` [ AmbientDecl
+                     "./main.nix"
+                     [AmbientEntry "default" (TForall ["t0"] (TFun Many (TVar "t0") (TVar "t0")))]
+                 ]
 
   it "matches the exact emitted declaration text for polymorphic defaults" $ do
     output <-
@@ -226,37 +224,34 @@ spec = describe "compile and emit" $ do
     output <- emitText "main.tnix" "[[1 2] [3 4]]" >>= expectRight
     program <- expectRight (parseDecl "main.d.tnix" output)
     programAmbient program
-      `shouldBe`
-        [ AmbientDecl
-            "./main.nix"
-            [ AmbientEntry
-                "default"
-                (TApp (TApp (TApp (TCon "Matrix") (TLit (LInt 2))) (TLit (LInt 2))) (TUnion [TLit (LInt 1), TLit (LInt 2), TLit (LInt 3), TLit (LInt 4)]))
-            ]
-        ]
+      `shouldBe` [ AmbientDecl
+                     "./main.nix"
+                     [ AmbientEntry
+                         "default"
+                         (TApp (TApp (TApp (TCon "Matrix") (TLit (LInt 2))) (TLit (LInt 2))) (TUnion [TLit (LInt 1), TLit (LInt 2), TLit (LInt 3), TLit (LInt 4)]))
+                     ]
+                 ]
 
   it "emits tuple roots for heterogeneous list literals" $ do
     output <- emitText "main.tnix" "[1 \"x\"]" >>= expectRight
     program <- expectRight (parseDecl "main.d.tnix" output)
     programAmbient program
-      `shouldBe`
-        [ AmbientDecl
-            "./main.nix"
-            [AmbientEntry "default" (TApp (TCon "Tuple") (TTypeList [TLit (LInt 1), TLit (LString "x")]))]
-        ]
+      `shouldBe` [ AmbientDecl
+                     "./main.nix"
+                     [AmbientEntry "default" (TApp (TCon "Tuple") (TTypeList [TLit (LInt 1), TLit (LString "x")]))]
+                 ]
 
   it "round-trips higher-rank tensor declarations through the emitter" $ do
     output <- emitText "main.tnix" "[[[1] [2]] [[3] [4]]]" >>= expectRight
     program <- expectRight (parseDecl "main.d.tnix" output)
     programAmbient program
-      `shouldBe`
-        [ AmbientDecl
-            "./main.nix"
-            [ AmbientEntry
-                "default"
-                (TApp (TApp (TCon "Tensor") (TTypeList [TLit (LInt 2), TLit (LInt 2), TLit (LInt 1)])) (TUnion [TLit (LInt 1), TLit (LInt 2), TLit (LInt 3), TLit (LInt 4)]))
-            ]
-        ]
+      `shouldBe` [ AmbientDecl
+                     "./main.nix"
+                     [ AmbientEntry
+                         "default"
+                         (TApp (TApp (TCon "Tensor") (TTypeList [TLit (LInt 2), TLit (LInt 2), TLit (LInt 1)])) (TUnion [TLit (LInt 1), TLit (LInt 2), TLit (LInt 3), TLit (LInt 4)]))
+                     ]
+                 ]
 
   it "emits ragged nested list roots as structural list declarations" $ do
     output <- emitText "main.tnix" "[[1] [2 3]]" >>= expectRight

@@ -43,27 +43,27 @@ uriPath text = T.unpack (percentDecode (stripAuthority (fromMaybe text (T.stripP
 percentEncode :: Text -> Text
 percentEncode =
   T.concatMap encodeChar
- where
-  encodeChar char
-    | isUnreserved char || char == '/' = T.singleton char
-    | otherwise = T.concat (map encodeByte (BS.unpack (TextEncoding.encodeUtf8 (T.singleton char))))
-  encodeByte byte =
-    let hex = showHex byte ""
-     in T.pack ['%', toUpper (pad hex !! 0), toUpper (pad hex !! 1)]
-  pad [digit] = ['0', digit]
-  pad digits = digits
-  isUnreserved char = isAsciiLower char || isAsciiUpper char || isDigit char || char `elem` ['-', '.', '_', '~']
+  where
+    encodeChar char
+      | isUnreserved char || char == '/' = T.singleton char
+      | otherwise = T.concat (map encodeByte (BS.unpack (TextEncoding.encodeUtf8 (T.singleton char))))
+    encodeByte byte =
+      let hex = showHex byte ""
+       in T.pack ['%', toUpper (head (pad hex)), toUpper (pad hex !! 1)]
+    pad [digit] = ['0', digit]
+    pad digits = digits
+    isUnreserved char = isAsciiLower char || isAsciiUpper char || isDigit char || char `elem` ['-', '.', '_', '~']
 
 percentDecode :: Text -> Text
 percentDecode text =
   case TextEncoding.decodeUtf8' (BS.pack (decodeBytes (T.unpack text))) of
     Left _ -> text
     Right decoded -> decoded
- where
-  decodeBytes ('%' : a : b : rest)
-    | isHexDigit a && isHexDigit b = fromIntegral (digitToInt a * 16 + digitToInt b) : decodeBytes rest
-  decodeBytes (char : rest) = BS.unpack (TextEncoding.encodeUtf8 (T.singleton char)) <> decodeBytes rest
-  decodeBytes [] = []
+  where
+    decodeBytes ('%' : a : b : rest)
+      | isHexDigit a && isHexDigit b = fromIntegral (digitToInt a * 16 + digitToInt b) : decodeBytes rest
+    decodeBytes (char : rest) = BS.unpack (TextEncoding.encodeUtf8 (T.singleton char)) <> decodeBytes rest
+    decodeBytes [] = []
 
 stripAuthority :: Text -> Text
 stripAuthority path =

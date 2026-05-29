@@ -6,11 +6,12 @@
 -- compilation can be implemented as a mostly mechanical erasure pass.
 module ParserExpr (expressionParser, programParser) where
 
+import Data.Either (lefts, rights)
 import Data.Text qualified as Text
-import Text.Megaparsec
 import ParserLexer
 import ParserType
 import Syntax
+import Text.Megaparsec
 import Type
 
 -- | Parse a full tnix source file.
@@ -20,8 +21,8 @@ programParser = do
   expr <- optional (markCurrent expressionParser)
   pure
     Program
-      { programAliases = [alias | Left alias <- decls],
-        programAmbient = [ambient | Right ambient <- decls],
+      { programAliases = lefts decls,
+        programAmbient = rights decls,
         programExpr = expr
       }
 
@@ -38,7 +39,7 @@ aliasParser = do
   _ <- symbol "="
   body <- typeParser
   _ <- symbol ";"
-  pure TypeAlias {typeAliasName = name, typeAliasParams = params, typeAliasBody = body}
+  pure TypeAlias{typeAliasName = name, typeAliasParams = params, typeAliasBody = body}
 
 -- | Parse a `declare` block that describes an existing `.nix` module.
 ambientParser :: Parser AmbientDecl
@@ -47,7 +48,7 @@ ambientParser = do
   path <- pathLiteral <|> (Text.unpack <$> stringLiteral)
   entries <- braces (many ambientEntry)
   _ <- symbol ";"
-  pure AmbientDecl {ambientPath = path, ambientEntries = entries}
+  pure AmbientDecl{ambientPath = path, ambientEntries = entries}
 
 -- | Parse a single ambiently-exported member.
 ambientEntry :: Parser AmbientEntry
@@ -56,7 +57,7 @@ ambientEntry = do
   _ <- symbol "::"
   ty <- typeParser
   _ <- symbol ";"
-  pure AmbientEntry {ambientEntryName = name, ambientEntryType = ty}
+  pure AmbientEntry{ambientEntryName = name, ambientEntryType = ty}
 
 -- | Parse any expression form supported by the prototype.
 expressionParser :: Parser Expr
@@ -70,8 +71,7 @@ ifParser = do
   reserved "then"
   yesExpr <- expressionParser
   reserved "else"
-  noExpr <- expressionParser
-  pure (EIf cond yesExpr noExpr)
+  EIf cond yesExpr <$> expressionParser
 
 -- | Parse a `let ... in ...` block with optional type signatures.
 letParser :: Parser Expr
@@ -202,7 +202,7 @@ patternParser = try (parens typed) <|> try attrSetPattern <|> (PVar <$> identifi
       PVar name . Just <$> typeParser
     attrSetPattern = braces $ do
       items <- sepEndBy patternItem (symbol ",")
-      let names = [name | Left name <- items]
+      let names = lefts items
           open = any isEllipsis items
       pure (PAttrSet names open)
     patternItem = (Left <$> identifier) <|> (Right () <$ symbol "...")
@@ -220,8 +220,9 @@ chainLeft1 item op = do
   rest first
   where
     rest acc =
-      (do
-        f <- op
-        next <- item
-        rest (f acc next))
+      ( do
+          f <- op
+          next <- item
+          rest (f acc next)
+      )
         <|> pure acc

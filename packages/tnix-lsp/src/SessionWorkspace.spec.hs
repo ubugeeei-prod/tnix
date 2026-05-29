@@ -7,7 +7,7 @@ import Control.Monad (forM_)
 import Data.List (sort)
 import SessionWorkspace
 import System.Directory (createDirectory, createDirectoryIfMissing, getTemporaryDirectory, removeFile, removePathForcibly)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
 import System.IO (hClose, openTempFile)
 import Test.Hspec
 
@@ -112,34 +112,34 @@ spec = do
 
     it "walks the workspace when a marker is present, skipping ignored dirs" $
       withTempTree
-        [ ("flake.nix", "")
-        , ("src/a.tnix", "1")
-        , ("src/nested/b.tnix", "2")
-        , ("dist/built.tnix", "ignored")
-        , ("node_modules/dep.tnix", "ignored")
-        , ("result-doc/inside.tnix", "ignored")
+        [ ("flake.nix", ""),
+          ("src/a.tnix", "1"),
+          ("src/nested/b.tnix", "2"),
+          ("dist/built.tnix", "ignored"),
+          ("node_modules/dep.tnix", "ignored"),
+          ("result-doc/inside.tnix", "ignored")
         ]
         ( \root -> do
             files <- workspaceFilesFor (root </> "src/a.tnix")
             sort files
               `shouldBe` sort
-                [ root </> "src/a.tnix"
-                , root </> "src/nested/b.tnix"
+                [ root </> "src/a.tnix",
+                  root </> "src/nested/b.tnix"
                 ]
         )
 
 withTempTree :: [(FilePath, String)] -> (FilePath -> IO a) -> IO a
 withTempTree files action = bracket createRoot removePathForcibly (\root -> writeTree root >> action root)
- where
-  createRoot = do
-    tmp <- getTemporaryDirectory
-    (path, handle) <- openTempFile tmp "tnix-session-workspace-spec"
-    hClose handle
-    removeFile path
-    createDirectory path
-    pure path
-  writeTree root =
-    forM_ files $ \(relative, content) -> do
-      let path = root </> relative
-      createDirectoryIfMissing True (takeDirectory path)
-      writeFile path content
+  where
+    createRoot = do
+      tmp <- getTemporaryDirectory
+      (path, handle) <- openTempFile tmp "tnix-session-workspace-spec"
+      hClose handle
+      removeFile path
+      createDirectory path
+      pure path
+    writeTree root =
+      forM_ files $ \(relative, content) -> do
+        let path = root </> relative
+        createDirectoryIfMissing True (takeDirectory path)
+        writeFile path content

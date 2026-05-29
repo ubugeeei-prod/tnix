@@ -41,10 +41,10 @@ module Indexed
   )
 where
 
-import Control.Monad (when)
+import Alias (collectApps)
+import Control.Monad (unless, when)
 import Data.Maybe (isNothing)
 import Data.Text (Text)
-import Alias (collectApps)
 import Syntax (AmbientDecl (ambientEntries), AmbientEntry (ambientEntryType), AttrItem (..), Expr (..), LetItem (..), Marked (markedValue), Pattern (..), Program (..), SelectStep (..))
 import Type (LiteralType (..), Name, Type (..), TypeAlias (typeAliasBody), tDynamic, tFloat, tInt, tList, tNat, tNumber)
 
@@ -272,7 +272,7 @@ validateProgramIndexedTypes program =
 
 -- | Build the internal canonical tensor spelling used by normalization.
 canonicalTensorType :: [Type] -> Type -> Type
-canonicalTensorType dims elemTy = TApp (TApp (TCon "Tensor") (TTypeList dims)) elemTy
+canonicalTensorType dims = TApp (TApp (TCon "Tensor") (TTypeList dims))
 
 -- | Recover the nicest surface spelling for a tensor shape.
 --
@@ -494,7 +494,7 @@ validateNumericCarrierType label site = \case
 -- | Check that numeric bounds agree with their base family and interval order.
 validateRangeBounds :: Text -> NumericBound -> NumericBound -> Type -> Either String ()
 validateRangeBounds label lower upper baseTy = do
-  when (not (boundsFitBase lower upper baseTy)) $
+  unless (boundsFitBase lower upper baseTy) $
     Left (renderRangeError label "Range bounds do not match base type" (boundType lower) (boundType upper))
   when (compareNumericBound lower upper == GT) $
     Left (renderRangeError label "Range bounds are inverted" (boundType lower) (boundType upper))
@@ -546,7 +546,7 @@ isObviouslyInvalidIndex = \case
   TLit (LFloat _) -> True
   TLit (LBool _) -> True
   TTypeList _ -> True
-  TFun _ _ _ -> True
+  TFun{} -> True
   TRecord _ -> True
   TForall _ _ -> True
   TCon name -> isPrimitiveTypeName name
@@ -640,5 +640,5 @@ joinTupleItems left right
   | left == right = left
   | otherwise = TUnion [left, right]
 
-traverse_ :: Foldable f => (a -> Either String b) -> f a -> Either String ()
+traverse_ :: (Foldable f) => (a -> Either String b) -> f a -> Either String ()
 traverse_ step = foldr (\item acc -> step item *> acc) (Right ())

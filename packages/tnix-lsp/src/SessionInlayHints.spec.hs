@@ -23,9 +23,9 @@ spec = do
       let content = Text.unlines ["let", "  value = 1;", "in value"]
           program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr =
+              { programAliases = [],
+                programAmbient = [],
+                programExpr =
                   Just
                     ( Marked
                         Nothing
@@ -44,15 +44,15 @@ spec = do
       let content = Text.unlines ["let", "  value :: Int;", "  value = 1;", "in value"]
           program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr =
+              { programAliases = [],
+                programAmbient = [],
+                programExpr =
                   Just
                     ( Marked
                         Nothing
                         ( ELet
-                            [ Marked Nothing (LetSignature "value" tInt)
-                            , Marked Nothing (LetBinding "value" (EInt 1))
+                            [ Marked Nothing (LetSignature "value" tInt),
+                              Marked Nothing (LetBinding "value" (EInt 1))
                             ]
                             (EVar "value")
                         )
@@ -66,9 +66,9 @@ spec = do
           scheme = Scheme ["a"] (TFun Many (TVar "a") (TVar "a"))
           program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr =
+              { programAliases = [],
+                programAmbient = [],
+                programExpr =
                   Just
                     ( Marked
                         Nothing
@@ -91,15 +91,15 @@ spec = do
       let content = Text.unlines ["let", "  a = 1;", "  b = 2;", "in a"]
           program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr =
+              { programAliases = [],
+                programAmbient = [],
+                programExpr =
                   Just
                     ( Marked
                         Nothing
                         ( ELet
-                            [ Marked Nothing (LetBinding "a" (EInt 1))
-                            , Marked Nothing (LetBinding "b" (EInt 2))
+                            [ Marked Nothing (LetBinding "a" (EInt 1)),
+                              Marked Nothing (LetBinding "b" (EInt 2))
                             ]
                             (EVar "a")
                         )
@@ -117,9 +117,9 @@ spec = do
 stubAnalysis :: Program -> Map.Map Name Scheme -> Analysis
 stubAnalysis program bindings =
   Analysis
-    { analysisProgram = program
-    , analysisRoot = Nothing
-    , analysisBindings = bindings
-    , analysisAliases = mempty
-    , analysisAmbient = mempty
+    { analysisProgram = program,
+      analysisRoot = Nothing,
+      analysisBindings = bindings,
+      analysisAliases = mempty,
+      analysisAmbient = mempty
     }

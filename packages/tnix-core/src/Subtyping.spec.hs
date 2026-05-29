@@ -2,10 +2,10 @@
 
 module Main (main) where
 
-import Data.Map.Strict qualified as Map
-import Test.Hspec
 import Alias (mkAliasEnv)
+import Data.Map.Strict qualified as Map
 import Subtyping (isConsistent, isSubtype, joinTypes, lookupRecordField, resolveType)
+import Test.Hspec
 import Type
 
 main :: IO ()

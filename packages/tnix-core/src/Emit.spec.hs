@@ -19,9 +19,9 @@ spec = do
     it "emits an attribute-set root field-by-field" $ do
       let program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr = Just (markedExpr (EAttrSet []))
+              { programAliases = [],
+                programAmbient = [],
+                programExpr = Just (markedExpr (EAttrSet []))
               }
           scheme =
             Scheme
@@ -37,9 +37,9 @@ spec = do
     it "exposes non-record roots as `default`" $ do
       let program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr = Just (markedExpr (EInt 1))
+              { programAliases = [],
+                programAmbient = [],
+                programExpr = Just (markedExpr (EInt 1))
               }
           scheme = Scheme [] tInt
       emitDeclarationFile "src/value.tnix" program scheme
@@ -48,9 +48,9 @@ spec = do
     it "preserves the polymorphic quantifier on default-style schemes" $ do
       let program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr = Just (markedExpr (ELambda (PVar "x" Nothing) (EVar "x")))
+              { programAliases = [],
+                programAmbient = [],
+                programExpr = Just (markedExpr (ELambda (PVar "x" Nothing) (EVar "x")))
               }
           scheme = Scheme ["a"] (TFun Many (TVar "a") (TVar "a"))
       emitDeclarationFile "src/id.tnix" program scheme
@@ -61,13 +61,13 @@ spec = do
             Program
               { programAliases =
                   [ TypeAlias
-                      { typeAliasName = "Pair"
-                      , typeAliasParams = ["a", "b"]
-                      , typeAliasBody = TRecord (Map.fromList [("fst", TVar "a"), ("snd", TVar "b")])
+                      { typeAliasName = "Pair",
+                        typeAliasParams = ["a", "b"],
+                        typeAliasBody = TRecord (Map.fromList [("fst", TVar "a"), ("snd", TVar "b")])
                       }
-                  ]
-              , programAmbient = []
-              , programExpr = Just (markedExpr (EInt 1))
+                  ],
+                programAmbient = [],
+                programExpr = Just (markedExpr (EInt 1))
               }
           scheme = Scheme [] tInt
           rendered = emitDeclarationFile "src/lib.tnix" program scheme
@@ -78,9 +78,9 @@ spec = do
     it "rewrites the declare target relative to the destination directory" $ do
       let program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr = Just (markedExpr (EAttrSet []))
+              { programAliases = [],
+                programAmbient = [],
+                programExpr = Just (markedExpr (EAttrSet []))
               }
           scheme = Scheme [] (TRecord (Map.fromList [("value", tInt)]))
       emitDeclarationFileFor "dist/lib.nix" "dist/types/lib.d.tnix" program scheme
@@ -89,9 +89,9 @@ spec = do
     it "keeps an absolute declare path verbatim" $ do
       let program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr = Just (markedExpr (EInt 1))
+              { programAliases = [],
+                programAmbient = [],
+                programExpr = Just (markedExpr (EInt 1))
               }
           scheme = Scheme [] tInt
       emitDeclarationFileFor "/abs/runtime.nix" "/abs/types/runtime.d.tnix" program scheme
@@ -100,18 +100,18 @@ spec = do
     it "strips redundant casts before deciding the emission shape" $ do
       let program =
             Program
-              { programAliases = []
-              , programAmbient = []
-              , programExpr = Just (markedExpr (ECast (EAttrSet []) tInt))
+              { programAliases = [],
+                programAmbient = [],
+                programExpr = Just (markedExpr (ECast (EAttrSet []) tInt))
               }
           scheme = Scheme [] (TRecord (Map.fromList [("value", tString)]))
       emitDeclarationFileFor "src/cast.nix" "src/cast.d.tnix" program scheme
         `shouldContain'` "value :: String;"
 
 markedExpr :: Expr -> Marked Expr
-markedExpr expr = Marked {markedDirective = Nothing, markedValue = expr}
+markedExpr expr = Marked{markedDirective = Nothing, markedValue = expr}
 
-shouldContain' :: HasCallStack => Text -> Text -> Expectation
+shouldContain' :: (HasCallStack) => Text -> Text -> Expectation
 shouldContain' haystack needle =
   if needle `Text.isInfixOf` haystack
     then pure ()

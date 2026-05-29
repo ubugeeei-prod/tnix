@@ -11,12 +11,12 @@ module Emit
   )
 where
 
+import Data.List (isPrefixOf)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
-import Data.List (isPrefixOf)
-import System.FilePath (isRelative, joinPath, normalise, replaceExtension, splitDirectories, takeDirectory)
 import Pretty (renderDeclarationFile)
 import Syntax
+import System.FilePath (isRelative, joinPath, normalise, replaceExtension, splitDirectories, takeDirectory)
 import Type
 
 -- | Emit a `.d.tnix`-style declaration text for a source file.
@@ -24,8 +24,8 @@ import Type
 -- Local aliases are preserved verbatim so downstream files can reuse the same
 -- abstractions rather than only seeing fully-expanded record shapes.
 emitDeclarationFile :: FilePath -> Program -> Scheme -> Text
-emitDeclarationFile source program scheme =
-  emitDeclarationFileFor (replaceExtension source "nix") (replaceExtension source "d.tnix") program scheme
+emitDeclarationFile source =
+  emitDeclarationFileFor (replaceExtension source "nix") (replaceExtension source "d.tnix")
 
 emitDeclarationFileFor :: FilePath -> FilePath -> Program -> Scheme -> Text
 emitDeclarationFileFor runtimeTarget declarationPath program scheme =
@@ -61,7 +61,7 @@ relativeBetween base target =
                 [] -> "."
                 parts -> joinPath parts
 
-sharedPrefixLength :: Eq a => [a] -> [a] -> Int
+sharedPrefixLength :: (Eq a) => [a] -> [a] -> Int
 sharedPrefixLength left right =
   length (takeWhile id (zipWith (==) left right))
 

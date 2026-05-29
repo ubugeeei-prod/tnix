@@ -19,11 +19,11 @@ module SessionText
   )
 where
 
+import Data.Char (isAlphaNum)
 import Data.List (nub)
 import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Char (isAlphaNum)
 
 -- | Find every offset on @line@ where @symbol@ is bound by a tnix
 -- definition form (alias, signature, or binding).
@@ -36,18 +36,18 @@ definitionSpans line symbol =
   let stripped = Text.stripStart line
       indent = Text.length line - Text.length stripped
       candidates =
-        [ "type " <> symbol
-        , symbol <> "::"
-        , symbol <> " ::"
-        , symbol <> "="
-        , symbol <> " ="
+        [ "type " <> symbol,
+          symbol <> "::",
+          symbol <> " ::",
+          symbol <> "=",
+          symbol <> " ="
         ]
    in nub
         [ (indent + startChar, indent + startChar + Text.length symbol)
-        | candidate <- candidates
-        , let (prefix, suffix) = Text.breakOn candidate stripped
-        , not (Text.null suffix)
-        , let startChar = Text.length prefix + if "type " `Text.isPrefixOf` candidate then 5 else 0
+        | candidate <- candidates,
+          let (prefix, suffix) = Text.breakOn candidate stripped,
+          not (Text.null suffix),
+          let startChar = Text.length prefix + if "type " `Text.isPrefixOf` candidate then 5 else 0
         ]
 
 -- | Every offset of @"." <> symbol@ in @line@, plus 1 to skip the dot so
@@ -65,16 +65,16 @@ fieldSpans line symbol =
 wordSpans :: Text -> Text -> [Int]
 wordSpans line symbol =
   mapMaybe validOffset offsets
- where
-  offsets = map (Text.length . fst) (Text.breakOnAll symbol line)
-  validOffset startChar =
-    if boundary (startChar - 1) && boundary (startChar + Text.length symbol)
-      then Just startChar
-      else Nothing
-  boundary ix
-    | ix < 0 = True
-    | ix >= Text.length line = True
-    | otherwise = not (wordChar (Text.index line ix))
+  where
+    offsets = map (Text.length . fst) (Text.breakOnAll symbol line)
+    validOffset startChar =
+      if boundary (startChar - 1) && boundary (startChar + Text.length symbol)
+        then Just startChar
+        else Nothing
+    boundary ix
+      | ix < 0 = True
+      | ix >= Text.length line = True
+      | otherwise = not (wordChar (Text.index line ix))
 
 -- | Predicate for characters that count as part of a tnix identifier.
 --

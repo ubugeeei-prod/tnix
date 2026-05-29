@@ -26,20 +26,20 @@ import Data.Text qualified as Text
 -- field when it is 'Nothing', matching the LSP spec where the field is
 -- optional.
 data FoldingRange = FoldingRange
-  { foldingRangeStartLine :: !Int
-  , foldingRangeEndLine :: !Int
-  , foldingRangeKind :: !(Maybe Text)
+  { foldingRangeStartLine :: !Int,
+    foldingRangeEndLine :: !Int,
+    foldingRangeKind :: !(Maybe Text)
   }
   deriving (Eq, Show)
 
 -- | Encode each folding range into the LSP wire object.
 encodeFoldingRanges :: [FoldingRange] -> [Value]
 encodeFoldingRanges = map encode1
- where
-  encode1 (FoldingRange start end Nothing) =
-    object ["startLine" .= start, "endLine" .= end]
-  encode1 (FoldingRange start end (Just kind)) =
-    object ["startLine" .= start, "endLine" .= end, "kind" .= kind]
+  where
+    encode1 (FoldingRange start end Nothing) =
+      object ["startLine" .= start, "endLine" .= end]
+    encode1 (FoldingRange start end (Just kind)) =
+      object ["startLine" .= start, "endLine" .= end, "kind" .= kind]
 
 -- | Compute folding ranges for the given document text.
 --
@@ -57,19 +57,19 @@ commentRanges :: Text -> [FoldingRange]
 commentRanges content =
   let (final, acc) = foldl' step (Nothing, []) (zip [0 ..] (Text.lines content))
    in reverse (finish final acc)
- where
-  step (current, acc) (lineNo, line)
-    | isCommentLine line = case current of
-        Nothing -> (Just (lineNo, lineNo), acc)
-        Just (start, _) -> (Just (start, lineNo), acc)
-    | otherwise = case current of
-        Nothing -> (Nothing, acc)
-        Just (start, end) -> (Nothing, flush start end acc)
-  finish Nothing acc = acc
-  finish (Just (start, end)) acc = flush start end acc
-  flush start end acc
-    | end > start = FoldingRange start end (Just "comment") : acc
-    | otherwise = acc
+  where
+    step (current, acc) (lineNo, line)
+      | isCommentLine line = case current of
+          Nothing -> (Just (lineNo, lineNo), acc)
+          Just (start, _) -> (Just (start, lineNo), acc)
+      | otherwise = case current of
+          Nothing -> (Nothing, acc)
+          Just (start, end) -> (Nothing, flush start end acc)
+    finish Nothing acc = acc
+    finish (Just (start, end)) acc = flush start end acc
+    flush start end acc
+      | end > start = FoldingRange start end (Just "comment") : acc
+      | otherwise = acc
 
 isCommentLine :: Text -> Bool
 isCommentLine line =
@@ -88,10 +88,10 @@ data ScanMode
   deriving (Eq, Show)
 
 data ScanState = ScanState
-  { scanLine :: !Int
-  , scanStack :: ![(Int, Bracket)]
-  , scanMode :: !ScanMode
-  , scanRanges :: ![FoldingRange]
+  { scanLine :: !Int,
+    scanStack :: ![(Int, Bracket)],
+    scanMode :: !ScanMode,
+    scanRanges :: ![FoldingRange]
   }
 
 initialState :: ScanState
@@ -111,15 +111,15 @@ loop txt state
 normalStep :: Text -> ScanState -> ScanState
 normalStep txt state
   | Text.isPrefixOf "''" txt =
-      loop (Text.drop 2 txt) state {scanMode = MIndented (scanLine state)}
+      loop (Text.drop 2 txt) state{scanMode = MIndented (scanLine state)}
   | otherwise =
       let c = Text.head txt
           rest = Text.tail txt
           line = scanLine state
        in case c of
-            '\n' -> loop rest state {scanLine = line + 1}
+            '\n' -> loop rest state{scanLine = line + 1}
             '#' -> loop (skipToEol rest) state
-            '"' -> loop rest state {scanMode = MDQuote line}
+            '"' -> loop rest state{scanMode = MDQuote line}
             '{' -> openBracket BBrace rest state
             '[' -> openBracket BBracket rest state
             '(' -> openBracket BParen rest state
@@ -130,14 +130,14 @@ normalStep txt state
               | isIdentStart c ->
                   let (ident, after) = takeIdent txt
                    in case ident of
-                        "let" -> loop after state {scanStack = (line, BLet) : scanStack state}
+                        "let" -> loop after state{scanStack = (line, BLet) : scanStack state}
                         "in" -> loop after (closeLet state)
                         _ -> loop after state
               | otherwise -> loop rest state
 
 openBracket :: Bracket -> Text -> ScanState -> ScanState
 openBracket kind rest state =
-  loop rest state {scanStack = (scanLine state, kind) : scanStack state}
+  loop rest state{scanStack = (scanLine state, kind) : scanStack state}
 
 closeBracket :: Bracket -> Text -> ScanState -> ScanState
 closeBracket kind rest state =
@@ -148,7 +148,7 @@ closeBracket kind rest state =
               newRanges
                 | line > startLine = FoldingRange startLine line Nothing : scanRanges state
                 | otherwise = scanRanges state
-           in loop rest state {scanStack = restStack, scanRanges = newRanges}
+           in loop rest state{scanStack = restStack, scanRanges = newRanges}
     _ -> loop rest state
 
 -- | Pop the nearest 'BLet' marker, ignoring any brackets opened in between.
@@ -165,7 +165,7 @@ closeLet state =
             let newRanges
                   | line > startLine = FoldingRange startLine line Nothing : scanRanges state
                   | otherwise = scanRanges state
-             in state {scanStack = reverse acc <> rest, scanRanges = newRanges}
+             in state{scanStack = reverse acc <> rest, scanRanges = newRanges}
         | otherwise = go ((startLine, k) : acc) rest
    in go [] (scanStack state)
 
@@ -176,14 +176,15 @@ dquoteStep txt state
       let c = Text.head txt
           rest = Text.tail txt
        in case c of
-            '\n' -> loop rest state {scanLine = scanLine state + 1}
-            '\\' | not (Text.null rest) ->
-              let c2 = Text.head rest
-                  rest2 = Text.tail rest
-                  state'
-                    | c2 == '\n' = state {scanLine = scanLine state + 1}
-                    | otherwise = state
-               in loop rest2 state'
+            '\n' -> loop rest state{scanLine = scanLine state + 1}
+            '\\'
+              | not (Text.null rest) ->
+                  let c2 = Text.head rest
+                      rest2 = Text.tail rest
+                      state'
+                        | c2 == '\n' = state{scanLine = scanLine state + 1}
+                        | otherwise = state
+                   in loop rest2 state'
             '"' ->
               let startLine = case scanMode state of
                     MDQuote n -> n
@@ -192,7 +193,7 @@ dquoteStep txt state
                   newRanges
                     | line > startLine = FoldingRange startLine line Nothing : scanRanges state
                     | otherwise = scanRanges state
-               in loop rest state {scanMode = MNormal, scanRanges = newRanges}
+               in loop rest state{scanMode = MNormal, scanRanges = newRanges}
             _ -> loop rest state
 
 indentStep :: Text -> ScanState -> ScanState
@@ -209,12 +210,12 @@ indentStep txt state
           newRanges
             | line > startLine = FoldingRange startLine line Nothing : scanRanges state
             | otherwise = scanRanges state
-       in loop (Text.drop 2 txt) state {scanMode = MNormal, scanRanges = newRanges}
+       in loop (Text.drop 2 txt) state{scanMode = MNormal, scanRanges = newRanges}
   | otherwise =
       let c = Text.head txt
           rest = Text.tail txt
        in if c == '\n'
-            then loop rest state {scanLine = scanLine state + 1}
+            then loop rest state{scanLine = scanLine state + 1}
             else loop rest state
 
 -- * Identifier / lexical helpers ------------------------------------------

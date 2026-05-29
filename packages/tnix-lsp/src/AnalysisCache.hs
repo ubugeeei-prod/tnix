@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 -- | Bounded analysis-result cache keyed by @(file path, source content)@.
 --
 -- Per-buffer analysis is already memoised inside 'Session.Documents', but
@@ -26,6 +24,7 @@ where
 import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Ord (Down (..))
 import Data.Text (Text)
 import Driver (Analysis)
 
@@ -37,8 +36,8 @@ type AnalysisKey = (FilePath, Text)
 -- | Opaque cache value. Construct with 'emptyAnalysisCache' and mutate via
 -- 'insertAnalysisCache'.
 data AnalysisCache = AnalysisCache
-  { analysisCacheEntries :: !(Map AnalysisKey (Int, Either String Analysis))
-  , analysisCacheNext :: !Int
+  { analysisCacheEntries :: !(Map AnalysisKey (Int, Either String Analysis)),
+    analysisCacheNext :: !Int
   }
   deriving (Show)
 
@@ -71,11 +70,9 @@ insertAnalysisCache key value cache =
             Map.fromList
               ( take
                   analysisCacheCapacity
-                  ( reverse
-                      ( sortOn
-                          (\(_, (seqNo, _)) -> seqNo)
-                          (Map.toList added)
-                      )
+                  ( sortOn
+                      (Down . (\(_, (seqNo, _)) -> seqNo))
+                      (Map.toList added)
                   )
               )
           else added

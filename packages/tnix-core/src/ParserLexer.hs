@@ -33,18 +33,20 @@ import Control.Monad.Reader (ReaderT, asks)
 import Data.Char (isAlphaNum, isLetter)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Void (Void)
+import Syntax (DiagnosticDirective)
+import Syntax qualified
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
-import Syntax (DiagnosticDirective)
-import Syntax qualified
 import Type (Name)
 
 -- | Parser type used throughout the frontend.
 type DirectiveTargets = Map Int DiagnosticDirective
+
 type Parser = ReaderT DirectiveTargets (Parsec Void Text)
 
 -- | Look up whether the current source line is targeted by a directive comment.
@@ -128,7 +130,7 @@ float = lexeme . try $ do
   _ <- char '.'
   frac <- some digitChar
   expo <- optional exponentPart
-  pure (read (whole <> "." <> frac <> maybe "" id expo))
+  pure (read (whole <> "." <> frac <> fromMaybe "" expo))
   where
     exponentPart = do
       marker <- oneOf ("eE" :: String)

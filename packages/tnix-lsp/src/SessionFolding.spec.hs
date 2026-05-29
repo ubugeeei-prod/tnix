@@ -88,10 +88,10 @@ spec = do
     it "includes kind when present" $
       encodeFoldingRanges [FoldingRange 0 4 (Just "comment")]
         `shouldBe` ( [ object
-                        [ "startLine" .= (0 :: Int),
-                          "endLine" .= (4 :: Int),
-                          "kind" .= ("comment" :: T.Text)
-                        ]
-                     ]
-                       :: [Value]
+                         [ "startLine" .= (0 :: Int),
+                           "endLine" .= (4 :: Int),
+                           "kind" .= ("comment" :: T.Text)
+                         ]
+                     ] ::
+                       [Value]
                    )

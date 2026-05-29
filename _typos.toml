@@ -1,0 +1,22 @@
+# Configuration for `typos` (crate-ci/typos), run in the Docs workflow.
+#
+# typos respects .gitignore, so build outputs (dist-newstyle, node_modules,
+# target) are already excluded. The entries below allow domain identifiers and
+# intentional misspellings used as test fixtures.
+
+[default.extend-identifiers]
+# Qualified import alias for Data.Text.IO.
+TIO = "TIO"
+# "Literals" abbreviations in subtyping specs.
+Lits = "Lits"
+pairLits = "pairLits"
+
+[default.extend-words]
+# Intentional misspellings: fixtures for the rename/spell-suggestion and
+# edit-distance ("closest candidate") features. Do not "fix" these.
+mising = "mising"
+valeu = "valeu"
+# Valid English variant used in a test description.
+unparseable = "unparseable"
+# Part of the fourmolu `indent-wheres` option name.
+wheres = "wheres"

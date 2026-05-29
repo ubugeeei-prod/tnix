@@ -8,10 +8,10 @@
 -- check, and declaration emission.
 module Main (main) where
 
+import Cli qualified
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Data.Version (showVersion)
-import Cli qualified
 import Options.Applicative
 import Paths_tnix_cli qualified as PackageInfo
 import System.Exit (die, exitFailure)

@@ -15,9 +15,9 @@ module Pretty
   )
 where
 
+import Data.Char (isAlphaNum, isLetter)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
-import Data.Char (isAlphaNum, isLetter)
 import Data.Text qualified as Text
 import Indexed (tensorView, tupleView)
 import Prettyprinter
@@ -103,7 +103,7 @@ prettyPattern :: Pattern -> Doc ann
 prettyPattern = \case
   PVar name _ -> pretty name
   PAttrSet names open ->
-    case map pretty names <> if open then [ellipsis] else [] of
+    case map pretty names <> [ellipsis | open] of
       [] -> "{}"
       items -> "{ " <> hsep (punctuate "," items) <> " }"
     where

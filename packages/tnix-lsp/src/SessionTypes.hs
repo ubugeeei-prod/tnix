@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 -- | Shared data types used across the LSP session.
 --
 -- This module is intentionally light on logic: it holds the records and
@@ -38,9 +36,9 @@ import Driver (Analysis)
 -- type errors so editor features like hover keep returning useful answers
 -- while the user is mid-edit.
 data CachedDocument = CachedDocument
-  { cachedDocumentText :: Text
-  , cachedDocumentAnalysis :: Maybe (Either String Analysis)
-  , cachedDocumentLastGoodAnalysis :: Maybe Analysis
+  { cachedDocumentText :: Text,
+    cachedDocumentAnalysis :: Maybe (Either String Analysis),
+    cachedDocumentLastGoodAnalysis :: Maybe Analysis
   }
   deriving (Eq, Show)
 
@@ -60,9 +58,9 @@ instance Monoid Documents where
 -- handlers can answer questions about a buffer they have never actively
 -- opened.
 data WorkspaceDocument = WorkspaceDocument
-  { workspaceDocumentFile :: FilePath
-  , workspaceDocumentContent :: Text
-  , workspaceDocumentAnalysis :: Either String Analysis
+  { workspaceDocumentFile :: FilePath,
+    workspaceDocumentContent :: Text,
+    workspaceDocumentAnalysis :: Either String Analysis
   }
 
 -- | Symbol surfaced through documentSymbol / workspaceSymbol.
@@ -71,11 +69,11 @@ data WorkspaceDocument = WorkspaceDocument
 -- expressed in UTF-16 columns so callers can pass it through to LSP
 -- directly.
 data IndexedSymbol = IndexedSymbol
-  { indexedSymbolName :: Text
-  , indexedSymbolKind :: Int
-  , indexedSymbolFile :: FilePath
-  , indexedSymbolRange :: (Int, Int, Int)
-  , indexedSymbolContainer :: Maybe Text
+  { indexedSymbolName :: Text,
+    indexedSymbolKind :: Int,
+    indexedSymbolFile :: FilePath,
+    indexedSymbolRange :: (Int, Int, Int),
+    indexedSymbolContainer :: Maybe Text
   }
 
 -- | How a reference search should match a symbol against source text.
@@ -89,15 +87,15 @@ data MatchMode
 
 -- | A resolved target for a references / rename request.
 data ReferenceTarget = ReferenceTarget
-  { referenceTargetFiles :: [FilePath]
-  , referenceTargetNeedle :: Text
-  , referenceTargetMode :: MatchMode
+  { referenceTargetFiles :: [FilePath],
+    referenceTargetNeedle :: Text,
+    referenceTargetMode :: MatchMode
   }
 
 -- | One delta entry emitted by the semantic-tokens provider.
 data SemanticToken = SemanticToken
-  { semanticTokenLine :: Int
-  , semanticTokenStart :: Int
-  , semanticTokenLength :: Int
-  , semanticTokenType :: Int
+  { semanticTokenLine :: Int,
+    semanticTokenStart :: Int,
+    semanticTokenLength :: Int,
+    semanticTokenType :: Int
   }
