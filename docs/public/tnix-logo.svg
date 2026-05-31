@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">tnix logo</title>
+  <desc id="desc">A minimal tnix mark with a lowercase t over a single-color x.</desc>
+  <g fill="none" stroke="#0ea5e9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 68l128 120" stroke-width="20" opacity="0.45"/>
+    <path d="M192 68L64 188" stroke-width="20" opacity="0.7"/>
+  </g>
+  <path d="M111 38h31v53h52v30h-52v52c0 25 12 38 37 38h18v30h-24c-41 0-62-23-62-68v-52H61V91h50z" fill="#0f172a"/>
+</svg>

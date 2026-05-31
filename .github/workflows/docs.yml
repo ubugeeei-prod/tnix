@@ -7,6 +7,12 @@ on:
   pull_request:
     paths:
       - "**/*.md"
+      - "docs/public/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "vite.config.ts"
+      - "vite.docs.config.ts"
       - ".github/workflows/docs.yml"
       - ".markdownlint.jsonc"
       - "lychee.toml"
@@ -137,3 +143,26 @@ jobs:
 
       - name: Run typos
         run: nix shell nixpkgs#typos --accept-flake-config --command typos
+
+  site-build:
+    name: Build docs site
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install workspace dependencies
+        run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
+
+      - name: Build Ox Content docs
+        run: nix develop --accept-flake-config --command vp run docs:build
