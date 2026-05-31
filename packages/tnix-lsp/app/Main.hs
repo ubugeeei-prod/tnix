@@ -91,7 +91,8 @@ runServer logFile = do
   cacheRef <- newIORef emptyAnalysisCache
   shutdownRef <- newIORef False
   let analyze = cachedAnalyzeText cacheRef
-  loop logger shutdownRef ref analyze
+      clearCache = writeIORef cacheRef emptyAnalysisCache
+  loop logger shutdownRef ref analyze clearCache
   where
     openLogHandle path = do
       h <- openFile path AppendMode
@@ -102,15 +103,15 @@ runServer logFile = do
       case logHandle of
         Just h -> hPutStrLn h ("tnix-lsp: " <> T.unpack message)
         Nothing -> pure ()
-    loop logger shutdownRef ref analyze = do
+    loop logger shutdownRef ref analyze clearCache = do
       outcome <- readMessageOutcome stdin
       case outcome of
         ReadEof -> pure ()
         ReadMessage msg ->
-          safeHandle logger shutdownRef ref analyze msg >> loop logger shutdownRef ref analyze
+          safeHandle logger shutdownRef ref analyze clearCache msg >> loop logger shutdownRef ref analyze clearCache
         ReadError reason -> do
           logger reason
-          loop logger shutdownRef ref analyze
+          loop logger shutdownRef ref analyze clearCache
 
 -- | Run one handler, isolating crashes so a single bad document or a partial
 -- function deep in the checker cannot take down the whole session.
@@ -119,9 +120,9 @@ runServer logFile = do
 -- can still terminate; any other exception is logged, surfaced to the client
 -- via @window/logMessage@, and—if the failing message was a request—answered
 -- with a JSON-RPC internal error so the client is never left waiting.
-safeHandle :: Logger -> IORef Bool -> IORef Session.Documents -> AnalyzeFn -> Value -> IO ()
-safeHandle logger shutdownRef ref analyze msg = do
-  result <- try (handle shutdownRef ref analyze msg)
+safeHandle :: Logger -> IORef Bool -> IORef Session.Documents -> AnalyzeFn -> IO () -> Value -> IO ()
+safeHandle logger shutdownRef ref analyze clearCache msg = do
+  result <- try (handle shutdownRef ref analyze clearCache msg)
   case result of
     Right () -> pure ()
     Left err
@@ -170,8 +171,8 @@ versionText = "tnix-lsp " <> showVersion PackageInfo.version
 type AnalyzeFn = FilePath -> Text -> IO (Either String Analysis)
 
 -- | Dispatch one incoming JSON-RPC message.
-handle :: IORef Bool -> IORef Session.Documents -> AnalyzeFn -> Value -> IO ()
-handle shutdownRef ref analyze msg = case field "method" msg >>= asText of
+handle :: IORef Bool -> IORef Session.Documents -> AnalyzeFn -> IO () -> Value -> IO ()
+handle shutdownRef ref analyze clearCache msg = case field "method" msg >>= asText of
   Just "initialize" -> respond stdout msg clientCapabilities
   Just "initialized" -> pure ()
   Just "shutdown" -> writeIORef shutdownRef True >> respond stdout msg Null
@@ -201,6 +202,8 @@ handle shutdownRef ref analyze msg = case field "method" msg >>= asText of
   Just "textDocument/foldingRange" -> foldingRanges ref msg >>= respond stdout msg
   Just "textDocument/documentLink" -> documentLinks ref msg >>= respond stdout msg
   Just "textDocument/inlayHint" -> inlayHints ref analyze msg >>= respond stdout msg
+  Just "workspace/didChangeWatchedFiles" -> clearCache
+  Just "workspace/didChangeConfiguration" -> clearCache
   -- A request (carries an `id`) for a method we do not implement must be
   -- answered with MethodNotFound; unknown notifications are ignored.
   method -> case field "id" msg of
