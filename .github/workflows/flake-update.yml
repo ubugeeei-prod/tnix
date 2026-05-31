@@ -20,7 +20,7 @@ defaults:
 jobs:
   update-flake-lock:
     name: Update flake.lock
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: write
