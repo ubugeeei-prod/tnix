@@ -318,7 +318,7 @@ genExpr _ =
   oneof
     [ genLeafExpr,
       EAdd <$> genLeafExpr <*> genLeafExpr,
-      EIf <$> (EBool <$> arbitrary) <*> genLeafExpr <*> genLeafExpr,
+      (EIf . EBool <$> arbitrary) <*> genLeafExpr <*> genLeafExpr,
       EList <$> resize 3 (listOf genLeafExpr),
       EAttrSet <$> resize 3 (listOf genAttr)
     ]
