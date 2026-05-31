@@ -80,6 +80,10 @@ spec = describe "analysis" $ do
     fmap renderScheme (analysisRoot analysis)
       `shouldBe` Just "forall t0 t1. {\n  nixpkgs :: t1;\n  self :: t0;\n} -> t0"
 
+  it "counts mutually exclusive if branches once for lambda multiplicity" $ do
+    analysis <- analyzeText "main.tnix" "x: if true then x else x" >>= expectRight
+    fmap renderScheme (analysisRoot analysis) `shouldBe` Just "forall t0. t0 %1 -> t0"
+
   it "reports missing fields" $
     analyzeText "main.tnix" "{ value = 1; }.missing" >>= (`expectLeftContaining` "missing field")
 
