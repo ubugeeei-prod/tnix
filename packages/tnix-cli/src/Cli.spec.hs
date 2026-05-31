@@ -2,7 +2,7 @@
 
 module Main (main) where
 
-import Cli (Command (..), OutputFormat (..), commandOutputFormat, commandOutputPath, commandParser, executeCommand, renderAnalysis, writeOutput)
+import Cli (Command (..), OutputFormat (..), commandOutputFormat, commandOutputPath, commandParser, executeCommand, renderAnalysis, renderVersion, writeOutput)
 import Control.Exception (bracket)
 import Control.Monad (forM_)
 import Data.List (intercalate, isInfixOf)
@@ -38,6 +38,8 @@ spec = do
       parse ["check-project"] `shouldBe` Just (CheckProject Nothing TextFormat)
       parse ["build", "demo", "--format", "json"] `shouldBe` Just (BuildProject (Just "demo") JsonFormat)
       parse ["emit-project", "demo"] `shouldBe` Just (EmitProject (Just "demo") TextFormat)
+      parse ["version"] `shouldBe` Just (Version TextFormat)
+      parse ["version", "--format", "json"] `shouldBe` Just (Version JsonFormat)
 
     it "reports an error for missing subcommands" $ do
       case parserResult [] of
@@ -66,6 +68,7 @@ spec = do
       commandOutputPath (Check "main.tnix" TextFormat) `shouldBe` Nothing
       commandOutputPath (Init Nothing) `shouldBe` Nothing
       commandOutputPath (Scaffold Nothing) `shouldBe` Nothing
+      commandOutputPath (Version TextFormat) `shouldBe` Nothing
 
   describe "commandOutputFormat" $
     it "tracks commands that can emit machine-readable reports" $ do
@@ -73,8 +76,17 @@ spec = do
       commandOutputFormat (CheckProject Nothing TextFormat) `shouldBe` Just TextFormat
       commandOutputFormat (BuildProject Nothing JsonFormat) `shouldBe` Just JsonFormat
       commandOutputFormat (EmitProject Nothing JsonFormat) `shouldBe` Just JsonFormat
+      commandOutputFormat (Version JsonFormat) `shouldBe` Just JsonFormat
       commandOutputFormat (Compile "main.tnix" Nothing) `shouldBe` Nothing
       commandOutputFormat (Init Nothing) `shouldBe` Nothing
+
+  describe "renderVersion" $ do
+    it "renders text and json version output" $ do
+      renderVersion "1.2.3" TextFormat `shouldBe` "tnix 1.2.3"
+      let json = renderVersion "1.2.3" JsonFormat
+      Text.isInfixOf "\"schemaVersion\":1" json `shouldBe` True
+      Text.isInfixOf "\"action\":\"version\"" json `shouldBe` True
+      Text.isInfixOf "\"version\":\"1.2.3\"" json `shouldBe` True
 
   describe "executeCommand" $ do
     it "compiles source files through the driver end-to-end" $
@@ -114,6 +126,7 @@ spec = do
         [("main.tnix", "1")]
         ( \root -> do
             output <- executeCommand (Check (root <> "/main.tnix") JsonFormat) >>= expectRight
+            Text.isInfixOf "\"schemaVersion\":1" output `shouldBe` True
             Text.isInfixOf "\"success\":true" output `shouldBe` True
             Text.isInfixOf "\"root\":\"1\"" output `shouldBe` True
         )
@@ -341,6 +354,7 @@ spec = do
         ]
       $ \root -> do
         output <- executeCommand (EmitProject (Just root) JsonFormat) >>= expectRight
+        Text.isInfixOf "\"schemaVersion\":1" output `shouldBe` True
         Text.isInfixOf "\"action\":\"emit-project\"" output `shouldBe` True
         Text.isInfixOf "\"success\":true" output `shouldBe` True
 

@@ -11,6 +11,7 @@ module Cli
     commandParser,
     executeCommand,
     renderAnalysis,
+    renderVersion,
     writeOutput,
   )
 where
@@ -45,6 +46,7 @@ data Command
   | CheckProject (Maybe FilePath) OutputFormat
   | BuildProject (Maybe FilePath) OutputFormat
   | EmitProject (Maybe FilePath) OutputFormat
+  | Version OutputFormat
   deriving (Eq, Show)
 
 data PlannedWrite = PlannedWrite FilePath Text
@@ -63,6 +65,7 @@ commandParser =
         <> command "check-project" (info checkProjectP (progDesc "Type-check every discovered project source file"))
         <> command "build" (info buildProjectP (progDesc "Compile project sources and emit generated declarations"))
         <> command "emit-project" (info emitProjectP (progDesc "Emit declaration files for every discovered project source file"))
+        <> command "version" (info versionP (progDesc "Show the tnix version"))
     )
   where
     fileArg = strArgument (metavar "FILE")
@@ -85,6 +88,7 @@ commandParser =
     checkProjectP = CheckProject <$> dirArg <*> formatOpt
     buildProjectP = BuildProject <$> dirArg <*> formatOpt
     emitProjectP = EmitProject <$> dirArg <*> formatOpt
+    versionP = Version <$> formatOpt
 
 -- | Extract the explicit destination path carried by a command, if any.
 commandOutputPath :: Command -> Maybe FilePath
@@ -98,6 +102,7 @@ commandOutputPath cmd =
     CheckProject _ _ -> Nothing
     BuildProject _ _ -> Nothing
     EmitProject _ _ -> Nothing
+    Version _ -> Nothing
 
 -- | Extract the requested machine-readable output format, if a command has one.
 commandOutputFormat :: Command -> Maybe OutputFormat
@@ -107,6 +112,7 @@ commandOutputFormat cmd =
     CheckProject _ format -> Just format
     BuildProject _ format -> Just format
     EmitProject _ format -> Just format
+    Version format -> Just format
     Compile _ _ -> Nothing
     Emit _ _ -> Nothing
     Init _ -> Nothing
@@ -126,6 +132,7 @@ executeCommand cmd =
     CheckProject target format -> executeProjectCheck target format
     BuildProject target format -> executeProjectBuild target format
     EmitProject target format -> executeProjectEmit target format
+    Version format -> pure (Right (renderVersion "unknown" format))
 
 -- | Pretty-print the inferred root and bindings for `tnix check`.
 renderAnalysis :: Analysis -> Text
@@ -133,6 +140,20 @@ renderAnalysis analysis =
   Text.unlines $
     maybe [] (\root -> ["root: " <> renderScheme root]) (analysisRoot analysis)
       <> [name <> " :: " <> renderScheme scheme | (name, scheme) <- Map.toList (analysisBindings analysis)]
+
+-- | Render the CLI version in the same text/json formats used by reports.
+renderVersion :: Text -> OutputFormat -> Text
+renderVersion version format =
+  case format of
+    TextFormat -> "tnix " <> version
+    JsonFormat ->
+      jsonText $
+        object
+          [ "schemaVersion" .= cliSchemaVersion,
+            "action" .= ("version" :: Text),
+            "success" .= True,
+            "version" .= version
+          ]
 
 -- | Write command output either to stdout or an explicit file.
 writeOutput :: Maybe FilePath -> Text -> IO ()
@@ -201,7 +222,8 @@ renderSingleCheck input format result =
             Text.unpack $
               jsonText $
                 object
-                  [ "action" .= ("check" :: Text),
+                  [ "schemaVersion" .= cliSchemaVersion,
+                    "action" .= ("check" :: Text),
                     "file" .= input,
                     "success" .= False,
                     "root" .= (Nothing :: Maybe Text),
@@ -212,7 +234,8 @@ renderSingleCheck input format result =
           Right $
             jsonText $
               object
-                [ "action" .= ("check" :: Text),
+                [ "schemaVersion" .= cliSchemaVersion,
+                  "action" .= ("check" :: Text),
                   "file" .= input,
                   "success" .= True,
                   "root" .= fmap renderScheme (analysisRoot analysis),
@@ -228,7 +251,8 @@ renderProjectCheck format config entries =
   where
     payload =
       object
-        [ "action" .= ("check-project" :: Text),
+        [ "schemaVersion" .= cliSchemaVersion,
+          "action" .= ("check-project" :: Text),
           "projectRoot" .= configRoot config,
           "projectName" .= configName config,
           "summary" .= summaryJson entries,
@@ -302,7 +326,8 @@ renderProjectBuild format config entries =
   where
     payload =
       object
-        [ "action" .= ("build" :: Text),
+        [ "schemaVersion" .= cliSchemaVersion,
+          "action" .= ("build" :: Text),
           "projectRoot" .= configRoot config,
           "projectName" .= configName config,
           "summary" .= buildSummaryJson entries,
@@ -341,7 +366,8 @@ renderProjectEmit format config entries =
   where
     payload =
       object
-        [ "action" .= ("emit-project" :: Text),
+        [ "schemaVersion" .= cliSchemaVersion,
+          "action" .= ("emit-project" :: Text),
           "projectRoot" .= configRoot config,
           "projectName" .= configName config,
           "summary" .= buildSummaryJson entries,
@@ -388,7 +414,8 @@ buildSummaryJson entries =
 projectErrorJson :: Text -> Maybe ProjectConfig -> String -> Value
 projectErrorJson actionName maybeConfig err =
   object
-    [ "action" .= actionName,
+    [ "schemaVersion" .= cliSchemaVersion,
+      "action" .= actionName,
       "projectRoot" .= fmap configRoot maybeConfig,
       "projectName" .= fmap configName maybeConfig,
       "success" .= False,
@@ -406,6 +433,9 @@ statusLabel = either (const "error") (const "ok")
 
 jsonText :: Value -> Text
 jsonText = TextEncoding.decodeUtf8 . LBS.toStrict . encode
+
+cliSchemaVersion :: Int
+cliSchemaVersion = 1
 
 writeTextFile :: FilePath -> Text -> IO ()
 writeTextFile path content = do
