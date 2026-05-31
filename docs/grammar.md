@@ -284,3 +284,21 @@ expressions, declarations, and lists can all span multiple lines freely.
   [`Parser.spec.hs`](../packages/tnix-core/src/Parser.spec.hs) double as
   executable examples for every production in this document; if you change
   the grammar, mirror the change there first.
+
+## Not Yet Supported
+
+The parser intentionally accepts a production-ready Nix-shaped subset instead
+of the full Nix language. These forms are still outside the supported surface:
+
+- string interpolation in double-quoted and indented strings, including
+  `"${expr}"` and `''${expr}''`
+- recursive attribute sets with `rec { ... }`
+- `with scope; expr`
+- attribute-set merging with `//`
+- attribute-presence tests with `?`
+- assertions with `assert condition; expr`
+- list concatenation with `++`
+- comparisons and boolean operators: `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`,
+  `||`, and unary `!`
+- nested attribute-path declarations such as `a.b.c = value;`
+- Nix's full indented-string indentation stripping and escape rules
