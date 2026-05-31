@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">tnix logo</title>
+  <desc id="desc">A geometric mark combining a typed branch shape with an x-shaped Nix snowflake node.</desc>
+  <defs>
+    <linearGradient id="mark" x1="40" y1="32" x2="216" y2="224" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="0.48" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="54" fill="#0f172a"/>
+  <g filter="url(#shadow)">
+    <path d="M64 70h92c22.091 0 40 17.909 40 40s-17.909 40-40 40H92" fill="none" stroke="url(#mark)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M64 70v116" fill="none" stroke="#f8fafc" stroke-width="24" stroke-linecap="round"/>
+    <path d="M70 186h58" fill="none" stroke="#f8fafc" stroke-width="24" stroke-linecap="round"/>
+    <path d="M148 92l54 54M202 92l-54 54" fill="none" stroke="#f8fafc" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="64" cy="70" r="13" fill="#2dd4bf"/>
+    <circle cx="64" cy="186" r="13" fill="#a78bfa"/>
+    <circle cx="128" cy="186" r="13" fill="#38bdf8"/>
+  </g>
+</svg>
+
