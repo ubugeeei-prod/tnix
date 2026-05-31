@@ -31,13 +31,21 @@ main = execParser opts >>= run
 
 -- | Execute one CLI command.
 run :: Cli.Command -> IO ()
+run (Cli.Version format) =
+  putPayload (Cli.renderVersion (Text.pack (showVersion PackageInfo.version)) format)
 run cmd =
   Cli.executeCommand cmd >>= \case
     Left err ->
       case Cli.commandOutputFormat cmd of
-        Just Cli.JsonFormat -> TextIO.putStr (Text.pack err) >> exitFailure
+        Just Cli.JsonFormat -> TextIO.putStrLn (Text.pack err) >> exitFailure
         _ -> die err
     Right content ->
       case Cli.commandOutputPath cmd of
         Just output -> Cli.writeOutput (Just output) content
-        Nothing -> TextIO.putStr content
+        Nothing -> putPayload content
+
+putPayload :: Text.Text -> IO ()
+putPayload content =
+  if "\n" `Text.isSuffixOf` content
+    then TextIO.putStr content
+    else TextIO.putStrLn content
