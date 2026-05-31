@@ -74,6 +74,7 @@ common spec-defaults
     , mtl
     , parser-combinators
     , prettyprinter
+    , QuickCheck
     , text
   default-language: GHC2021
 
