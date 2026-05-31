@@ -4,13 +4,16 @@ export default defineConfig({
   run: {
     tasks: {
       "workspace:build": {
-        command: "vp run build:haskell && pnpm --filter tnix build && vp run build:zed",
+        command: "vp run build:haskell && pnpm --filter tnix build && vp run build:zed && vp run docs:build",
       },
       "workspace:check": {
         command: "vp run check:versions && vp run check:haskell && vp run test:haskell && vp run check:dogfood && vp run check:examples && pnpm --filter tnix check && pnpm --filter tnix test && vp run check:zed && vp run test:zed && vp run check:neovim",
       },
       "workspace:fmt": {
         command: "vp run fmt:haskell && pnpm --filter tnix fmt",
+      },
+      "docs:build": {
+        command: "vp build --config vite.docs.config.ts",
       },
       ide: {
         command: "node --experimental-strip-types ./scripts/install-ide.ts",
