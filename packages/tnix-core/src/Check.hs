@@ -144,10 +144,13 @@ inferExpr ctx env = \case
           then pure tAny
           else case resolvedFunTy of
             TFun _ domTy outTy -> constrain ctx argTy domTy *> zonk outTy
-            _ -> do
-              outTy <- freshMeta
-              _ <- unify ctx funTy (TFun Many argTy outTy)
-              zonk outTy
+            _
+              | definitelyNotCallable resolvedFunTy ->
+                  lift (Left (withCode TC0018NotCallable ("cannot call " <> describeNonCallable resolvedFunTy <> " as a function")))
+              | otherwise -> do
+                  outTy <- freshMeta
+                  _ <- unify ctx funTy (TFun Many argTy outTy)
+                  zonk outTy
   EAdd left right -> inferAddition ctx env left right
   ELet items body -> do
     (env', _) <- inferLet ctx env items
@@ -234,7 +237,7 @@ inferLet ctx env items = do
     -- here is a checker bug rather than a user error; surface it as such.
     expected <- case Map.lookup name recursiveEnv of
       Just scheme -> instantiate scheme
-      Nothing -> lift (Left ("internal: missing placeholder for binding " <> show name))
+      Nothing -> lift (Left (withCode TC0017MissingPlaceholder ("internal: missing placeholder for binding " <> show name)))
     let directive = inlineDirective <|> Map.lookup name sigDirectives
     attempt <-
       catchInfer $ do
@@ -361,7 +364,7 @@ inferRootExpression ctx env (Marked directive expr) = do
     (Just TnixIgnore, Right result) -> pure result
     (Just TnixIgnore, Left _) -> pure (CheckResult (Just (Scheme [] tDynamic)) Map.empty)
     (Just TnixExpected, Left _) -> pure (CheckResult (Just (Scheme [] tDynamic)) Map.empty)
-    (Just TnixExpected, Right _) -> lift (Left "unused @tnix-expected directive on root expression")
+    (Just TnixExpected, Right _) -> lift (Left (withCode TC0006UnusedExpectedDirective "unused @tnix-expected directive on root expression"))
 
 catchInfer :: InferM a -> InferM (Either String a)
 catchInfer action = do
@@ -613,6 +616,31 @@ duplicateNames = foldr step [] . group . sort
 -- | Render a name inside backticks so diagnostics stay readable.
 quoteName :: Name -> String
 quoteName name = "`" <> T.unpack name <> "`"
+
+-- | Types that can never be applied as a function. Deliberately conservative:
+-- only structurally-concrete non-functions (literals, records, lists, and the
+-- base scalar constructors) are flagged. Gradual types (dynamic, any, unknown),
+-- unresolved metas, and type applications fall through so the gradual boundary
+-- and inference behavior are preserved.
+definitelyNotCallable :: Type -> Bool
+definitelyNotCallable ty = case ty of
+  TLit _ -> True
+  TRecord _ -> True
+  TTypeList _ -> True
+  TCon name -> name `elem` ["String", "Int", "Float", "Number", "Nat", "Bool", "Null", "Path"]
+  _ -> False
+
+-- | Human-readable noun phrase for a non-callable value, used in TC0018.
+describeNonCallable :: Type -> String
+describeNonCallable ty = case ty of
+  TRecord _ -> "an attribute set"
+  TTypeList _ -> "a list"
+  TLit (LString _) -> "a string"
+  TLit (LInt _) -> "an integer"
+  TLit (LFloat _) -> "a float"
+  TLit (LBool _) -> "a boolean"
+  TCon name -> "a value of type " <> T.unpack name
+  _ -> "a non-function value"
 
 -- | Render a list of names as a comma-separated, backtick-quoted sequence.
 quoteNames :: [Name] -> String

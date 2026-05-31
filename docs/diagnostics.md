@@ -166,6 +166,14 @@ itself.
 An internal invariant in the recursive-let placeholder allocation was
 broken. Please file a bug.
 
+### `TC0018` — value is not callable
+
+A value of a concrete non-function type (an attribute set, list, string,
+number, boolean, or other base type) was applied as if it were a function.
+
+**Fix:** apply only functions, or correct the expression so the callee is a
+function. Gradual types (`dynamic`, `unknown`, `any`) are still callable.
+
 ## Driver / Project (`TDxxxx`)
 
 ### `TD0001` — failed to read
