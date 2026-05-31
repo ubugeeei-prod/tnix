@@ -28,7 +28,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -54,7 +61,14 @@ jobs:
           - ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
           - macos-latest
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(matrix.os, 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(matrix.os, 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -80,7 +94,14 @@ jobs:
           - ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
           - macos-latest
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(matrix.os, 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(matrix.os, 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -90,7 +111,22 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Mount Cabal package cache
+        if: ${{ startsWith(matrix.os, 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-cabal-packages-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
+          path: ~/.cabal/packages
+
+      - name: Mount Cabal store
+        if: ${{ startsWith(matrix.os, 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-cabal-store-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
+          path: ~/.cabal/store
+
       - name: Cache Cabal dependencies
+        if: ${{ !startsWith(matrix.os, 'blacksmith-') }}
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: |
@@ -116,7 +152,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -126,7 +169,22 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Mount Cabal package cache
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-cabal-packages-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
+          path: ~/.cabal/packages
+
+      - name: Mount Cabal store
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-cabal-store-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
+          path: ~/.cabal/store
+
       - name: Cache Cabal dependencies
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: |
@@ -152,7 +210,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -168,7 +233,15 @@ jobs:
           store_path="$(nix develop --accept-flake-config --command pnpm store path --silent | tail -n 1)"
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
+      - name: Mount pnpm store
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          path: ${{ steps.pnpm-store.outputs.path }}
+
       - name: Cache pnpm store
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -197,7 +270,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -207,7 +287,29 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Mount Cargo git cache
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-cargo-git-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
+          path: ~/.cargo/git
+
+      - name: Mount Cargo registry cache
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-cargo-registry-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
+          path: ~/.cargo/registry
+
+      - name: Mount Zed target cache
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-zed-target-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
+          path: editors/zed/target
+
       - name: Cache Cargo dependencies
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: |
@@ -234,7 +336,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -254,7 +363,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
@@ -270,7 +386,15 @@ jobs:
           store_path="$(nix develop --accept-flake-config --command pnpm store path --silent | tail -n 1)"
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
+      - name: Mount pnpm store
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          path: ${{ steps.pnpm-store.outputs.path }}
+
       - name: Cache pnpm store
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -284,7 +408,29 @@ jobs:
       - name: Check VS Code extension formatting
         run: nix develop --accept-flake-config --command pnpm --filter tnix fmt
 
+      - name: Mount Cargo git cache
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-cargo-git-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
+          path: ~/.cargo/git
+
+      - name: Mount Cargo registry cache
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-cargo-registry-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
+          path: ~/.cargo/registry
+
+      - name: Mount Zed target cache
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-zed-target-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
+          path: editors/zed/target
+
       - name: Cache Cargo dependencies
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: |
@@ -305,7 +451,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
       - name: Check out sources
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
