@@ -133,6 +133,8 @@ inferExpr ctx env = \case
     pure (TFun (inferLambdaMultiplicity pattern' body) argTy bodyTy)
   EApp (EVar "import") (EPath raw) ->
     maybe (pure tDynamic) instantiate (Map.lookup (resolvePath (checkFile ctx) raw) (checkAmbient ctx))
+  EApp (EVar "import") (EString raw) ->
+    maybe (pure tDynamic) instantiate (Map.lookup (resolvePath (checkFile ctx) (T.unpack (stringLiteralText raw))) (checkAmbient ctx))
   EApp fun arg -> do
     funTy <- inferExpr ctx env fun >>= zonk
     argTy <- inferExpr ctx env arg

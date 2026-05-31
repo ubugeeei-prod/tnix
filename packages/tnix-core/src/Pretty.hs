@@ -20,6 +20,7 @@ import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Indexed (tensorView, tupleView)
+import Numeric (showGFloat)
 import Prettyprinter
 import Prettyprinter.Render.Text qualified as Render
 import Syntax
@@ -78,7 +79,7 @@ prettyExpr :: Int -> Expr -> Doc ann
 prettyExpr p = \case
   EVar name -> pretty name
   EString value -> prettyStringLiteral value
-  EFloat value -> pretty (show value)
+  EFloat value -> pretty (prettyFloat value)
   EInt value -> pretty value
   EBool True -> "true"
   EBool False -> "false"
@@ -146,7 +147,7 @@ prettyType p ty =
             TCon name -> pretty name
             TMeta n -> pretty ("?" <> show n)
             TLit (LString text) -> dquotes (pretty text)
-            TLit (LFloat n) -> pretty (show n)
+            TLit (LFloat n) -> pretty (prettyFloat n)
             TLit (LInt n) -> pretty n
             TLit (LBool True) -> "true"
             TLit (LBool False) -> "false"
@@ -185,3 +186,10 @@ prettyKind p = \case
 parenIf :: Bool -> Doc ann -> Doc ann
 parenIf True = parens
 parenIf False = id
+
+prettyFloat :: Double -> String
+prettyFloat n =
+  let rendered = showGFloat Nothing n ""
+   in if any (`elem` (".eE" :: String)) rendered
+        then rendered
+        else rendered <> ".0"

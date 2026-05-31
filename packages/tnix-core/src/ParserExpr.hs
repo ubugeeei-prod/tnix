@@ -162,6 +162,7 @@ atomParser =
       EBool False <$ reserved "false",
       ENull <$ reserved "null",
       EPath <$> pathLiteral,
+      EVar "import" <$ reserved "import",
       EVar <$> identifier
     ]
 

@@ -42,6 +42,7 @@ import Syntax qualified
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
+import Text.Read (readMaybe)
 import Type (Name)
 
 -- | Parser type used throughout the frontend.
@@ -121,16 +122,24 @@ termStringLiteral =
 
 -- | Parse a decimal integer literal.
 integer :: Parser Integer
-integer = lexeme L.decimal
+integer = lexeme . try $ do
+  sign <- optional (char '-')
+  value <- L.decimal
+  pure $
+    case sign of
+      Just _ -> negate value
+      Nothing -> value
 
 -- | Parse a decimal float literal with a required fractional part.
 float :: Parser Double
 float = lexeme . try $ do
+  sign <- optional (char '-')
   whole <- some digitChar
   _ <- char '.'
   frac <- some digitChar
   expo <- optional exponentPart
-  pure (read (whole <> "." <> frac <> fromMaybe "" expo))
+  let rendered = maybe "" pure sign <> whole <> "." <> frac <> fromMaybe "" expo
+  maybe (fail ("invalid float literal: " <> rendered)) pure (readMaybe rendered)
   where
     exponentPart = do
       marker <- oneOf ("eE" :: String)
@@ -153,7 +162,7 @@ brackets = between (symbol "[") (symbol "]")
 
 reservedWords :: [Text]
 reservedWords =
-  ["any", "as", "declare", "dynamic", "else", "extends", "false", "forall", "if", "in", "infer", "inherit", "let", "null", "then", "true", "type", "unknown"]
+  ["Tuple", "any", "as", "declare", "dynamic", "else", "extends", "false", "forall", "if", "import", "in", "infer", "inherit", "let", "null", "then", "true", "type", "unknown"]
 
 identStart, identCont, pathChar :: Char -> Bool
 identStart c = isLetter c || c == '_'

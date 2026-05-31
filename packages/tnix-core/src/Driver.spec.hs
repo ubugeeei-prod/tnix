@@ -166,6 +166,19 @@ spec = describe "analysis" $ do
     analysisRoot analysis
       `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("value", tInt)])))
 
+  it "uses ambient declarations for string imports" $ do
+    analysis <-
+      analyzeText
+        "main.tnix"
+        ( source
+            [ "declare \"./lib.nix\" { default :: { value :: Int; }; };",
+              "import \"./lib.nix\""
+            ]
+        )
+        >>= expectRight
+    analysisRoot analysis
+      `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("value", tInt)])))
+
   it "builds record schemes from named ambient exports" $ do
     analysis <-
       analyzeText
