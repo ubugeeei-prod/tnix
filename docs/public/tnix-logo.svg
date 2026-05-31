@@ -1,25 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
   <title id="title">tnix logo</title>
-  <desc id="desc">A compact tnix mark combining a type-style t with a crystalline x.</desc>
-  <defs>
-    <linearGradient id="axis" x1="118" y1="56" x2="220" y2="200" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#14b8a6"/>
-      <stop offset="0.5" stop-color="#0ea5e9"/>
-      <stop offset="1" stop-color="#6366f1"/>
-    </linearGradient>
-  </defs>
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M76 52v152M43 88h88" stroke="#0f172a" stroke-width="22"/>
-    <path d="M133 68l78 120M211 68l-78 120" stroke="url(#axis)" stroke-width="24"/>
+  <desc id="desc">A minimal tnix mark with a lowercase t over a single-color x.</desc>
+  <g fill="none" stroke="#0ea5e9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 68l128 120" stroke-width="20" opacity="0.45"/>
+    <path d="M192 68L64 188" stroke-width="20" opacity="0.7"/>
   </g>
-  <g fill="url(#axis)">
-    <path d="M133 68h-24l12-20z"/>
-    <path d="M211 68l24-1-14-19z"/>
-    <path d="M133 188l-24 1 14 19z"/>
-    <path d="M211 188h24l-12 20z"/>
-  </g>
-  <g fill="#0f172a">
-    <circle cx="111" cy="150" r="7"/>
-    <circle cx="111" cy="174" r="7"/>
-  </g>
+  <path d="M111 38h31v53h52v30h-52v52c0 25 12 38 37 38h18v30h-24c-41 0-62-23-62-68v-52H61V91h50z" fill="#0f172a"/>
 </svg>
