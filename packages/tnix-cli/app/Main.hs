@@ -15,6 +15,7 @@ import Data.Version (showVersion)
 import Options.Applicative
 import Paths_tnix_cli qualified as PackageInfo
 import System.Exit (die, exitFailure)
+import System.Process (callProcess)
 
 -- | Parse arguments and execute the requested command.
 main :: IO ()
@@ -33,6 +34,8 @@ main = execParser opts >>= run
 run :: Cli.Command -> IO ()
 run (Cli.Version format) =
   putPayload (Cli.renderVersion (Text.pack (showVersion PackageInfo.version)) format)
+run (Cli.Lsp logFile) =
+  callProcess "tnix-lsp" (Cli.lspCommandArgs logFile)
 run cmd =
   Cli.executeCommand cmd >>= \case
     Left err ->
