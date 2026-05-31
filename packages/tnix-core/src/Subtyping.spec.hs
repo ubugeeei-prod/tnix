@@ -1,11 +1,14 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main (main) where
 
 import Alias (mkAliasEnv)
 import Data.Map.Strict qualified as Map
+import Data.Text qualified as Text
 import Subtyping (isConsistent, isSubtype, joinTypes, lookupRecordField, resolveType)
 import Test.Hspec
+import Test.QuickCheck
 import Type
 
 main :: IO ()
@@ -13,6 +16,10 @@ main = hspec spec
 
 spec :: Spec
 spec = describe "subtyping and type reduction" $ do
+  it "keeps generated concrete types reflexive under subtyping" $
+    property $ \(ConcreteType ty) ->
+      isSubtype mempty ty ty === True
+
   it "treats literal values as subtypes of primitive constructors" $ do
     isSubtype mempty (TLit (LString "tnix")) tString `shouldBe` True
     isSubtype mempty (TLit (LInt 1)) tInt `shouldBe` True
@@ -175,3 +182,42 @@ spec = describe "subtyping and type reduction" $ do
         rightVec = TApp (TApp (TCon "Vec") (TLit (LInt 2))) timeout
     joinTypes mempty leftVec rightVec
       `shouldBe` TApp (TApp (TCon "Vec") (TUnion [TLit (LInt 1), TLit (LInt 2)])) timeout
+
+newtype ConcreteType = ConcreteType Type
+  deriving (Show)
+
+instance Arbitrary ConcreteType where
+  arbitrary = sized (fmap ConcreteType . genType)
+  shrink (ConcreteType ty) = ConcreteType <$> shrinkType ty
+
+genType :: Int -> Gen Type
+genType size
+  | size <= 0 = genLeafType
+  | otherwise =
+      oneof
+        [ genLeafType,
+          tList <$> child,
+          TFun <$> elements [One, Many] <*> child <*> child,
+          TRecord . Map.fromList <$> resize 3 (listOf ((,) <$> genName <*> child))
+        ]
+  where
+    child = genType (size `div` 2)
+
+genLeafType :: Gen Type
+genLeafType =
+  oneof
+    [ elements [tString, tInt, tFloat, tNumber, tNat, tBool, tNull, tPath, tAny, tDynamic, tUnknown],
+      TLit . LInt <$> chooseInteger (0, 1000),
+      TLit . LBool <$> arbitrary,
+      TLit . LString <$> genName
+    ]
+
+genName :: Gen Name
+genName = Text.pack <$> ((:) <$> elements ['a' .. 'z'] <*> listOf (elements (['a' .. 'z'] <> ['0' .. '9'])))
+
+shrinkType :: Type -> [Type]
+shrinkType = \case
+  TApp _ item -> [item]
+  TFun _ input output -> [input, output]
+  TRecord fields -> Map.elems fields
+  _ -> []

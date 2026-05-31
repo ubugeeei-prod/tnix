@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main (main) where
@@ -5,8 +6,10 @@ module Main (main) where
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Parser (ParseError (..), parseProgram, parseProgramDetailed)
+import Pretty (renderExpr)
 import Syntax
 import Test.Hspec
+import Test.QuickCheck
 import TestSupport (expectRight, source)
 import Type
 
@@ -292,7 +295,52 @@ spec = describe "parseProgram" $ do
               digits | all (`elem` ("0123456789" :: String)) digits, not (null digits) -> pure ()
               _ -> expectationFailure ("expected a numeric line prefix, got " <> Text.unpack header)
       Right _ -> expectationFailure "expected a parse failure"
+
+  it "round-trips generated executable expressions through the pretty-printer" $
+    property $ \(RoundTripExpr expr) ->
+      case parseProgram "roundtrip.tnix" (renderExpr expr) of
+        Right program -> programExpr program === Just (plain expr)
+        Left err -> counterexample (Text.unpack err) False
   where
     plain = Marked Nothing
     isLeft (Left _) = True
     isLeft _ = False
+
+newtype RoundTripExpr = RoundTripExpr Expr
+  deriving (Show)
+
+instance Arbitrary RoundTripExpr where
+  arbitrary = sized (fmap RoundTripExpr . genExpr)
+  shrink (RoundTripExpr expr) = RoundTripExpr <$> shrinkExpr expr
+
+genExpr :: Int -> Gen Expr
+genExpr _ =
+  oneof
+    [ genLeafExpr,
+      EAdd <$> genLeafExpr <*> genLeafExpr,
+      EIf <$> (EBool <$> arbitrary) <*> genLeafExpr <*> genLeafExpr,
+      EList <$> resize 3 (listOf genLeafExpr),
+      EAttrSet <$> resize 3 (listOf genAttr)
+    ]
+  where
+    genAttr = AttrField <$> genName <*> genLeafExpr
+
+genLeafExpr :: Gen Expr
+genLeafExpr =
+  oneof
+    [ EInt <$> chooseInteger (0, 1000),
+      EBool <$> arbitrary,
+      pure ENull,
+      EString . DoubleQuoted . Text.pack <$> listOf (elements ['a' .. 'z'])
+    ]
+
+genName :: Gen Text.Text
+genName = Text.pack <$> ((:) <$> elements ['a' .. 'z'] <*> listOf (elements (['a' .. 'z'] <> ['0' .. '9'])))
+
+shrinkExpr :: Expr -> [Expr]
+shrinkExpr = \case
+  EAdd left right -> [left, right]
+  EIf _ yes no -> [yes, no]
+  EList items -> items
+  EAttrSet items -> [expr | AttrField _ expr <- items]
+  _ -> []
