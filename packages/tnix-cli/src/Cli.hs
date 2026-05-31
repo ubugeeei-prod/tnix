@@ -10,6 +10,7 @@ module Cli
     commandOutputPath,
     commandParser,
     executeCommand,
+    lspCommandArgs,
     renderAnalysis,
     renderVersion,
     writeOutput,
@@ -47,6 +48,7 @@ data Command
   | BuildProject (Maybe FilePath) OutputFormat
   | EmitProject (Maybe FilePath) OutputFormat
   | Version OutputFormat
+  | Lsp (Maybe FilePath)
   deriving (Eq, Show)
 
 data PlannedWrite = PlannedWrite FilePath Text
@@ -66,6 +68,7 @@ commandParser =
         <> command "build" (info buildProjectP (progDesc "Compile project sources and emit generated declarations"))
         <> command "emit-project" (info emitProjectP (progDesc "Emit declaration files for every discovered project source file"))
         <> command "version" (info versionP (progDesc "Show the tnix version"))
+        <> command "lsp" (info lspP (progDesc "Launch the tnix language server over stdio"))
     )
   where
     fileArg = strArgument (metavar "FILE")
@@ -89,6 +92,7 @@ commandParser =
     buildProjectP = BuildProject <$> dirArg <*> formatOpt
     emitProjectP = EmitProject <$> dirArg <*> formatOpt
     versionP = Version <$> formatOpt
+    lspP = Lsp <$> optional (strOption (long "log-file" <> metavar "PATH"))
 
 -- | Extract the explicit destination path carried by a command, if any.
 commandOutputPath :: Command -> Maybe FilePath
@@ -103,6 +107,7 @@ commandOutputPath cmd =
     BuildProject _ _ -> Nothing
     EmitProject _ _ -> Nothing
     Version _ -> Nothing
+    Lsp _ -> Nothing
 
 -- | Extract the requested machine-readable output format, if a command has one.
 commandOutputFormat :: Command -> Maybe OutputFormat
@@ -117,6 +122,7 @@ commandOutputFormat cmd =
     Emit _ _ -> Nothing
     Init _ -> Nothing
     Scaffold _ -> Nothing
+    Lsp _ -> Nothing
 
 -- | Execute one CLI command and return the rendered text payload.
 executeCommand :: Command -> IO (Either String Text)
@@ -133,6 +139,7 @@ executeCommand cmd =
     BuildProject target format -> executeProjectBuild target format
     EmitProject target format -> executeProjectEmit target format
     Version format -> pure (Right (renderVersion "unknown" format))
+    Lsp _ -> pure (Left "tnix lsp must be launched by the executable entry point")
 
 -- | Pretty-print the inferred root and bindings for `tnix check`.
 renderAnalysis :: Analysis -> Text
@@ -154,6 +161,11 @@ renderVersion version format =
             "success" .= True,
             "version" .= version
           ]
+
+-- | Arguments used when `tnix lsp` delegates to the standalone LSP executable.
+lspCommandArgs :: Maybe FilePath -> [String]
+lspCommandArgs logFile =
+  ["--stdio"] <> maybe [] (\path -> ["--log-file", path]) logFile
 
 -- | Write command output either to stdout or an explicit file.
 writeOutput :: Maybe FilePath -> Text -> IO ()

@@ -2,7 +2,7 @@
 
 module Main (main) where
 
-import Cli (Command (..), OutputFormat (..), commandOutputFormat, commandOutputPath, commandParser, executeCommand, renderAnalysis, renderVersion, writeOutput)
+import Cli (Command (..), OutputFormat (..), commandOutputFormat, commandOutputPath, commandParser, executeCommand, lspCommandArgs, renderAnalysis, renderVersion, writeOutput)
 import Control.Exception (bracket)
 import Control.Monad (forM_)
 import Data.List (intercalate, isInfixOf)
@@ -40,6 +40,8 @@ spec = do
       parse ["emit-project", "demo"] `shouldBe` Just (EmitProject (Just "demo") TextFormat)
       parse ["version"] `shouldBe` Just (Version TextFormat)
       parse ["version", "--format", "json"] `shouldBe` Just (Version JsonFormat)
+      parse ["lsp"] `shouldBe` Just (Lsp Nothing)
+      parse ["lsp", "--log-file", "tnix-lsp.log"] `shouldBe` Just (Lsp (Just "tnix-lsp.log"))
 
     it "reports an error for missing subcommands" $ do
       case parserResult [] of
@@ -69,6 +71,7 @@ spec = do
       commandOutputPath (Init Nothing) `shouldBe` Nothing
       commandOutputPath (Scaffold Nothing) `shouldBe` Nothing
       commandOutputPath (Version TextFormat) `shouldBe` Nothing
+      commandOutputPath (Lsp Nothing) `shouldBe` Nothing
 
   describe "commandOutputFormat" $
     it "tracks commands that can emit machine-readable reports" $ do
@@ -79,6 +82,12 @@ spec = do
       commandOutputFormat (Version JsonFormat) `shouldBe` Just JsonFormat
       commandOutputFormat (Compile "main.tnix" Nothing) `shouldBe` Nothing
       commandOutputFormat (Init Nothing) `shouldBe` Nothing
+      commandOutputFormat (Lsp Nothing) `shouldBe` Nothing
+
+  describe "lspCommandArgs" $
+    it "delegates to the standalone server over stdio" $ do
+      lspCommandArgs Nothing `shouldBe` ["--stdio"]
+      lspCommandArgs (Just "tnix-lsp.log") `shouldBe` ["--stdio", "--log-file", "tnix-lsp.log"]
 
   describe "renderVersion" $ do
     it "renders text and json version output" $ do

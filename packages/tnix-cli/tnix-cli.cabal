@@ -39,6 +39,7 @@ executable tnix
     , bytestring
     , containers
     , optparse-applicative
+    , process
     , text
     , tnix-cli
     , tnix-core
