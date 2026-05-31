@@ -7,12 +7,13 @@
 -- collapsing what was an O(workspace) cost into O(changed files).
 --
 -- Entries carry a monotonically increasing sequence number so the cache
--- can be capped at 'analysisCacheCapacity' with simple FIFO eviction. A
+-- can be capped at 'analysisCacheCapacity' with simple LRU eviction. A
 -- 'didChange' that changes the document text shifts the key, so stale
 -- entries naturally fall out of the working set even before eviction.
 module AnalysisCache
   ( AnalysisCache,
     AnalysisKey,
+    accessAnalysisCache,
     analysisCacheCapacity,
     analysisCacheSize,
     emptyAnalysisCache,
@@ -41,8 +42,8 @@ data AnalysisCache = AnalysisCache
   }
   deriving (Show)
 
--- | Maximum number of entries kept in the cache. Once exceeded, older
--- entries (lowest sequence numbers) are evicted FIFO.
+-- | Maximum number of entries kept in the cache. Once exceeded, least
+-- recently used entries (lowest sequence numbers) are evicted.
 analysisCacheCapacity :: Int
 analysisCacheCapacity = 256
 
@@ -58,7 +59,17 @@ analysisCacheSize = Map.size . analysisCacheEntries
 lookupAnalysisCache :: AnalysisKey -> AnalysisCache -> Maybe (Either String Analysis)
 lookupAnalysisCache key cache = snd <$> Map.lookup key (analysisCacheEntries cache)
 
--- | Insert or replace an analysis result, evicting the oldest entries if
+-- | Look up and mark an entry as recently used.
+accessAnalysisCache :: AnalysisKey -> AnalysisCache -> (Maybe (Either String Analysis), AnalysisCache)
+accessAnalysisCache key cache =
+  case Map.lookup key (analysisCacheEntries cache) of
+    Nothing -> (Nothing, cache)
+    Just (_, value) ->
+      let nextSeq = analysisCacheNext cache
+          entries' = Map.insert key (nextSeq, value) (analysisCacheEntries cache)
+       in (Just value, cache{analysisCacheEntries = entries', analysisCacheNext = nextSeq + 1})
+
+-- | Insert or replace an analysis result, evicting the least recently used entries if
 -- the cache would exceed 'analysisCacheCapacity'.
 insertAnalysisCache :: AnalysisKey -> Either String Analysis -> AnalysisCache -> AnalysisCache
 insertAnalysisCache key value cache =

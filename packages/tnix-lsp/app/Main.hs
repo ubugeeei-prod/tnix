@@ -10,9 +10,9 @@ module Main (main) where
 
 import AnalysisCache
   ( AnalysisCache,
+    accessAnalysisCache,
     emptyAnalysisCache,
     insertAnalysisCache,
-    lookupAnalysisCache,
   )
 import Control.Exception (IOException, SomeException, fromException, throwIO, try)
 import Data.Aeson
@@ -143,9 +143,11 @@ safeHandle logger shutdownRef ref analyze msg = do
 cachedAnalyzeText :: IORef AnalysisCache -> FilePath -> Text -> IO (Either String Analysis)
 cachedAnalyzeText cacheRef file content = do
   cache <- readIORef cacheRef
-  case lookupAnalysisCache (file, content) cache of
-    Just result -> pure result
-    Nothing -> do
+  case accessAnalysisCache (file, content) cache of
+    (Just result, touchedCache) -> do
+      writeIORef cacheRef touchedCache
+      pure result
+    (Nothing, _) -> do
       result <- analyzeText file content
       modifyIORef' cacheRef (insertAnalysisCache (file, content) result)
       pure result

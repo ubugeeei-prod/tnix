@@ -174,7 +174,7 @@ identChar char = isAlphaNum char || char `elem` ("_'-" :: String)
 
 reservedWords :: [Text]
 reservedWords =
-  ["any", "as", "declare", "dynamic", "else", "extends", "false", "forall", "if", "in", "infer", "inherit", "let", "null", "then", "true", "type", "unknown"]
+  ["Tuple", "any", "as", "declare", "dynamic", "else", "extends", "false", "forall", "if", "import", "in", "infer", "inherit", "let", "null", "then", "true", "type", "unknown"]
 
 -- | Convert the per-token list into the LSP integer delta stream that the
 -- spec requires.

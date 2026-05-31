@@ -34,11 +34,13 @@ import Control.Monad (forM)
 import Data.Aeson (Value)
 import Data.List (nub)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import Driver (Analysis)
 import Server
   ( applyContentChanges,
     asText,
+    contentChanges,
     documentPath,
     field,
     uriPath,
@@ -123,8 +125,9 @@ effectiveCachedAnalysis cached =
 --
 -- Full-text @didOpen@/@didChange@ updates replace the cached content
 -- directly. Incremental @didChange@ messages reuse the cached buffer when
--- possible and fall back to reading from disk only when the editor has
--- not opened the file yet.
+-- possible. Ranged incremental edits require an open-document baseline,
+-- because applying them to a freshly-read disk snapshot can target the
+-- wrong version of the buffer.
 updateDocuments ::
   (FilePath -> IO (Either String Text)) ->
   (FilePath -> Text -> IO (Either String Analysis)) ->
@@ -137,17 +140,32 @@ updateDocuments readDocument analyze docs msg = do
       file = maybe "" (normalise . uriPath) (textDocument >>= field "uri" >>= asText)
       fullText = textDocument >>= field "text" >>= asText
       current = lookupDocumentText file docs
+      changes = contentChanges params
+      rangedChangeWithoutBaseline = isNothing current && any hasRange changes
   contentResult <-
     case fullText of
       Just content -> pure (Right content)
-      Nothing -> do
-        base <- maybe (readDocument file) (pure . Right) current
-        pure (base >>= (`applyContentChanges` params))
+      Nothing
+        | rangedChangeWithoutBaseline ->
+            pure (Left "cannot apply incremental changes without an open document baseline")
+        | otherwise -> do
+            base <-
+              case current of
+                Just content -> pure (Right content)
+                Nothing
+                  | null changes -> readDocument file
+                  | otherwise -> pure (Right "")
+            pure (base >>= (`applyContentChanges` params))
   case contentResult of
     Left err -> pure (docs, file, Left err)
     Right content -> do
       result <- analyze file content
       pure (insertDocument file content (Just result) docs, file, result)
+  where
+    hasRange change =
+      case field "range" change of
+        Just _ -> True
+        Nothing -> False
 
 -- | Remove one document from the cache and return the cleared file path.
 closeDocuments :: Documents -> Value -> (Documents, Maybe FilePath)

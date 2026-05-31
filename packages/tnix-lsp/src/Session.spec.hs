@@ -43,9 +43,16 @@ spec = do
       lookupDocumentText "/tmp/main.tnix" docs' `shouldBe` Just "let result = 2;\n"
       fmap analysisBindings result `shouldBe` Right (Map.fromList [("result", Scheme [] tInt)])
 
-    it "falls back to disk for uncached incremental updates" $ do
+    it "rejects uncached ranged incremental updates without a baseline" $ do
       let msg = changeMessage "/tmp/main.tnix" [replaceRange 0 0 0 1 "2"]
-      (docs, file, result) <- updateDocuments (\_ -> pure (Right "1")) analyzeStub mempty msg
+      (docs, file, result) <- updateDocuments readNever analyzeStub mempty msg
+      file `shouldBe` "/tmp/main.tnix"
+      lookupDocumentText file docs `shouldBe` Nothing
+      result `shouldBe` Left "cannot apply incremental changes without an open document baseline"
+
+    it "accepts uncached full-text didChange updates without a baseline" $ do
+      let msg = changeMessage "/tmp/main.tnix" [object ["text" .= ("2" :: Text)]]
+      (docs, file, result) <- updateDocuments readNever analyzeStub mempty msg
       file `shouldBe` "/tmp/main.tnix"
       lookupDocumentText file docs `shouldBe` Just "2"
       fmap analysisBindings result `shouldBe` Right (Map.fromList [("result", Scheme [] tInt)])

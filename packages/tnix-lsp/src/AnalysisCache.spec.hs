@@ -49,3 +49,14 @@ spec = describe "AnalysisCache" $ do
     lookupAnalysisCache (head keys) cache `shouldBe` Nothing
     -- The most recent inserts should still be present.
     lookupAnalysisCache (last keys) cache `shouldSatisfy` maybe False isLeft
+
+  it "touches cached entries so eviction follows least-recently-used order" $ do
+    let capacity = analysisCacheCapacity
+        keys = [("/file" <> show n <> ".tnix", "stub") | n <- [1 .. capacity]]
+        fullCache = foldl (\acc (n, key) -> insertAnalysisCache key (Left (show n)) acc) emptyAnalysisCache (zip [1 :: Int ..] keys)
+        (hit, touchedCache) = accessAnalysisCache (head keys) fullCache
+        evictedCache = insertAnalysisCache ("/extra.tnix", "stub") (Left "extra") touchedCache
+    hit `shouldBe` Just (Left "1")
+    analysisCacheSize evictedCache `shouldBe` capacity
+    lookupAnalysisCache (head keys) evictedCache `shouldBe` Just (Left "1")
+    lookupAnalysisCache (keys !! 1) evictedCache `shouldBe` Nothing
