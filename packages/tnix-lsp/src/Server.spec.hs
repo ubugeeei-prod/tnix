@@ -39,6 +39,11 @@ spec = do
                   "renameProvider" .= True,
                   "documentSymbolProvider" .= True,
                   "workspaceSymbolProvider" .= True,
+                  "workspace"
+                    .= object
+                      [ "didChangeWatchedFiles" .= object ["dynamicRegistration" .= False],
+                        "didChangeConfiguration" .= object ["dynamicRegistration" .= False]
+                      ],
                   "codeActionProvider" .= True,
                   "documentHighlightProvider" .= True,
                   "documentLinkProvider" .= object ["resolveProvider" .= False],
