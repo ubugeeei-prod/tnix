@@ -1,2 +1,3 @@
 packages:
   - editors/vscode
+  - tools/deploy
