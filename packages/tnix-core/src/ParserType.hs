@@ -83,6 +83,7 @@ atomParser =
       TUnknown <$ reserved "unknown",
       inferParser,
       parens typeParser,
+      TCon "Tuple" <$ reserved "Tuple",
       varOrConParser
     ]
 
@@ -114,6 +115,7 @@ shapeItemParser =
       TUnknown <$ reserved "unknown",
       inferParser,
       parens typeParser,
+      TCon "Tuple" <$ reserved "Tuple",
       varOrConParser
     ]
 

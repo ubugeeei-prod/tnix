@@ -133,6 +133,29 @@ spec = describe "compile and emit" $ do
     output <- compileText "main.tnix" "1.5" >>= expectRight
     output `shouldBe` "1.5"
 
+  it "keeps integer-looking floats distinct from integers" $ do
+    compiled <- compileText "main.tnix" "1.0" >>= expectRight
+    emitted <- emitText "main.tnix" "1.0" >>= expectRight
+    compiled `shouldBe` "1.0"
+    Text.isInfixOf "default :: 1.0;" emitted `shouldBe` True
+
+  it "compiles and emits negative numeric literals" $ do
+    compiled <-
+      compileText
+        "main.tnix"
+        ( source
+            [ "let",
+              "  x = -1;",
+              "  y = -1.0;",
+              "in y"
+            ]
+        )
+        >>= expectRight
+    emitted <- emitText "main.tnix" "-1.0" >>= expectRight
+    Text.isInfixOf "x = -1;" compiled `shouldBe` True
+    Text.isInfixOf "y = -1.0;" compiled `shouldBe` True
+    Text.isInfixOf "default :: -1.0;" emitted `shouldBe` True
+
   it "compiles infix addition without rewriting the operator away" $ do
     output <- compileText "math.nix" "{ inc = x: x + 1; }" >>= expectRight
     "x + 1" `Text.isInfixOf` output `shouldBe` True

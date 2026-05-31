@@ -80,6 +80,23 @@ spec = describe "parseProgram" $ do
                  ]
     programExpr program `shouldBe` Just (plain (EFloat 1.5))
 
+  it "parses negative numeric literals in expressions and type shapes" $ do
+    program <-
+      expectRight $
+        parseProgram
+          "main.tnix"
+          ( source
+              [ "type Signed = Range -1 1 Int;",
+                "type Shape = Tensor [-1 -2.5] Float;",
+                "-1.5"
+              ]
+          )
+    programAliases program
+      `shouldBe` [ TypeAlias "Signed" [] (TApp (TApp (TApp (TCon "Range") (TLit (LInt (-1)))) (TLit (LInt 1))) tInt),
+                   TypeAlias "Shape" [] (TApp (TApp (TCon "Tensor") (TTypeList [TLit (LInt (-1)), TLit (LFloat (-2.5))])) tFloat)
+                 ]
+    programExpr program `shouldBe` Just (plain (EFloat (-1.5)))
+
   it "parses any and unknown as distinct built-in gradual types" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Loose = any; type Opaque = unknown;"
     programAliases program
@@ -109,6 +126,15 @@ spec = describe "parseProgram" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Pair = Tuple [Int String];"
     programAliases program
       `shouldBe` [TypeAlias "Pair" [] (TApp (TCon "Tuple") (TTypeList [tInt, tString]))]
+
+  it "reserves import and Tuple while preserving their builtin uses" $ do
+    program <- expectRight $ parseProgram "main.tnix" "type Pair = Tuple [Int String]; import \"./lib.nix\""
+    programAliases program
+      `shouldBe` [TypeAlias "Pair" [] (TApp (TCon "Tuple") (TTypeList [tInt, tString]))]
+    programExpr program
+      `shouldBe` Just (plain (EApp (EVar "import") (EString (DoubleQuoted "./lib.nix"))))
+    parseProgram "main.tnix" "let import = 1; in import" `shouldSatisfy` isLeft
+    parseProgram "main.tnix" "type Tuple = Int;" `shouldSatisfy` isLeft
 
   it "parses linear function arrows alongside ordinary arrows" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Consume a = a %1 -> a; type Endo a = a -> a;"
