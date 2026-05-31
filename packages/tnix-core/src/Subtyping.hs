@@ -79,7 +79,7 @@ resolveType env = go 0 . normalizeIndexedType . expandAliases env . eraseForall
               case matchPattern (go (depth + 1) a) (go (depth + 1) b) of
                 Just subst -> go (depth + 1) (substituteTypeVars subst c)
                 Nothing ->
-                  if isSubtype env a b || isConsistent env a b
+                  if isSubtype env a b
                     then go (depth + 1) c
                     else go (depth + 1) d
             other -> other

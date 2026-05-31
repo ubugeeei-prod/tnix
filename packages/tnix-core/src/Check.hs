@@ -696,7 +696,7 @@ usageCount target = go
               else sum (map (letItemCount . markedValue) items) + go body
       EAttrSet items -> sum (map attrItemCount items)
       ESelect base steps -> go base + sum (map selectStepCount steps)
-      EIf cond yesExpr noExpr -> go cond + go yesExpr + go noExpr
+      EIf cond yesExpr noExpr -> go cond + max (go yesExpr) (go noExpr)
       EList items -> sum (map go items)
       ECast expr _ -> go expr
     letItemCount = \case

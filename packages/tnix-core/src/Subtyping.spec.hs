@@ -69,6 +69,10 @@ spec = describe "subtyping and type reduction" $ do
             tDynamic
     resolveType mempty rowsOfMatrix `shouldBe` TLit (LInt 2)
 
+  it "does not reduce conditional types through gradual consistency alone" $ do
+    let dynamicCheck = TConditional tDynamic tString tInt tBool
+    resolveType mempty dynamicCheck `shouldBe` tBool
+
   it "joins compatible types and falls back to unions" $ do
     joinTypes mempty (TLit (LString "x")) tString `shouldBe` tString
     joinTypes mempty tInt tFloat `shouldBe` tNumber
