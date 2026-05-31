@@ -15,6 +15,10 @@ export default defineConfig({
       "docs:build": {
         command: "vp build --config vite.docs.config.ts",
       },
+      "docs:deploy": {
+        command: "vp run docs:build && void deploy --dir dist/docs",
+        cache: false,
+      },
       ide: {
         command: "node --experimental-strip-types ./scripts/install-ide.ts",
         cache: false,
