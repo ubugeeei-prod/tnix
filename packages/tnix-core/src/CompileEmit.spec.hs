@@ -131,6 +131,34 @@ spec = describe "compile and emit" $ do
     " - " `Text.isInfixOf` output `shouldBe` True
     " * " `Text.isInfixOf` output `shouldBe` True
 
+  it "renders same-precedence operator chains without redundant parentheses" $ do
+    output <-
+      compileText
+        "main.tnix"
+        ( source
+            [ "let",
+              "  a = 1;",
+              "  b = 2;",
+              "  c = 3;",
+              "in a + b + c"
+            ]
+        )
+        >>= expectRight
+    "a + b + c" `Text.isInfixOf` output `shouldBe` True
+
+  it "parenthesizes control flow used as an operator operand for valid nix" $ do
+    output <-
+      compileText
+        "main.tnix"
+        ( source
+            [ "let",
+              "  a = 1;",
+              "in a + (if true then 1 else 2)"
+            ]
+        )
+        >>= expectRight
+    "+ (if true" `Text.isInfixOf` output `shouldBe` True
+
   it "preserves list concatenation when compiling to nix" $ do
     output <-
       compileText
