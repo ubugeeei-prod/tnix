@@ -16,7 +16,7 @@ where
 
 import Alias
 import Control.Applicative ((<|>))
-import Control.Monad (foldM, forM, unless, when, zipWithM)
+import Control.Monad (foldM, forM, unless, void, when, zipWithM)
 import Control.Monad.State.Strict
 import Data.Functor (($>), (<&>))
 import Data.List (group, intercalate, sort)
@@ -123,7 +123,7 @@ inferExpr ctx env = \case
   EVar name -> maybe (lift (Left (withCode TC0001UnboundName ("unbound name: " <> quoteName name)))) instantiate (Map.lookup name env)
   EString text -> pure (TLit (LString (stringLiteralText text)))
   EInterp _ parts -> do
-    mapM_ (\case StrExpr expr -> () <$ inferExpr ctx env expr; StrText _ -> pure ()) parts
+    mapM_ (\case StrExpr expr -> void (inferExpr ctx env expr); StrText _ -> pure ()) parts
     pure tString
   EFloat n -> pure (TLit (LFloat n))
   EInt n -> pure (TLit (LInt n))
