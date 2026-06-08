@@ -50,8 +50,8 @@ ambient_entry = attr_name "::" type ";"
 ## Expressions
 
 The expression grammar is layered from loosest binding to tightest:
-`expression < or < and < equality < relational < not < addition < cast <
-application < postfix < atom`.
+`expression < or < and < equality < relational < not < addition <
+multiplication < cast < application < postfix < atom`.
 
 ```ebnf
 expression       = if_expr
@@ -100,8 +100,9 @@ or_expr          = and_expr ("||" and_expr)*
 and_expr         = equality_expr ("&&" equality_expr)*
 equality_expr    = relational_expr (("==" | "!=") relational_expr)*
 relational_expr  = not_expr (("<=" | ">=" | "<" | ">") not_expr)*
-not_expr         = "!" not_expr | addition_expr
-addition_expr    = cast_expr ("+" cast_expr)*
+not_expr            = "!" not_expr | addition_expr
+addition_expr       = multiplication_expr (("+" | "-") multiplication_expr)*
+multiplication_expr = cast_expr ("*" cast_expr)*
 
 cast_expr        = application_expr ("as" type)*
 application_expr = postfix_expr+
@@ -253,10 +254,11 @@ From loosest to tightest binding:
 | 4 | `==`, `!=` (equality) | left |
 | 5 | `<`, `>`, `<=`, `>=` (relational) | left |
 | 6 | `!` (boolean not) | prefix |
-| 7 | `+` (addition) | left |
-| 8 | `expr as Type` (cast) | left |
-| 9 | function application `f x` | left |
-| 10 | `.field` and `.${expr}` (postfix select) | left |
+| 7 | `+`, `-` (additive) | left |
+| 8 | `*` (multiplicative) | left |
+| 9 | `expr as Type` (cast) | left |
+| 10 | function application `f x` | left |
+| 11 | `.field` and `.${expr}` (postfix select) | left |
 
 Type-level precedence, from loosest to tightest:
 

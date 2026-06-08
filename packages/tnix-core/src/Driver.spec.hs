@@ -84,6 +84,19 @@ spec = describe "analysis" $ do
     analysis <- analyzeText "main.tnix" "x: if true then x else x" >>= expectRight
     fmap renderScheme (analysisRoot analysis) `shouldBe` Just "forall t0. t0 %1 -> t0"
 
+  it "infers numeric results for subtraction and multiplication" $ do
+    mul <- analyzeText "math.nix" "{ area = w: h: w * h; }" >>= expectRight
+    analysisRoot mul
+      `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("area", TFun One tNumber (TFun One tNumber tNumber))])))
+    sub <- analyzeText "math.nix" "{ diff = a: b: a - b; }" >>= expectRight
+    analysisRoot sub
+      `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("diff", TFun One tNumber (TFun One tNumber tNumber))])))
+
+  it "widens Nat-only subtraction to Int" $ do
+    analysis <- analyzeText "main.nix" "{ diff = (a :: Nat): (b :: Nat): a - b; }" >>= expectRight
+    analysisRoot analysis
+      `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("diff", TFun One tNat (TFun One tNat tInt))])))
+
   it "infers Bool from relational, equality, and boolean operators" $ do
     lt <- analyzeText "main.tnix" "1 < 2" >>= expectRight
     analysisRoot lt `shouldBe` Just (Scheme [] tBool)

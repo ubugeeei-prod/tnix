@@ -191,6 +191,8 @@ parenIf False = id
 binOpSymbol :: BinOp -> Text
 binOpSymbol = \case
   OpAdd -> "+"
+  OpSub -> "-"
+  OpMul -> "*"
   OpEq -> "=="
   OpNeq -> "!="
   OpLt -> "<"

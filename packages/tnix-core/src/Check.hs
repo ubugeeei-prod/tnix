@@ -541,7 +541,9 @@ checkCast ctx actual expected = do
 inferBinaryOp :: CheckContext -> TypeEnv -> BinOp -> Expr -> Expr -> InferM Type
 inferBinaryOp ctx env op left right =
   case op of
-    OpAdd -> inferArithmetic ctx env left right
+    OpAdd -> inferArithmetic ctx env op left right
+    OpSub -> inferArithmetic ctx env op left right
+    OpMul -> inferArithmetic ctx env op left right
     OpEq -> inferEquality ctx env left right
     OpNeq -> inferEquality ctx env left right
     OpLt -> inferRelational ctx env left right
@@ -551,8 +553,8 @@ inferBinaryOp ctx env op left right =
     OpAnd -> inferLogical ctx env left right
     OpOr -> inferLogical ctx env left right
 
-inferArithmetic :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
-inferArithmetic ctx env left right = do
+inferArithmetic :: CheckContext -> TypeEnv -> BinOp -> Expr -> Expr -> InferM Type
+inferArithmetic ctx env op left right = do
   leftTy <- inferExpr ctx env left >>= zonk
   rightTy <- inferExpr ctx env right >>= zonk
   let aliases = checkAliases ctx
@@ -564,10 +566,17 @@ inferArithmetic ctx env left right = do
       if leftResolved == tDynamic || rightResolved == tDynamic
         then pure tDynamic
         else do
-          let expected = additionTarget leftResolved rightResolved
+          let expected = arithmeticTarget op leftResolved rightResolved
           _ <- constrain ctx leftTy expected
           _ <- constrain ctx rightTy expected
           zonk expected
+
+-- | Pick the numeric result family for an arithmetic operator. Subtraction can
+-- yield negative results, so a `Nat`-only operand pair widens to `Int`.
+arithmeticTarget :: BinOp -> Type -> Type -> Type
+arithmeticTarget op left right =
+  let base = additionTarget left right
+   in if op == OpSub && base == tNat then tInt else base
 
 -- | Structural equality (`==`/`!=`) accepts any pair of operands and always
 -- produces `Bool`, mirroring Nix's value-level equality.

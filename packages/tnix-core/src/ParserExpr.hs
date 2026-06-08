@@ -150,9 +150,17 @@ relationalParser =
 notParser :: Parser Expr
 notParser = (EUnaryOp OpNot <$> (symbol "!" *> notParser)) <|> additionParser
 
--- | Parse left-associated infix addition.
+-- | Parse left-associated additive arithmetic (`+`, `-`).
 additionParser :: Parser Expr
-additionParser = chainLeft1 castParser (EBinaryOp OpAdd <$ symbol "+")
+additionParser =
+  chainLeft1
+    multiplicationParser
+    ((EBinaryOp OpAdd <$ symbol "+") <|> (EBinaryOp OpSub <$ symbol "-"))
+
+-- | Parse left-associated multiplicative arithmetic (`*`), binding tighter
+-- than additive operators.
+multiplicationParser :: Parser Expr
+multiplicationParser = chainLeft1 castParser (EBinaryOp OpMul <$ symbol "*")
 
 -- | Parse left-associated application chains.
 applicationParser :: Parser Expr
