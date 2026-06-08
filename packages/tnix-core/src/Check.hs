@@ -153,7 +153,11 @@ inferExpr ctx env = \case
                   outTy <- freshMeta
                   _ <- unify ctx funTy (TFun Many argTy outTy)
                   zonk outTy
-  EAdd left right -> inferAddition ctx env left right
+  EBinaryOp op left right -> inferBinaryOp ctx env op left right
+  EUnaryOp OpNot operand -> do
+    operandTy <- inferExpr ctx env operand
+    _ <- constrain ctx operandTy tBool
+    pure tBool
   ELet items body -> do
     (env', _) <- inferLet ctx env items
     inferExpr ctx env' body
@@ -529,8 +533,26 @@ checkCast ctx actual expected = do
         then pure expected
         else lift (Left (withCode TC0015InvalidCast ("invalid cast: " <> showType actual' <> " as " <> showType expected')))
 
-inferAddition :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
-inferAddition ctx env left right = do
+-- | Infer the result type of a binary operator application.
+--
+-- Numeric `+` keeps its dedicated coercion rules; structural equality accepts
+-- any operands and yields `Bool`; ordered comparisons require comparable
+-- (numeric or string) operands; boolean connectives require `Bool` operands.
+inferBinaryOp :: CheckContext -> TypeEnv -> BinOp -> Expr -> Expr -> InferM Type
+inferBinaryOp ctx env op left right =
+  case op of
+    OpAdd -> inferArithmetic ctx env left right
+    OpEq -> inferEquality ctx env left right
+    OpNeq -> inferEquality ctx env left right
+    OpLt -> inferRelational ctx env left right
+    OpGt -> inferRelational ctx env left right
+    OpLe -> inferRelational ctx env left right
+    OpGe -> inferRelational ctx env left right
+    OpAnd -> inferLogical ctx env left right
+    OpOr -> inferLogical ctx env left right
+
+inferArithmetic :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
+inferArithmetic ctx env left right = do
   leftTy <- inferExpr ctx env left >>= zonk
   rightTy <- inferExpr ctx env right >>= zonk
   let aliases = checkAliases ctx
@@ -546,6 +568,45 @@ inferAddition ctx env left right = do
           _ <- constrain ctx leftTy expected
           _ <- constrain ctx rightTy expected
           zonk expected
+
+-- | Structural equality (`==`/`!=`) accepts any pair of operands and always
+-- produces `Bool`, mirroring Nix's value-level equality.
+inferEquality :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
+inferEquality ctx env left right = do
+  _ <- inferExpr ctx env left
+  _ <- inferExpr ctx env right
+  pure tBool
+
+-- | Ordered comparisons require comparable operands (numeric or string) on both
+-- sides, unless a gradual boundary connects them. The result is always `Bool`.
+inferRelational :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
+inferRelational ctx env left right = do
+  leftTy <- inferExpr ctx env left >>= zonk
+  rightTy <- inferExpr ctx env right >>= zonk
+  let aliases = checkAliases ctx
+      leftResolved = resolveType aliases leftTy
+      rightResolved = resolveType aliases rightTy
+      gradual ty = ty == tAny || ty == tDynamic
+      comparable ty = isSubtype aliases ty tNumber || isSubtype aliases ty tString
+  if gradual leftResolved || gradual rightResolved || (comparable leftResolved && comparable rightResolved)
+    then pure tBool
+    else
+      lift
+        ( Left
+            ( withCode
+                TC0019NotComparable
+                ("cannot compare " <> showType leftResolved <> " with " <> showType rightResolved)
+            )
+        )
+
+-- | Boolean connectives (`&&`/`||`) require `Bool` operands and yield `Bool`.
+inferLogical :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
+inferLogical ctx env left right = do
+  leftTy <- inferExpr ctx env left
+  _ <- constrain ctx leftTy tBool
+  rightTy <- inferExpr ctx env right
+  _ <- constrain ctx rightTy tBool
+  pure tBool
 
 additionTarget :: Type -> Type -> Type
 additionTarget left right =
@@ -688,7 +749,8 @@ usageCount target = go
         | target `elem` patternBoundNames pattern' -> 0
         | otherwise -> go body
       EApp fun arg -> go fun + go arg
-      EAdd left right -> go left + go right
+      EBinaryOp _ left right -> go left + go right
+      EUnaryOp _ operand -> go operand
       ELet items body ->
         let names = [name | Marked _ (LetBinding name _) <- items]
          in if target `elem` names

@@ -61,7 +61,7 @@ ambientEntry = do
 
 -- | Parse any expression form supported by the prototype.
 expressionParser :: Parser Expr
-expressionParser = choice [ifParser, letParser, try lambdaParser, additionParser]
+expressionParser = choice [ifParser, letParser, try lambdaParser, orParser]
 
 -- | Parse a Nix-style conditional expression.
 ifParser :: Parser Expr
@@ -116,12 +116,43 @@ castParser = do
   casts <- many (reserved "as" *> typeParser)
   pure (foldl ECast base casts)
 
--- | Parse left-associated infix addition.
+-- | Operator precedence ladder, from loosest to tightest binding.
 --
--- Addition binds looser than application/selection and explicit casts so
--- expressions such as `f x + 1` keep the expected Nix shape.
+-- The layering mirrors Nix: boolean `||` binds loosest, then `&&`, equality,
+-- ordered comparisons, prefix `!`, and finally numeric `+`. Each level sits
+-- above application/selection and explicit casts so expressions such as
+-- `f x + 1 < limit && ok` keep the expected Nix shape.
+orParser :: Parser Expr
+orParser = chainLeft1 andParser (EBinaryOp OpOr <$ symbol "||")
+
+andParser :: Parser Expr
+andParser = chainLeft1 equalityParser (EBinaryOp OpAnd <$ symbol "&&")
+
+equalityParser :: Parser Expr
+equalityParser =
+  chainLeft1
+    relationalParser
+    ((EBinaryOp OpEq <$ symbol "==") <|> (EBinaryOp OpNeq <$ symbol "!="))
+
+relationalParser :: Parser Expr
+relationalParser =
+  chainLeft1
+    notParser
+    ( choice
+        [ EBinaryOp OpLe <$ symbol "<=",
+          EBinaryOp OpGe <$ symbol ">=",
+          EBinaryOp OpLt <$ symbol "<",
+          EBinaryOp OpGt <$ symbol ">"
+        ]
+    )
+
+-- | Parse prefix boolean negation, falling through to numeric addition.
+notParser :: Parser Expr
+notParser = (EUnaryOp OpNot <$> (symbol "!" *> notParser)) <|> additionParser
+
+-- | Parse left-associated infix addition.
 additionParser :: Parser Expr
-additionParser = chainLeft1 castParser (EAdd <$ symbol "+")
+additionParser = chainLeft1 castParser (EBinaryOp OpAdd <$ symbol "+")
 
 -- | Parse left-associated application chains.
 applicationParser :: Parser Expr
@@ -187,7 +218,7 @@ listParser :: Parser Expr
 listParser = EList <$> brackets (many listItem)
   where
     listItem = choice [ifParser, letParser, try lambdaParser, listAdditionParser]
-    listAdditionParser = chainLeft1 listCastParser (EAdd <$ symbol "+")
+    listAdditionParser = chainLeft1 listCastParser (EBinaryOp OpAdd <$ symbol "+")
     listCastParser = do
       base <- postfixParser
       casts <- many (reserved "as" *> typeParser)

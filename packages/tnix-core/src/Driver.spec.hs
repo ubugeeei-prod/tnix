@@ -84,6 +84,26 @@ spec = describe "analysis" $ do
     analysis <- analyzeText "main.tnix" "x: if true then x else x" >>= expectRight
     fmap renderScheme (analysisRoot analysis) `shouldBe` Just "forall t0. t0 %1 -> t0"
 
+  it "infers Bool from relational, equality, and boolean operators" $ do
+    lt <- analyzeText "main.tnix" "1 < 2" >>= expectRight
+    analysisRoot lt `shouldBe` Just (Scheme [] tBool)
+    eq <- analyzeText "main.tnix" "1 == 2" >>= expectRight
+    analysisRoot eq `shouldBe` Just (Scheme [] tBool)
+    conj <- analyzeText "main.tnix" "true && false" >>= expectRight
+    analysisRoot conj `shouldBe` Just (Scheme [] tBool)
+    neg <- analyzeText "main.tnix" "!true" >>= expectRight
+    analysisRoot neg `shouldBe` Just (Scheme [] tBool)
+
+  it "compares strings as ordered values" $ do
+    cmp <- analyzeText "main.tnix" "\"a\" < \"b\"" >>= expectRight
+    analysisRoot cmp `shouldBe` Just (Scheme [] tBool)
+
+  it "rejects comparing non-comparable operands" $
+    analyzeText "main.tnix" "true < false" >>= (`expectLeftContaining` "cannot compare")
+
+  it "rejects boolean connectives applied to non-boolean operands" $
+    analyzeText "main.tnix" "1 && true" >>= (`expectLeftContaining` "type mismatch")
+
   it "reports missing fields" $
     analyzeText "main.tnix" "{ value = 1; }.missing" >>= (`expectLeftContaining` "missing field")
 

@@ -255,7 +255,8 @@ exprAnnotations = \case
   EPath _ -> []
   ELambda pattern' body -> patternAnnotations pattern' <> exprAnnotations body
   EApp fun arg -> exprAnnotations fun <> exprAnnotations arg
-  EAdd left right -> exprAnnotations left <> exprAnnotations right
+  EBinaryOp _ left right -> exprAnnotations left <> exprAnnotations right
+  EUnaryOp _ operand -> exprAnnotations operand
   ELet items body -> foldMap (letItemAnnotations . markedValue) items <> exprAnnotations body
   EAttrSet items -> foldMap attrAnnotations items
   ESelect base steps -> exprAnnotations base <> foldMap selectStepAnnotations steps
