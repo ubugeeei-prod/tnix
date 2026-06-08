@@ -222,10 +222,13 @@ int_literal     = ["-"] digit+
 float_literal   = ["-"] digit+ "." digit+ ( ("e"|"E") ["+"|"-"] digit+ )?
 
 string_literal  = double_quoted | indented
-double_quoted   = '"' double_quoted_char* '"'
-indented        = "''" indented_char* "''"
-double_quoted_char = escape_seq | any character except '"' and '\'
+double_quoted   = '"' ( interpolation | double_quoted_char )* '"'
+indented        = "''" ( interpolation | indented_char )* "''"
+double_quoted_char = escape_seq | "\$" | any character except '"' and '\'
+indented_char   = "''${" | "'''" | any character except "''" and "${"
 escape_seq      = "\\" ( '"' | '\\' | 'n' | 't' | '$' | '/' | other_char )
+
+interpolation   = "${" expression "}"
 
 path_literal    = relative_path | absolute_path | parent_path
 relative_path   = "./" path_body
@@ -321,8 +324,6 @@ expressions, declarations, and lists can all span multiple lines freely.
 The parser intentionally accepts a production-ready Nix-shaped subset instead
 of the full Nix language. These forms are still outside the supported surface:
 
-- string interpolation in double-quoted and indented strings, including
-  `"${expr}"` and `''${expr}''`
 - `with scope; expr`
 - nested attribute-path declarations such as `a.b.c = value;`
 - Nix's full indented-string indentation stripping and escape rules

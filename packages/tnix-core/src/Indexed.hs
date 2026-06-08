@@ -45,7 +45,7 @@ import Alias (collectApps)
 import Control.Monad (unless, when)
 import Data.Maybe (isNothing)
 import Data.Text (Text)
-import Syntax (AmbientDecl (ambientEntries), AmbientEntry (ambientEntryType), AttrItem (..), Expr (..), LetItem (..), Marked (markedValue), Pattern (..), Program (..), SelectStep (..))
+import Syntax (AmbientDecl (ambientEntries), AmbientEntry (ambientEntryType), AttrItem (..), Expr (..), LetItem (..), Marked (markedValue), Pattern (..), Program (..), SelectStep (..), StringPart (..))
 import Type (LiteralType (..), Name, Type (..), TypeAlias (typeAliasBody), tDynamic, tFloat, tInt, tList, tNat, tNumber)
 
 -- | Infer the most precise sequence type that can be justified from a list
@@ -347,6 +347,7 @@ validateExpr = \case
   EAssert cond body -> validateExpr cond *> validateExpr body
   EIf cond yesExpr noExpr -> validateExpr cond *> validateExpr yesExpr *> validateExpr noExpr
   EList items -> traverse_ validateExpr items
+  EInterp _ parts -> traverse_ (\case StrExpr expr -> validateExpr expr; StrText _ -> pure ()) parts
   ECast expr ty -> validateExpr expr *> validateType "term annotation" ty
   _ -> pure ()
 

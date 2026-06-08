@@ -131,6 +131,7 @@ prettyExpr p = \case
   EAttrSet items -> vsep ["{", indent 2 (vsep (map prettyAttr items)), "}"]
   ERec items -> vsep ["rec {", indent 2 (vsep (map prettyAttr items)), "}"]
   EList items -> "[" <+> hsep (map (prettyExpr 13) items) <+> "]"
+  EInterp form parts -> prettyInterp form parts
 
 prettyLet :: LetItem -> Doc ann
 prettyLet = \case
@@ -166,6 +167,20 @@ prettyStringLiteral :: StringLiteral -> Doc ann
 prettyStringLiteral = \case
   DoubleQuoted value -> dquotes (pretty value)
   Indented value -> "''" <> pretty value <> "''"
+
+-- | Render an interpolated string back to its surface form, restoring `${...}`
+-- antiquotations around the embedded expressions.
+prettyInterp :: InterpForm -> [StringPart] -> Doc ann
+prettyInterp form parts =
+  let body = hcat (map prettyStringPart parts)
+   in case form of
+        InterpDouble -> dquotes body
+        InterpIndented -> "''" <> body <> "''"
+
+prettyStringPart :: StringPart -> Doc ann
+prettyStringPart = \case
+  StrText text -> pretty text
+  StrExpr expr -> "${" <> prettyExpr 0 expr <> "}"
 
 prettyType :: Int -> Type -> Doc ann
 prettyType p ty =

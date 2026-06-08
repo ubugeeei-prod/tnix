@@ -265,6 +265,7 @@ exprAnnotations = \case
   EAssert cond body -> exprAnnotations cond <> exprAnnotations body
   EIf cond yesExpr noExpr -> foldMap exprAnnotations [cond, yesExpr, noExpr]
   EList members -> foldMap exprAnnotations members
+  EInterp _ parts -> foldMap (\case StrExpr expr -> exprAnnotations expr; StrText _ -> []) parts
   ECast expr ty -> exprAnnotations expr <> [ty]
 
 patternAnnotations :: Pattern -> [Type]

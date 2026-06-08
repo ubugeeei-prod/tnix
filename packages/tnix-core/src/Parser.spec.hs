@@ -180,6 +180,25 @@ spec = describe "parseProgram" $ do
     notAdd <- expectRight $ parseProgram "main.tnix" "!a + b"
     programExpr notAdd `shouldBe` Just (plain (EUnaryOp OpNot (EBinaryOp OpAdd (EVar "a") (EVar "b"))))
 
+  it "parses string interpolation in double-quoted and indented strings" $ do
+    dq <- expectRight $ parseProgram "main.tnix" "\"a${x}b\""
+    programExpr dq
+      `shouldBe` Just (plain (EInterp InterpDouble [StrText "a", StrExpr (EVar "x"), StrText "b"]))
+    leading <- expectRight $ parseProgram "main.tnix" "\"${x}\""
+    programExpr leading `shouldBe` Just (plain (EInterp InterpDouble [StrExpr (EVar "x")]))
+    indented <- expectRight $ parseProgram "main.tnix" "''a${x}b''"
+    programExpr indented
+      `shouldBe` Just (plain (EInterp InterpIndented [StrText "a", StrExpr (EVar "x"), StrText "b"]))
+
+  it "keeps non-interpolated strings as plain string literals" $ do
+    program <- expectRight $ parseProgram "main.tnix" "\"abc\""
+    programExpr program `shouldBe` Just (plain (EString (DoubleQuoted "abc")))
+
+  it "parses interpolation containing a full expression" $ do
+    program <- expectRight $ parseProgram "main.tnix" "\"sum ${a + b}\""
+    programExpr program
+      `shouldBe` Just (plain (EInterp InterpDouble [StrText "sum ", StrExpr (EBinaryOp OpAdd (EVar "a") (EVar "b"))]))
+
   it "parses any and unknown as distinct built-in gradual types" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Loose = any; type Opaque = unknown;"
     programAliases program
@@ -408,11 +427,20 @@ genExpr depth
           EApp <$> sub <*> sub,
           EIf <$> sub <*> sub <*> sub,
           EList <$> resize 3 (listOf sub),
-          EAttrSet <$> resize 3 (listOf genAttr)
+          EAttrSet <$> resize 3 (listOf genAttr),
+          EInterp <$> elements [InterpDouble, InterpIndented] <*> genInterpParts sub
         ]
   where
     sub = genExpr (depth `div` 2)
     genAttr = AttrField <$> genName <*> sub
+
+-- | Generate a canonical interpolated string: non-empty literal text on either
+-- side of a single antiquotation. This guarantees the segments round-trip (no
+-- adjacent or empty text runs, and at least one expression so the form is not
+-- collapsed back to a plain string).
+genInterpParts :: Gen Expr -> Gen [StringPart]
+genInterpParts sub =
+  (\a expr b -> [StrText a, StrExpr expr, StrText b]) <$> genName <*> sub <*> genName
 
 genBinOp :: Gen BinOp
 genBinOp = elements [OpAdd, OpSub, OpMul, OpConcat, OpUpdate, OpEq, OpNeq, OpLt, OpGt, OpLe, OpGe, OpAnd, OpOr]
@@ -437,4 +465,5 @@ shrinkExpr = \case
   EIf cond yes no -> [cond, yes, no]
   EList items -> items
   EAttrSet items -> [expr | AttrField _ expr <- items]
+  EInterp _ parts -> [expr | StrExpr expr <- parts]
   _ -> []
