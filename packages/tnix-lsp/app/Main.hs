@@ -189,6 +189,7 @@ handle shutdownRef ref analyze clearCache msg = case field "method" msg >>= asTe
   Just "textDocument/didSave" -> update ref analyze msg >>= publish
   Just "textDocument/didClose" -> closeDocument ref msg
   Just "textDocument/hover" -> hover ref analyze msg >>= respond stdout msg
+  Just "textDocument/signatureHelp" -> signatureHelp ref analyze msg >>= respond stdout msg
   Just "textDocument/completion" -> completion ref analyze msg >>= respond stdout msg
   Just "textDocument/definition" -> definition ref analyze msg >>= respond stdout msg
   Just "textDocument/declaration" -> definition ref analyze msg >>= respond stdout msg
@@ -246,6 +247,12 @@ hover :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
 hover ref analyze msg = do
   docs <- readIORef ref
   Session.hoverDocument readFileSafe analyze docs msg
+
+-- | Compute signature help at the requested position.
+signatureHelp :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
+signatureHelp ref analyze msg = do
+  docs <- readIORef ref
+  Session.signatureHelpDocument readFileSafe analyze docs msg
 
 -- | Compute completion results at the requested position.
 completion :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
