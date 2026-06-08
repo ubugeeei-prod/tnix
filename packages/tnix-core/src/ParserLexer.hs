@@ -148,11 +148,16 @@ float = lexeme . try $ do
       pure (marker : maybe digits (: digits) sign)
 
 -- | Parse a Nix path literal such as `./foo.nix` or `/etc/hosts`.
+--
+-- The first character after the prefix must be a non-slash segment character.
+-- This keeps `//` (the attribute-set update operator) and a bare `/` from
+-- being mis-lexed as paths, matching Nix where a path always has a segment.
 pathLiteral :: Parser FilePath
 pathLiteral = lexeme $ try $ do
   prefix <- Text.unpack <$> choice [string "../", string "./", string "/"]
+  firstChar <- satisfy pathSegmentStart
   rest <- many (satisfy pathChar)
-  pure (prefix <> rest)
+  pure (prefix <> (firstChar : rest))
 
 -- | Standard bracket helpers used by both term and type parsers.
 parens, braces, brackets :: Parser a -> Parser a
@@ -164,7 +169,8 @@ reservedWords :: [Text]
 reservedWords =
   ["Tuple", "any", "as", "declare", "dynamic", "else", "extends", "false", "forall", "if", "import", "in", "infer", "inherit", "let", "null", "then", "true", "type", "unknown"]
 
-identStart, identCont, pathChar :: Char -> Bool
+identStart, identCont, pathChar, pathSegmentStart :: Char -> Bool
 identStart c = isLetter c || c == '_'
 identCont c = isAlphaNum c || c `elem` ("_'-" :: String)
 pathChar c = isAlphaNum c || c `elem` ("._/-+" :: String)
+pathSegmentStart c = pathChar c && c /= '/'

@@ -192,6 +192,15 @@ list-like; the result is a plain `List` joining both element types.
 **Fix:** concatenate lists with lists. A gradual boundary (`dynamic`, `any`)
 on either side suppresses the error.
 
+### `TC0021` — operands are not updatable
+
+The attribute-set update operator (`//`) was applied to operands that are not
+both records. The result merges the two field maps, with the right-hand side
+overriding fields present on both.
+
+**Fix:** update an attribute set with another attribute set. A gradual
+boundary (`dynamic`, `any`) on either side suppresses the error.
+
 ## Driver / Project (`TDxxxx`)
 
 ### `TD0001` — failed to read

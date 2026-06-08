@@ -116,6 +116,7 @@ data BinOp
   | OpSub
   | OpMul
   | OpConcat
+  | OpUpdate
   | OpEq
   | OpNeq
   | OpLt

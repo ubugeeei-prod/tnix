@@ -137,7 +137,7 @@ equalityParser =
 relationalParser :: Parser Expr
 relationalParser =
   chainLeft1
-    notParser
+    updateParser
     ( choice
         [ EBinaryOp OpLe <$ symbol "<=",
           EBinaryOp OpGe <$ symbol ">=",
@@ -145,6 +145,11 @@ relationalParser =
           EBinaryOp OpGt <$ symbol ">"
         ]
     )
+
+-- | Parse right-associated attribute-set update (`//`), binding tighter than
+-- comparisons but looser than prefix `!`, matching Nix.
+updateParser :: Parser Expr
+updateParser = chainRight1 notParser (EBinaryOp OpUpdate <$ symbol "//")
 
 -- | Parse prefix boolean negation, falling through to numeric addition.
 notParser :: Parser Expr

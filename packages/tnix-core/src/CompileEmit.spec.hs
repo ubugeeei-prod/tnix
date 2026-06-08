@@ -139,6 +139,14 @@ spec = describe "compile and emit" $ do
         >>= expectRight
     "++" `Text.isInfixOf` output `shouldBe` True
 
+  it "preserves attribute-set update when compiling to nix" $ do
+    output <-
+      compileText
+        "main.tnix"
+        "{ a = 1; } // { b = 2; }"
+        >>= expectRight
+    "//" `Text.isInfixOf` output `shouldBe` True
+
   it "emits field-wise declarations for attrset roots" $ do
     output <- emitText "main.tnix" "{ name = \"tnix\"; count = 1; }" >>= expectRight
     program <- expectRight (parseDecl "main.d.tnix" output)

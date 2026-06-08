@@ -109,6 +109,14 @@ spec = describe "analysis" $ do
   it "rejects concatenating non-list operands" $
     analyzeText "main.tnix" "1 ++ 2" >>= (`expectLeftContaining` "cannot concatenate")
 
+  it "merges attribute sets with the update operator, right side overriding" $ do
+    analysis <- analyzeText "main.tnix" "{ a = 1; } // { a = 2; b = 3; }" >>= expectRight
+    analysisRoot analysis
+      `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("a", TLit (LInt 2)), ("b", TLit (LInt 3))])))
+
+  it "rejects updating non-record operands" $
+    analyzeText "main.tnix" "1 // 2" >>= (`expectLeftContaining` "cannot update")
+
   it "infers Bool from relational, equality, and boolean operators" $ do
     lt <- analyzeText "main.tnix" "1 < 2" >>= expectRight
     analysisRoot lt `shouldBe` Just (Scheme [] tBool)

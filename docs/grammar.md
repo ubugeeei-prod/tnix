@@ -50,7 +50,7 @@ ambient_entry = attr_name "::" type ";"
 ## Expressions
 
 The expression grammar is layered from loosest binding to tightest:
-`expression < or < and < equality < relational < not < addition <
+`expression < or < and < equality < relational < update < not < addition <
 multiplication < concat < cast < application < postfix < atom`.
 
 ```ebnf
@@ -99,7 +99,8 @@ control flow.
 or_expr          = and_expr ("||" and_expr)*
 and_expr         = equality_expr ("&&" equality_expr)*
 equality_expr    = relational_expr (("==" | "!=") relational_expr)*
-relational_expr  = not_expr (("<=" | ">=" | "<" | ">") not_expr)*
+relational_expr  = update_expr (("<=" | ">=" | "<" | ">") update_expr)*
+update_expr         = not_expr ("//" update_expr)?
 not_expr            = "!" not_expr | addition_expr
 addition_expr       = multiplication_expr (("+" | "-") multiplication_expr)*
 multiplication_expr = concat_expr ("*" concat_expr)*
@@ -111,9 +112,10 @@ postfix_expr     = atom select_step*
 select_step      = "." (attr_name | "${" expression "}")
 ```
 
-All binary operators are left-associative except list concatenation `++`,
-which is right-associative. Precedence runs (loosest to tightest)
-`||` < `&&` < `==`/`!=` < relational < prefix `!` < `+`/`-` < `*` < `++`, so
+All binary operators are left-associative except list concatenation `++` and
+attribute-set update `//`, which are right-associative. Precedence runs
+(loosest to tightest) `||` < `&&` < `==`/`!=` < relational < `//` <
+prefix `!` < `+`/`-` < `*` < `++`, so
 `a + 1 < limit && ok || done` parses as
 `(((a + 1) < limit) && ok) || done`. `cast_expr` is left-associative:
 `expr as A as B` desugars to `(expr as A) as B`. `application_expr` is also
@@ -255,13 +257,14 @@ From loosest to tightest binding:
 | 3 | `&&` (boolean and) | left |
 | 4 | `==`, `!=` (equality) | left |
 | 5 | `<`, `>`, `<=`, `>=` (relational) | left |
-| 6 | `!` (boolean not) | prefix |
-| 7 | `+`, `-` (additive) | left |
-| 8 | `*` (multiplicative) | left |
-| 9 | `++` (list concatenation) | right |
-| 10 | `expr as Type` (cast) | left |
-| 11 | function application `f x` | left |
-| 12 | `.field` and `.${expr}` (postfix select) | left |
+| 6 | `//` (attribute-set update) | right |
+| 7 | `!` (boolean not) | prefix |
+| 8 | `+`, `-` (additive) | left |
+| 9 | `*` (multiplicative) | left |
+| 10 | `++` (list concatenation) | right |
+| 11 | `expr as Type` (cast) | left |
+| 12 | function application `f x` | left |
+| 13 | `.field` and `.${expr}` (postfix select) | left |
 
 Type-level precedence, from loosest to tightest:
 
@@ -314,7 +317,6 @@ of the full Nix language. These forms are still outside the supported surface:
   `"${expr}"` and `''${expr}''`
 - recursive attribute sets with `rec { ... }`
 - `with scope; expr`
-- attribute-set merging with `//`
 - attribute-presence tests with `?`
 - assertions with `assert condition; expr`
 - nested attribute-path declarations such as `a.b.c = value;`

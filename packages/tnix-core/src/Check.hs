@@ -545,6 +545,7 @@ inferBinaryOp ctx env op left right =
     OpSub -> inferArithmetic ctx env op left right
     OpMul -> inferArithmetic ctx env op left right
     OpConcat -> inferConcat ctx env left right
+    OpUpdate -> inferUpdate ctx env left right
     OpEq -> inferEquality ctx env left right
     OpNeq -> inferEquality ctx env left right
     OpLt -> inferRelational ctx env left right
@@ -642,6 +643,32 @@ inferConcat ctx env left right = do
                   ( withCode
                       TC0020NotConcatenable
                       ("cannot concatenate " <> showType leftResolved <> " with " <> showType rightResolved)
+                  )
+              )
+
+-- | Attribute-set update (`//`) merges two record types, with the right-hand
+-- side overriding fields present on both. A gradual operand on either side
+-- yields a gradual result; non-record operands raise TC0021.
+inferUpdate :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
+inferUpdate ctx env left right = do
+  leftTy <- inferExpr ctx env left >>= zonk
+  rightTy <- inferExpr ctx env right >>= zonk
+  let aliases = checkAliases ctx
+      leftResolved = resolveType aliases leftTy
+      rightResolved = resolveType aliases rightTy
+  if leftResolved == tAny || rightResolved == tAny
+    then pure tAny
+    else
+      if leftResolved == tDynamic || rightResolved == tDynamic
+        then pure tDynamic
+        else case (leftResolved, rightResolved) of
+          (TRecord leftFields, TRecord rightFields) -> pure (TRecord (Map.union rightFields leftFields))
+          _ ->
+            lift
+              ( Left
+                  ( withCode
+                      TC0021NotUpdatable
+                      ("cannot update " <> showType leftResolved <> " with " <> showType rightResolved)
                   )
               )
 
