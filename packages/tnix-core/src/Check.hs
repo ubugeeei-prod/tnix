@@ -122,6 +122,9 @@ inferExpr :: CheckContext -> TypeEnv -> Expr -> InferM Type
 inferExpr ctx env = \case
   EVar name -> maybe (lift (Left (withCode TC0001UnboundName ("unbound name: " <> quoteName name)))) instantiate (Map.lookup name env)
   EString text -> pure (TLit (LString (stringLiteralText text)))
+  EInterp _ parts -> do
+    mapM_ (\case StrExpr expr -> () <$ inferExpr ctx env expr; StrText _ -> pure ()) parts
+    pure tString
   EFloat n -> pure (TLit (LFloat n))
   EInt n -> pure (TLit (LInt n))
   EBool b -> pure (TLit (LBool b))
@@ -852,6 +855,7 @@ usageCount target = go
         | name == target -> 1
         | otherwise -> 0
       EString _ -> 0
+      EInterp _ parts -> sum [go expr | StrExpr expr <- parts]
       EFloat _ -> 0
       EInt _ -> 0
       EBool _ -> 0

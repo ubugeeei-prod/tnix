@@ -7,11 +7,14 @@
 module ParserExpr (expressionParser, programParser) where
 
 import Data.Either (lefts, rights)
+import Data.Functor (($>))
 import Data.Text qualified as Text
 import ParserLexer
 import ParserType
 import Syntax
 import Text.Megaparsec
+import Text.Megaparsec.Char (char, string)
+import Text.Megaparsec.Char.Lexer qualified as L
 import Type
 
 -- | Parse a full tnix source file.
@@ -223,7 +226,7 @@ atomParser =
       recAttrSetParser,
       attrSetParser,
       listParser,
-      EString <$> termStringLiteral,
+      stringExpr,
       EFloat <$> float,
       EInt <$> integer,
       EBool True <$ reserved "true",
@@ -241,6 +244,61 @@ attrSetParser = EAttrSet <$> braces (many attrParser)
 -- | Parse a recursive attribute set (`rec { ... }`).
 recAttrSetParser :: Parser Expr
 recAttrSetParser = reserved "rec" *> (ERec <$> braces (many attrParser))
+
+-- | Parse a string literal, producing an interpolated string when it contains
+-- `${...}` antiquotations and a plain 'EString' otherwise. Both double-quoted
+-- and indented `'' ... ''` forms are supported.
+stringExpr :: Parser Expr
+stringExpr = lexeme (doubleQuotedExpr <|> indentedExpr)
+
+doubleQuotedExpr :: Parser Expr
+doubleQuotedExpr =
+  mkStringExpr InterpDouble
+    <$> (char '"' *> many (interpPart <|> doubleTextPart) <* char '"')
+
+indentedExpr :: Parser Expr
+indentedExpr =
+  mkStringExpr InterpIndented
+    <$> (string "''" *> many (interpPart <|> indentedTextPart) <* string "''")
+
+-- | An antiquoted `${ expr }` segment shared by both string forms. The leading
+-- `${` is wrapped in 'try' so a literal `$` not followed by `{` falls through to
+-- the surrounding text parser.
+interpPart :: Parser StringPart
+interpPart = StrExpr <$> (try (string "${") *> sc *> expressionParser <* char '}')
+
+doubleTextPart :: Parser StringPart
+doubleTextPart = StrText . Text.pack <$> some doubleTextChar
+
+-- | A literal character inside a double-quoted string. `\$` escapes a literal
+-- dollar; otherwise standard escapes are honored and `${`/`"` terminate the run.
+doubleTextChar :: Parser Char
+doubleTextChar =
+  (try (char '\\' *> char '$') $> '$')
+    <|> (notFollowedBy (string "${") *> notFollowedBy (char '"') *> L.charLiteral)
+
+indentedTextPart :: Parser StringPart
+indentedTextPart = StrText . Text.concat <$> some indentedChunk
+
+-- | A literal chunk inside an indented string. `''${` escapes a literal `${`
+-- and `'''` escapes a literal `''`; other characters are preserved verbatim.
+indentedChunk :: Parser Text.Text
+indentedChunk =
+  (try (string "''${") $> "${")
+    <|> (try (string "'''") $> "''")
+    <|> (Text.singleton <$> (notFollowedBy (string "${") *> notFollowedBy (string "''") *> anySingle))
+
+-- | Collapse parsed segments into a plain 'EString' when there is no
+-- interpolation; otherwise keep the interpolated representation.
+mkStringExpr :: InterpForm -> [StringPart] -> Expr
+mkStringExpr form parts
+  | all isText parts = EString (literalFor form (Text.concat [t | StrText t <- parts]))
+  | otherwise = EInterp form parts
+  where
+    isText StrText{} = True
+    isText StrExpr{} = False
+    literalFor InterpDouble = DoubleQuoted
+    literalFor InterpIndented = Indented
 
 -- | Parse either an explicit field or an `inherit` clause.
 attrParser :: Parser AttrItem

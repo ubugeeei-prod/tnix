@@ -160,6 +160,13 @@ spec = describe "analysis" $ do
   it "rejects boolean connectives applied to non-boolean operands" $
     analyzeText "main.tnix" "1 && true" >>= (`expectLeftContaining` "type mismatch")
 
+  it "types interpolated strings as String and checks embedded expressions" $ do
+    analysis <- analyzeText "main.tnix" "let name = \"x\"; in \"hi ${name}\"" >>= expectRight
+    analysisRoot analysis `shouldBe` Just (Scheme [] tString)
+
+  it "reports unbound names used inside interpolation" $
+    analyzeText "main.tnix" "\"value is ${missing}\"" >>= (`expectLeftContaining` "unbound name")
+
   it "reports missing fields" $
     analyzeText "main.tnix" "{ value = 1; }.missing" >>= (`expectLeftContaining` "missing field")
 

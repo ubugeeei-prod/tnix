@@ -34,8 +34,13 @@ eraseExpr expr =
     EAssert cond body -> EAssert (eraseExpr cond) (eraseExpr body)
     EIf cond yesExpr noExpr -> EIf (eraseExpr cond) (eraseExpr yesExpr) (eraseExpr noExpr)
     EList members -> EList (map eraseExpr members)
+    EInterp form parts -> EInterp form (map eraseStringPart parts)
     ECast inner _ -> eraseExpr inner
     other -> other
+
+eraseStringPart :: StringPart -> StringPart
+eraseStringPart (StrExpr expr) = StrExpr (eraseExpr expr)
+eraseStringPart (StrText text) = StrText text
 
 erasePattern :: Pattern -> Pattern
 erasePattern (PVar name _) = PVar name Nothing

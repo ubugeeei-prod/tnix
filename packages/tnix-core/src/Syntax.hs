@@ -12,12 +12,14 @@ module Syntax
     BinOp (..),
     DiagnosticDirective (..),
     Expr (..),
+    InterpForm (..),
     LetItem (..),
     Marked (..),
     Pattern (..),
     Program (..),
     SelectStep (..),
     StringLiteral (..),
+    StringPart (..),
     UnaryOp (..),
     stringLiteralText,
   )
@@ -105,6 +107,21 @@ data Expr
   | EIf Expr Expr Expr
   | EList [Expr]
   | ECast Expr Type
+  | EInterp InterpForm [StringPart]
+  deriving (Eq, Show)
+
+-- | Which string syntax an interpolated string was written in, so the compiler
+-- can round-trip the original spelling.
+data InterpForm
+  = InterpDouble
+  | InterpIndented
+  deriving (Eq, Show)
+
+-- | One segment of an interpolated string: either literal text or an
+-- antiquoted @${expr}@ expression.
+data StringPart
+  = StrText Text
+  | StrExpr Expr
   deriving (Eq, Show)
 
 -- | Binary operators preserved by the compiler.
