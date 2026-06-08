@@ -161,6 +161,10 @@ inferExpr ctx env = \case
   EHasAttr base _ -> do
     _ <- inferExpr ctx env base
     pure tBool
+  EAssert cond body -> do
+    condTy <- inferExpr ctx env cond
+    _ <- constrain ctx condTy tBool
+    inferExpr ctx env body
   ELet items body -> do
     (env', _) <- inferLet ctx env items
     inferExpr ctx env' body
@@ -840,6 +844,7 @@ usageCount target = go
       ESelect base steps -> go base + sum (map selectStepCount steps)
       EHasAttr base _ -> go base
       EIf cond yesExpr noExpr -> go cond + max (go yesExpr) (go noExpr)
+      EAssert cond body -> go cond + go body
       EList items -> sum (map go items)
       ECast expr _ -> go expr
     letItemCount = \case

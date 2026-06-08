@@ -56,6 +56,7 @@ multiplication < concat < has_attr < cast < application < postfix < atom`.
 ```ebnf
 expression       = if_expr
                  | let_expr
+                 | assert_expr
                  | lambda_expr
                  | or_expr
 ```
@@ -64,6 +65,8 @@ expression       = if_expr
 
 ```ebnf
 if_expr  = "if" expression "then" expression "else" expression
+
+assert_expr = "assert" expression ";" expression
 
 let_expr = "let" let_item* "in" expression
 let_item = let_signature | let_binding
@@ -209,7 +212,7 @@ attr_name       = identifier | string_literal
 reserved        = "true" | "false" | "null" | "let" | "in"
                 | "if" | "then" | "else" | "inherit"
                 | "type" | "declare" | "import"
-                | "as" | "forall" | "extends" | "infer"
+                | "as" | "assert" | "forall" | "extends" | "infer"
                 | "any" | "dynamic" | "unknown"
                 | "Tuple"
 
@@ -320,6 +323,5 @@ of the full Nix language. These forms are still outside the supported surface:
   `"${expr}"` and `''${expr}''`
 - recursive attribute sets with `rec { ... }`
 - `with scope; expr`
-- assertions with `assert condition; expr`
 - nested attribute-path declarations such as `a.b.c = value;`
 - Nix's full indented-string indentation stripping and escape rules
