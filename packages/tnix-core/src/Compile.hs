@@ -28,6 +28,7 @@ eraseExpr expr =
     EUnaryOp op operand -> EUnaryOp op (eraseExpr operand)
     ELet items body -> ELet [eraseMarkedLetItem item | item <- items, isLetBinding (markedValue item)] (eraseExpr body)
     EAttrSet items -> EAttrSet (map eraseAttrItem items)
+    ERec items -> ERec (map eraseAttrItem items)
     ESelect base fields -> ESelect (eraseExpr base) (map eraseSelectStep fields)
     EHasAttr base path -> EHasAttr (eraseExpr base) path
     EAssert cond body -> EAssert (eraseExpr cond) (eraseExpr body)

@@ -180,6 +180,7 @@ inferExpr ctx env = \case
           pure [(name, ty)]
         AttrInherit names ->
           traverse (\name -> inferExpr ctx env (EVar name) >>= \ty -> pure (name, ty)) names
+  ERec items -> inferRecAttrSet ctx env items
   ESelect base fields -> do
     baseTy <- inferExpr ctx env base
     foldM step baseTy fields
@@ -269,6 +270,33 @@ inferLet ctx env items = do
     pure (name, fromMaybe (closeMetas resolved) (Map.lookup name sigs))
   let finals = Map.fromList inferred
   pure (finals <> env, finals)
+
+-- | Infer a recursive attribute set (`rec { ... }`).
+--
+-- Field bindings may refer to one another, so each declared field name gets a
+-- placeholder in scope before any field body is inferred — mirroring `let`.
+-- `inherit` clauses resolve against the enclosing scope, not the rec scope.
+inferRecAttrSet :: CheckContext -> TypeEnv -> [AttrItem] -> InferM Type
+inferRecAttrSet ctx env items = do
+  let fieldNames = [name | AttrField name _ <- items]
+  placeholders <- Map.fromList <$> traverse (\name -> (,) name . Scheme [] <$> freshMeta) fieldNames
+  let recEnv = placeholders <> env
+      inferAttr = \case
+        AttrField name expr -> do
+          ty <- inferExpr ctx recEnv expr
+          finalTy <- case Map.lookup name placeholders of
+            Just scheme -> do
+              expected <- instantiate scheme
+              _ <- constrain ctx ty expected
+              zonk expected
+            Nothing -> pure ty
+          pure [(name, finalTy)]
+        AttrInherit names ->
+          traverse (\name -> inferExpr ctx env (EVar name) >>= \ty -> pure (name, ty)) names
+  fields <- concat <$> traverse inferAttr items
+  case duplicateNames (map fst fields) of
+    dup : _ -> lift (Left (withCode TC0002DuplicateAttribute ("duplicate attribute: " <> quoteName dup)))
+    [] -> TRecord . Map.fromList <$> traverse (\(name, ty) -> (,) name <$> zonk ty) fields
 
 inferPatternBindings :: Pattern -> InferM (Type, TypeEnv)
 inferPatternBindings = \case
@@ -841,6 +869,10 @@ usageCount target = go
               then 0
               else sum (map (letItemCount . markedValue) items) + go body
       EAttrSet items -> sum (map attrItemCount items)
+      ERec items ->
+        if target `elem` [name | AttrField name _ <- items]
+          then 0
+          else sum (map attrItemCount items)
       ESelect base steps -> go base + sum (map selectStepCount steps)
       EHasAttr base _ -> go base
       EIf cond yesExpr noExpr -> go cond + max (go yesExpr) (go noExpr)

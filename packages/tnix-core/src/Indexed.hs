@@ -341,6 +341,7 @@ validateExpr = \case
   EUnaryOp _ operand -> validateExpr operand
   ELet items body -> traverse_ (validateLetItem . markedValue) items *> validateExpr body
   EAttrSet items -> traverse_ validateAttrItem items
+  ERec items -> traverse_ validateAttrItem items
   ESelect base steps -> validateExpr base *> traverse_ validateSelectStep steps
   EHasAttr base _ -> validateExpr base
   EAssert cond body -> validateExpr cond *> validateExpr body

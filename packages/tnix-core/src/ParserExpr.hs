@@ -220,6 +220,7 @@ atomParser :: Parser Expr
 atomParser =
   choice
     [ parens expressionParser,
+      recAttrSetParser,
       attrSetParser,
       listParser,
       EString <$> termStringLiteral,
@@ -236,6 +237,10 @@ atomParser =
 -- | Parse an attribute set.
 attrSetParser :: Parser Expr
 attrSetParser = EAttrSet <$> braces (many attrParser)
+
+-- | Parse a recursive attribute set (`rec { ... }`).
+recAttrSetParser :: Parser Expr
+recAttrSetParser = reserved "rec" *> (ERec <$> braces (many attrParser))
 
 -- | Parse either an explicit field or an `inherit` clause.
 attrParser :: Parser AttrItem

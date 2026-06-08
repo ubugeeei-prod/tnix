@@ -91,6 +91,7 @@ prettyExpr p = \case
   EUnaryOp OpNot operand -> parenIf (p > 0) ("!" <> prettyExpr 1 operand)
   ELet items body -> vsep ["let", indent 2 (vsep (map (prettyLet . markedValue) items)), "in" <+> prettyExpr 0 body]
   EAttrSet items -> vsep ["{", indent 2 (vsep (map prettyAttr items)), "}"]
+  ERec items -> vsep ["rec {", indent 2 (vsep (map prettyAttr items)), "}"]
   ESelect base steps -> parenIf (p > 2) (prettyExpr 2 base <> foldMap prettySelectStep steps)
   EHasAttr base path -> parenIf (p > 0) (prettyExpr 1 base <+> "?" <+> hcat (punctuate "." (map prettyAttrName path)))
   EAssert cond body -> parenIf (p > 0) ("assert" <+> prettyExpr 0 cond <> ";" <+> prettyExpr 0 body)
