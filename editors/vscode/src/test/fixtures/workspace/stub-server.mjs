@@ -74,6 +74,15 @@ const capabilities = {
   documentRangeFormattingProvider: true,
   foldingRangeProvider: true,
   codeActionProvider: true,
+  documentLinkProvider: { resolveProvider: false },
+  inlayHintProvider: { resolveProvider: false },
+  semanticTokensProvider: {
+    legend: {
+      tokenTypes: ["keyword", "type", "function", "variable"],
+      tokenModifiers: [],
+    },
+    full: true,
+  },
 };
 
 function handleRequest(id, method, params) {
@@ -157,6 +166,20 @@ function handleRequest(id, method, params) {
       return;
     case "textDocument/foldingRange":
       respond(id, [{ startLine: 0, endLine: 1, kind: "region" }]);
+      return;
+    case "textDocument/documentLink":
+      respond(id, [
+        { range: fullRange, target: "https://example.invalid/tnix-stub" },
+      ]);
+      return;
+    case "textDocument/inlayHint":
+      respond(id, [
+        { position: { line: 0, character: 1 }, label: `: ${STUB}Int`, kind: 1 },
+      ]);
+      return;
+    case "textDocument/semanticTokens/full":
+      // One token: line 0, startChar 0, length 3, tokenType 0 (keyword), no modifiers.
+      respond(id, { data: [0, 0, 3, 0, 0] });
       return;
     case "textDocument/codeAction":
       respond(id, [{ title: `${STUB} action`, kind: "quickfix" }]);
