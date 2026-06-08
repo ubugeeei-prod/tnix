@@ -151,7 +151,7 @@ float = lexeme . try $ do
 --
 -- The first character after the prefix must be a non-slash segment character.
 -- This keeps `//` (the attribute-set update operator) and a bare `/` from
--- being mis-lexed as paths, matching Nix where a path always has a segment.
+-- being lexed as paths, matching Nix where a path always has a segment.
 pathLiteral :: Parser FilePath
 pathLiteral = lexeme $ try $ do
   prefix <- Text.unpack <$> choice [string "../", string "./", string "/"]
