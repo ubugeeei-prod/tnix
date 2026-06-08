@@ -41,7 +41,10 @@ import Type
 data CheckContext = CheckContext
   { checkAliases :: AliasEnv,
     checkAmbient :: Map FilePath Scheme,
-    checkFile :: FilePath
+    checkFile :: FilePath,
+    -- | True inside the body of a `with` whose scope type is not a known
+    -- record, so unresolved names degrade to `dynamic` instead of erroring.
+    checkOpenScope :: Bool
   }
 
 -- | User-visible results produced by checking a program.
@@ -120,7 +123,12 @@ checkProgram ctx program =
 -- @
 inferExpr :: CheckContext -> TypeEnv -> Expr -> InferM Type
 inferExpr ctx env = \case
-  EVar name -> maybe (lift (Left (withCode TC0001UnboundName ("unbound name: " <> quoteName name)))) instantiate (Map.lookup name env)
+  EVar name ->
+    case Map.lookup name env of
+      Just scheme -> instantiate scheme
+      Nothing
+        | checkOpenScope ctx -> pure tDynamic
+        | otherwise -> lift (Left (withCode TC0001UnboundName ("unbound name: " <> quoteName name)))
   EString text -> pure (TLit (LString (stringLiteralText text)))
   EInterp _ parts -> do
     mapM_ (\case StrExpr expr -> void (inferExpr ctx env expr); StrText _ -> pure ()) parts
@@ -168,6 +176,15 @@ inferExpr ctx env = \case
     condTy <- inferExpr ctx env cond
     _ <- constrain ctx condTy tBool
     inferExpr ctx env body
+  EWith scope body -> do
+    scopeTy <- inferExpr ctx env scope >>= zonk
+    case resolveType (checkAliases ctx) scopeTy of
+      -- A known record contributes its fields (lexical bindings still win), and
+      -- truly-unbound names in the body remain errors.
+      TRecord fields -> inferExpr ctx (Map.union env (Map.map (Scheme []) fields)) body
+      -- Any other scope (dynamic, unknown, ...) cannot be enumerated, so the
+      -- body is checked with an open scope where unresolved names are dynamic.
+      _ -> inferExpr ctx{checkOpenScope = True} env body
   ELet items body -> do
     (env', _) <- inferLet ctx env items
     inferExpr ctx env' body
@@ -881,6 +898,7 @@ usageCount target = go
       EHasAttr base _ -> go base
       EIf cond yesExpr noExpr -> go cond + max (go yesExpr) (go noExpr)
       EAssert cond body -> go cond + go body
+      EWith scope body -> go scope + go body
       EList items -> sum (map go items)
       ECast expr _ -> go expr
     letItemCount = \case

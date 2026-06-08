@@ -345,6 +345,7 @@ validateExpr = \case
   ESelect base steps -> validateExpr base *> traverse_ validateSelectStep steps
   EHasAttr base _ -> validateExpr base
   EAssert cond body -> validateExpr cond *> validateExpr body
+  EWith scope body -> validateExpr scope *> validateExpr body
   EIf cond yesExpr noExpr -> validateExpr cond *> validateExpr yesExpr *> validateExpr noExpr
   EList items -> traverse_ validateExpr items
   EInterp _ parts -> traverse_ (\case StrExpr expr -> validateExpr expr; StrText _ -> pure ()) parts
