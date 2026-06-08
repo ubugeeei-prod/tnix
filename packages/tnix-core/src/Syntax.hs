@@ -98,6 +98,7 @@ data Expr
   | EUnaryOp UnaryOp Expr
   | ELet [Marked LetItem] Expr
   | EAttrSet [AttrItem]
+  | ERec [AttrItem]
   | ESelect Expr [SelectStep]
   | EHasAttr Expr [Name]
   | EAssert Expr Expr

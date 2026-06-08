@@ -109,6 +109,16 @@ spec = describe "analysis" $ do
   it "rejects concatenating non-list operands" $
     analyzeText "main.tnix" "1 ++ 2" >>= (`expectLeftContaining` "cannot concatenate")
 
+  it "infers recursive attribute sets where fields reference each other" $ do
+    analysis <- analyzeText "main.tnix" "rec { a = 1; b = a; }" >>= expectRight
+    analysisRoot analysis
+      `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("a", TLit (LInt 1)), ("b", TLit (LInt 1))])))
+
+  it "resolves forward references inside a recursive attribute set" $ do
+    analysis <- analyzeText "main.tnix" "rec { b = a; a = 1; }" >>= expectRight
+    analysisRoot analysis
+      `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("a", TLit (LInt 1)), ("b", TLit (LInt 1))])))
+
   it "types attribute-presence tests as Bool regardless of field presence" $ do
     present <- analyzeText "main.tnix" "{ a = 1; } ? a" >>= expectRight
     analysisRoot present `shouldBe` Just (Scheme [] tBool)

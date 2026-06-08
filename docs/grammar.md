@@ -130,6 +130,7 @@ left-associative.
 
 ```ebnf
 atom = "(" expression ")"
+     | rec_attr_set
      | attr_set
      | list
      | string_literal
@@ -140,6 +141,7 @@ atom = "(" expression ")"
      | identifier
 
 attr_set        = "{" attr_item* "}"
+rec_attr_set    = "rec" "{" attr_item* "}"
 attr_item       = inherit_clause | attr_field
 inherit_clause  = "inherit" identifier+ ";"
 attr_field      = attr_name "=" expression ";"
@@ -211,7 +213,7 @@ attr_name       = identifier | string_literal
 
 reserved        = "true" | "false" | "null" | "let" | "in"
                 | "if" | "then" | "else" | "inherit"
-                | "type" | "declare" | "import"
+                | "type" | "declare" | "import" | "rec"
                 | "as" | "assert" | "forall" | "extends" | "infer"
                 | "any" | "dynamic" | "unknown"
                 | "Tuple"
@@ -321,7 +323,6 @@ of the full Nix language. These forms are still outside the supported surface:
 
 - string interpolation in double-quoted and indented strings, including
   `"${expr}"` and `''${expr}''`
-- recursive attribute sets with `rec { ... }`
 - `with scope; expr`
 - nested attribute-path declarations such as `a.b.c = value;`
 - Nix's full indented-string indentation stripping and escape rules

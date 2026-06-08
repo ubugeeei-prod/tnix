@@ -259,6 +259,7 @@ exprAnnotations = \case
   EUnaryOp _ operand -> exprAnnotations operand
   ELet items body -> foldMap (letItemAnnotations . markedValue) items <> exprAnnotations body
   EAttrSet items -> foldMap attrAnnotations items
+  ERec items -> foldMap attrAnnotations items
   ESelect base steps -> exprAnnotations base <> foldMap selectStepAnnotations steps
   EHasAttr base _ -> exprAnnotations base
   EAssert cond body -> exprAnnotations cond <> exprAnnotations body

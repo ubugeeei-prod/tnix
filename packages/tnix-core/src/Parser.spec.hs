@@ -125,6 +125,12 @@ spec = describe "parseProgram" $ do
     programExpr program
       `shouldBe` Just (plain (EBinaryOp OpConcat (EVar "xs") (EBinaryOp OpConcat (EVar "ys") (EVar "zs"))))
 
+  it "parses recursive attribute sets and reserves rec" $ do
+    program <- expectRight $ parseProgram "main.tnix" "rec { a = 1; b = a; }"
+    programExpr program
+      `shouldBe` Just (plain (ERec [AttrField "a" (EInt 1), AttrField "b" (EVar "a")]))
+    parseProgram "main.tnix" "let rec = 1; in rec" `shouldSatisfy` isLeft
+
   it "parses assert expressions and reserves the keyword" $ do
     program <- expectRight $ parseProgram "main.tnix" "assert x; y"
     programExpr program `shouldBe` Just (plain (EAssert (EVar "x") (EVar "y")))

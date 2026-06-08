@@ -34,6 +34,7 @@ emitDeclarationFileFor runtimeTarget declarationPath program scheme =
     entries =
       case (stripCasts . markedValue <$> programExpr program, schemeType scheme, schemeVars scheme) of
         (Just (EAttrSet _), TRecord fields, []) -> Map.toList fields
+        (Just (ERec _), TRecord fields, []) -> Map.toList fields
         _ -> [("default", quantified)]
     quantified =
       case schemeVars scheme of
