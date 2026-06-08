@@ -114,6 +114,25 @@ spec = do
       hover <- hoverDocument (\_ -> pure (Left "boom")) analyzeStub mempty (hoverMessage "/tmp/main.tnix" 0 0)
       hoverText hover `shouldBe` "```tnix\nboom\n```"
 
+  describe "signatureHelpDocument" $ do
+    it "renders the parameters of the function applied at the cursor" $ do
+      let content = "greet \"hi\""
+          analyze _ _ =
+            pure $ do
+              program <- either (const (parseText "/tmp/main.tnix" "1")) Right (parseText "/tmp/main.tnix" content)
+              pure
+                completionAnalysis
+                  { analysisProgram = program,
+                    analysisBindings = Map.fromList [("greet", Scheme [] (TFun Many tString tString))]
+                  }
+      sig <- signatureHelpDocument readNever analyze (documentsFromList [("/tmp/main.tnix", content)]) (hoverMessage "/tmp/main.tnix" 0 6)
+      signatureLabels sig `shouldBe` ["greet :: String -> String"]
+      signatureActiveParameter sig `shouldBe` Just 0
+
+    it "returns null when no function is applied at the cursor" $ do
+      sig <- signatureHelpDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", "1")]) (hoverMessage "/tmp/main.tnix" 0 1)
+      sig `shouldBe` Null
+
   describe "completionDocument" $ do
     it "returns field completions from the current analyzed buffer" $ do
       completions <- completionDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", "box.")]) (completionMessage "/tmp/main.tnix" 0 4)
@@ -477,6 +496,25 @@ hoverText value =
             _ -> "missing hover value"
         _ -> "missing hover contents"
     _ -> "unexpected hover payload"
+
+signatureLabels :: Value -> [Text]
+signatureLabels value =
+  case value of
+    Object obj ->
+      case KeyMap.lookup "signatures" obj of
+        Just (Array sigs) ->
+          [ label
+          | Object s <- toList sigs,
+            Just (String label) <- [KeyMap.lookup "label" s]
+          ]
+        _ -> []
+    _ -> []
+
+signatureActiveParameter :: Value -> Maybe Int
+signatureActiveParameter value = do
+  Object obj <- pure value
+  Number n <- KeyMap.lookup "activeParameter" obj
+  pure (floor n)
 
 completionLabels :: Value -> [Text]
 completionLabels value =

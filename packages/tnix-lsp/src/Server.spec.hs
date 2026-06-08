@@ -33,6 +33,7 @@ spec = do
                 [ "positionEncoding" .= ("utf-16" :: String),
                   "hoverProvider" .= True,
                   "completionProvider" .= object ["triggerCharacters" .= ["." :: String]],
+                  "signatureHelpProvider" .= object ["triggerCharacters" .= [" " :: String, "("]],
                   "definitionProvider" .= True,
                   "declarationProvider" .= True,
                   "referencesProvider" .= True,

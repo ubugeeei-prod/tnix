@@ -26,6 +26,7 @@ module Server
     notify,
     pathUri,
     publishDiagnostics,
+    signatureHelpResult,
     publishDiagnosticsWithContent,
     readMessage,
     readMessageOutcome,
@@ -44,6 +45,7 @@ import Control.Monad (foldM)
 import Data.Aeson
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
+import Data.Char (isSpace)
 import Data.Foldable (toList)
 import Data.List (nub, sortOn)
 import Data.Map.Strict qualified as Map
@@ -52,7 +54,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Read qualified as TextRead
 import Driver (Analysis (..), lookupSymbolType)
-import Pretty (renderScheme)
+import Pretty (renderScheme, renderType)
 import ServerProtocol
   ( ReadOutcome (..),
     contentLengthFromHeaders,
@@ -86,6 +88,7 @@ clientCapabilities =
           [ "positionEncoding" .= ("utf-16" :: Text),
             "hoverProvider" .= True,
             "completionProvider" .= object ["triggerCharacters" .= ["." :: Text]],
+            "signatureHelpProvider" .= object ["triggerCharacters" .= [" " :: Text, "("]],
             "definitionProvider" .= True,
             "declarationProvider" .= True,
             "referencesProvider" .= True,
@@ -310,6 +313,71 @@ hoveredPathAt lineNo charNo content =
            in take segmentCount parts
         Nothing -> []
     _ -> []
+
+-- | Build a @textDocument/signatureHelp@ response for the cursor position.
+--
+-- tnix uses Nix-style juxtaposition application (@f a b@), so the heuristic
+-- scans the current line up to the cursor, finds the left-most identifier whose
+-- inferred type is a function, and renders that function's parameters. The
+-- active parameter follows the number of arguments already supplied. Returns
+-- JSON @null@ when no function call is in scope.
+signatureHelpResult :: Either String Analysis -> Text -> Int -> Int -> Value
+signatureHelpResult result content lineNo charNo =
+  case result of
+    Left _ -> Null
+    Right analysis ->
+      case signatureAt analysis lineNo charNo content of
+        Nothing -> Null
+        Just (name, scheme, activeParam) ->
+          let params = arrowDomains (schemeType scheme)
+           in object
+                [ "signatures"
+                    .= [ object
+                           [ "label" .= (name <> " :: " <> renderScheme scheme),
+                             "parameters" .= [object ["label" .= renderType paramTy] | paramTy <- params]
+                           ]
+                       ],
+                  "activeSignature" .= (0 :: Int),
+                  "activeParameter" .= activeParam
+                ]
+
+-- | Locate the function being applied at the cursor and its active parameter.
+signatureAt :: Analysis -> Int -> Int -> Text -> Maybe (Text, Scheme, Int)
+signatureAt analysis lineNo charNo content = do
+  line <- listToMaybe (drop lineNo (T.lines content))
+  offset <- utf16ColumnToTextOffset line charNo
+  let before = T.take offset line
+      tokens = filter (not . T.null) (map identifierOf (T.words before))
+  (calleeIndex, name, scheme) <- firstFunction tokens
+  let suppliedArgs = length tokens - (calleeIndex + 1)
+      cursorMidWord = not (T.null before) && not (isSpace (T.last before))
+      typedArgs = max 0 (suppliedArgs - (if cursorMidWord && suppliedArgs > 0 then 1 else 0))
+      paramCount = length (arrowDomains (schemeType scheme))
+      activeParam = if paramCount == 0 then 0 else min typedArgs (paramCount - 1)
+  pure (name, scheme, activeParam)
+  where
+    firstFunction toks =
+      listToMaybe
+        [ (index, tok, scheme)
+        | (index, tok) <- zip [0 ..] toks,
+          Just scheme <- [resolveSymbol analysis tok],
+          not (null (arrowDomains (schemeType scheme)))
+        ]
+
+-- | Extract the leading identifier from a whitespace-separated token, dropping
+-- any surrounding punctuation such as @(@ or @;@.
+identifierOf :: Text -> Text
+identifierOf = T.takeWhile wordChar . T.dropWhile (not . wordChar)
+
+-- | Peel a (possibly quantified) function type into its parameter types.
+arrowDomains :: Type -> [Type]
+arrowDomains = go . stripForall
+  where
+    go ty = case stripForall ty of
+      TFun _ dom cod -> dom : go cod
+      _ -> []
+    stripForall (TForall _ body) = stripForall body
+    stripForall ty = ty
 
 diagnosticWithContent :: Text -> String -> Value
 diagnosticWithContent content err =

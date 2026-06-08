@@ -22,6 +22,7 @@ module Session
     referencesDocument,
     renameDocument,
     semanticTokensDocument,
+    signatureHelpDocument,
     updateDocuments,
     workspaceSymbolsDocument,
   )
@@ -53,6 +54,7 @@ import Server
     hoverResult,
     location,
     pathUri,
+    signatureHelpResult,
     textOffsetToUtf16Column,
     textRangeToUtf16Columns,
     uriPath,
@@ -154,6 +156,30 @@ hoverDocument readDocument analyze docs msg = do
     Right content -> do
       result <- loadDocumentAnalysis readDocument analyze docs file
       pure (hoverResult result content lineNo charNo)
+
+-- | Compute signature help for the requested position.
+--
+-- Reuses the cached analysis to render the parameters of the function being
+-- applied at the cursor. Mirrors 'hoverDocument' so unsaved edits are honored.
+signatureHelpDocument ::
+  (FilePath -> IO (Either String Text)) ->
+  (FilePath -> Text -> IO (Either String Analysis)) ->
+  Documents ->
+  Value ->
+  IO Value
+signatureHelpDocument readDocument analyze docs msg = do
+  let params = field "params" msg
+      textDocument = params >>= field "textDocument"
+      position = params >>= field "position"
+      file = maybe "" (normalise . uriPath) (textDocument >>= field "uri" >>= asText)
+      lineNo = maybe 0 asInt (position >>= field "line")
+      charNo = maybe 0 asInt (position >>= field "character")
+  contentResult <- loadDocumentContent readDocument docs file
+  case contentResult of
+    Left _ -> pure Null
+    Right content -> do
+      result <- loadDocumentAnalysis readDocument analyze docs file
+      pure (signatureHelpResult result content lineNo charNo)
 
 -- | Compute completion items for the requested position.
 --

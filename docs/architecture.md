@@ -19,6 +19,7 @@ Haskell is the core implementation language. Editor integrations stay thin and a
 - `tnix-lsp`
   - diagnostics
   - hover
+  - signature help
   - go to definition
   - declaration lookup
 
@@ -97,6 +98,7 @@ Haskell is the core implementation language. Editor integrations stay thin and a
 - TextDocumentSync
 - diagnostics push
 - hover
+- signature help
 - semantic tokens in a later phase
 
 ### Zed
