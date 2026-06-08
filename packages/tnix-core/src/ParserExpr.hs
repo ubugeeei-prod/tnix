@@ -170,7 +170,17 @@ multiplicationParser = chainLeft1 concatParser (EBinaryOp OpMul <$ symbol "*")
 -- | Parse right-associated list concatenation (`++`), binding tighter than
 -- arithmetic so `xs ++ ys ++ zs` groups as `xs ++ (ys ++ zs)`.
 concatParser :: Parser Expr
-concatParser = chainRight1 castParser (EBinaryOp OpConcat <$ symbol "++")
+concatParser = chainRight1 hasAttrParser (EBinaryOp OpConcat <$ symbol "++")
+
+-- | Parse the attribute-presence test (`e ? attrpath`), binding tighter than
+-- concatenation. The right-hand side is a dotted attribute path, not an
+-- arbitrary expression, matching Nix.
+hasAttrParser :: Parser Expr
+hasAttrParser = do
+  base <- castParser
+  option base (EHasAttr base <$> (symbol "?" *> attrPathParser))
+  where
+    attrPathParser = sepBy1 attrName (symbol ".")
 
 -- | Parse left-associated application chains.
 applicationParser :: Parser Expr

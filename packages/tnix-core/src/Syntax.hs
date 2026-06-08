@@ -99,6 +99,7 @@ data Expr
   | ELet [Marked LetItem] Expr
   | EAttrSet [AttrItem]
   | ESelect Expr [SelectStep]
+  | EHasAttr Expr [Name]
   | EIf Expr Expr Expr
   | EList [Expr]
   | ECast Expr Type

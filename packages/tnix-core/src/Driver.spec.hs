@@ -109,6 +109,12 @@ spec = describe "analysis" $ do
   it "rejects concatenating non-list operands" $
     analyzeText "main.tnix" "1 ++ 2" >>= (`expectLeftContaining` "cannot concatenate")
 
+  it "types attribute-presence tests as Bool regardless of field presence" $ do
+    present <- analyzeText "main.tnix" "{ a = 1; } ? a" >>= expectRight
+    analysisRoot present `shouldBe` Just (Scheme [] tBool)
+    absent <- analyzeText "main.tnix" "{ a = 1; } ? b" >>= expectRight
+    analysisRoot absent `shouldBe` Just (Scheme [] tBool)
+
   it "merges attribute sets with the update operator, right side overriding" $ do
     analysis <- analyzeText "main.tnix" "{ a = 1; } // { a = 2; b = 3; }" >>= expectRight
     analysisRoot analysis
