@@ -174,6 +174,15 @@ number, boolean, or other base type) was applied as if it were a function.
 **Fix:** apply only functions, or correct the expression so the callee is a
 function. Gradual types (`dynamic`, `unknown`, `any`) are still callable.
 
+### `TC0019` — operands are not comparable
+
+An ordered comparison (`<`, `>`, `<=`, `>=`) was applied to operands that are
+not both numeric or both string-like. Structural equality (`==`, `!=`) accepts
+any operands; only ordered comparisons require comparable types.
+
+**Fix:** compare numbers with numbers or strings with strings. A gradual
+boundary (`dynamic`, `any`) on either side suppresses the error.
+
 ## Driver / Project (`TDxxxx`)
 
 ### `TD0001` — failed to read

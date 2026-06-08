@@ -337,7 +337,8 @@ validateExpr :: Expr -> Either String ()
 validateExpr = \case
   ELambda pattern' body -> validatePattern pattern' *> validateExpr body
   EApp fun arg -> validateExpr fun *> validateExpr arg
-  EAdd left right -> validateExpr left *> validateExpr right
+  EBinaryOp _ left right -> validateExpr left *> validateExpr right
+  EUnaryOp _ operand -> validateExpr operand
   ELet items body -> traverse_ (validateLetItem . markedValue) items *> validateExpr body
   EAttrSet items -> traverse_ validateAttrItem items
   ESelect base steps -> validateExpr base *> traverse_ validateSelectStep steps

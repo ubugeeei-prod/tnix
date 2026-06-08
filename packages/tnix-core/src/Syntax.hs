@@ -9,6 +9,7 @@ module Syntax
   ( AmbientDecl (..),
     AmbientEntry (..),
     AttrItem (..),
+    BinOp (..),
     DiagnosticDirective (..),
     Expr (..),
     LetItem (..),
@@ -17,6 +18,7 @@ module Syntax
     Program (..),
     SelectStep (..),
     StringLiteral (..),
+    UnaryOp (..),
     stringLiteralText,
   )
 where
@@ -92,13 +94,37 @@ data Expr
   | EPath FilePath
   | ELambda Pattern Expr
   | EApp Expr Expr
-  | EAdd Expr Expr
+  | EBinaryOp BinOp Expr Expr
+  | EUnaryOp UnaryOp Expr
   | ELet [Marked LetItem] Expr
   | EAttrSet [AttrItem]
   | ESelect Expr [SelectStep]
   | EIf Expr Expr Expr
   | EList [Expr]
   | ECast Expr Type
+  deriving (Eq, Show)
+
+-- | Binary operators preserved by the compiler.
+--
+-- The set mirrors the executable Nix surface tnix understands: numeric
+-- addition, structural equality, ordered comparisons, and short-circuiting
+-- boolean connectives. Each operator is erased back to the identical Nix
+-- spelling, so this enum doubles as the round-trip representation.
+data BinOp
+  = OpAdd
+  | OpEq
+  | OpNeq
+  | OpLt
+  | OpGt
+  | OpLe
+  | OpGe
+  | OpAnd
+  | OpOr
+  deriving (Eq, Show)
+
+-- | Prefix operators preserved by the compiler.
+data UnaryOp
+  = OpNot
   deriving (Eq, Show)
 
 -- | String literals preserved in executable tnix.

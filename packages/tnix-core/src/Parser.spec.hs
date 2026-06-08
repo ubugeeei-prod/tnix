@@ -53,7 +53,7 @@ spec = describe "parseProgram" $ do
             ( EAttrSet
                 [ AttrField
                     "inc"
-                    (ELambda (PVar "x" Nothing) (EAdd (EVar "x") (EInt 1)))
+                    (ELambda (PVar "x" Nothing) (EBinaryOp OpAdd (EVar "x") (EInt 1)))
                 ]
             )
         )
@@ -99,6 +99,44 @@ spec = describe "parseProgram" $ do
                    TypeAlias "Shape" [] (TApp (TApp (TCon "Tensor") (TTypeList [TLit (LInt (-1)), TLit (LFloat (-2.5))])) tFloat)
                  ]
     programExpr program `shouldBe` Just (plain (EFloat (-1.5)))
+
+  it "parses relational and equality operators producing comparisons" $ do
+    program <- expectRight $ parseProgram "main.tnix" "1 < 2"
+    programExpr program `shouldBe` Just (plain (EBinaryOp OpLt (EInt 1) (EInt 2)))
+    leq <- expectRight $ parseProgram "main.tnix" "1 <= 2"
+    programExpr leq `shouldBe` Just (plain (EBinaryOp OpLe (EInt 1) (EInt 2)))
+    eq <- expectRight $ parseProgram "main.tnix" "1 == 2"
+    programExpr eq `shouldBe` Just (plain (EBinaryOp OpEq (EInt 1) (EInt 2)))
+    neq <- expectRight $ parseProgram "main.tnix" "1 != 2"
+    programExpr neq `shouldBe` Just (plain (EBinaryOp OpNeq (EInt 1) (EInt 2)))
+
+  it "parses boolean connectives and prefix negation" $ do
+    program <- expectRight $ parseProgram "main.tnix" "true && false"
+    programExpr program `shouldBe` Just (plain (EBinaryOp OpAnd (EBool True) (EBool False)))
+    notProgram <- expectRight $ parseProgram "main.tnix" "!true"
+    programExpr notProgram `shouldBe` Just (plain (EUnaryOp OpNot (EBool True)))
+
+  it "honors operator precedence: || looser than && looser than == looser than < looser than + looser than !" $ do
+    -- a + 1 < limit && ok || done  ==>  (((a + 1) < limit) && ok) || done
+    program <- expectRight $ parseProgram "main.tnix" "a + 1 < limit && ok || done"
+    programExpr program
+      `shouldBe` Just
+        ( plain
+            ( EBinaryOp
+                OpOr
+                ( EBinaryOp
+                    OpAnd
+                    (EBinaryOp OpLt (EBinaryOp OpAdd (EVar "a") (EInt 1)) (EVar "limit"))
+                    (EVar "ok")
+                )
+                (EVar "done")
+            )
+        )
+    -- !a == b  ==>  (!a) == b ; ! a + b ==> !(a + b)
+    notEq <- expectRight $ parseProgram "main.tnix" "!a == b"
+    programExpr notEq `shouldBe` Just (plain (EBinaryOp OpEq (EUnaryOp OpNot (EVar "a")) (EVar "b")))
+    notAdd <- expectRight $ parseProgram "main.tnix" "!a + b"
+    programExpr notAdd `shouldBe` Just (plain (EUnaryOp OpNot (EBinaryOp OpAdd (EVar "a") (EVar "b"))))
 
   it "parses any and unknown as distinct built-in gradual types" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Loose = any; type Opaque = unknown;"
@@ -317,13 +355,17 @@ genExpr :: Int -> Gen Expr
 genExpr _ =
   oneof
     [ genLeafExpr,
-      EAdd <$> genLeafExpr <*> genLeafExpr,
+      EBinaryOp <$> genBinOp <*> genLeafExpr <*> genLeafExpr,
+      EUnaryOp OpNot <$> genLeafExpr,
       (EIf . EBool <$> arbitrary) <*> genLeafExpr <*> genLeafExpr,
       EList <$> resize 3 (listOf genLeafExpr),
       EAttrSet <$> resize 3 (listOf genAttr)
     ]
   where
     genAttr = AttrField <$> genName <*> genLeafExpr
+
+genBinOp :: Gen BinOp
+genBinOp = elements [OpAdd, OpEq, OpNeq, OpLt, OpGt, OpLe, OpGe, OpAnd, OpOr]
 
 genLeafExpr :: Gen Expr
 genLeafExpr =
@@ -339,7 +381,8 @@ genName = Text.pack <$> ((:) <$> elements ['a' .. 'z'] <*> listOf (elements (['a
 
 shrinkExpr :: Expr -> [Expr]
 shrinkExpr = \case
-  EAdd left right -> [left, right]
+  EBinaryOp _ left right -> [left, right]
+  EUnaryOp _ operand -> [operand]
   EIf _ yes no -> [yes, no]
   EList items -> items
   EAttrSet items -> [expr | AttrField _ expr <- items]

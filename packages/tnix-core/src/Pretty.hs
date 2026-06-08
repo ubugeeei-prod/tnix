@@ -87,7 +87,8 @@ prettyExpr p = \case
   EPath path -> pretty path
   ELambda pattern' body -> parenIf (p > 0) (prettyPattern pattern' <> ":" <+> prettyExpr 0 body)
   EApp f x -> parenIf (p > 1) (prettyExpr 1 f <+> prettyExpr 2 x)
-  EAdd left right -> parenIf (p > 0) (prettyExpr 1 left <+> "+" <+> prettyExpr 1 right)
+  EBinaryOp op left right -> parenIf (p > 0) (prettyExpr 1 left <+> pretty (binOpSymbol op) <+> prettyExpr 1 right)
+  EUnaryOp OpNot operand -> parenIf (p > 0) ("!" <> prettyExpr 1 operand)
   ELet items body -> vsep ["let", indent 2 (vsep (map (prettyLet . markedValue) items)), "in" <+> prettyExpr 0 body]
   EAttrSet items -> vsep ["{", indent 2 (vsep (map prettyAttr items)), "}"]
   ESelect base steps -> parenIf (p > 2) (prettyExpr 2 base <> foldMap prettySelectStep steps)
@@ -186,6 +187,18 @@ prettyKind p = \case
 parenIf :: Bool -> Doc ann -> Doc ann
 parenIf True = parens
 parenIf False = id
+
+binOpSymbol :: BinOp -> Text
+binOpSymbol = \case
+  OpAdd -> "+"
+  OpEq -> "=="
+  OpNeq -> "!="
+  OpLt -> "<"
+  OpGt -> ">"
+  OpLe -> "<="
+  OpGe -> ">="
+  OpAnd -> "&&"
+  OpOr -> "||"
 
 prettyFloat :: Double -> String
 prettyFloat n =
