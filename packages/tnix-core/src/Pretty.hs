@@ -9,6 +9,7 @@ module Pretty
   ( renderDeclarationFile,
     renderExpr,
     renderKind,
+    renderProgram,
     renderProgramAsNix,
     renderScheme,
     renderType,
@@ -25,6 +26,25 @@ import Prettyprinter
 import Prettyprinter.Render.Text qualified as Render
 import Syntax
 import Type
+
+-- | Render a full program back to tnix surface syntax, preserving type aliases,
+-- ambient declarations, and embedded type annotations (unlike
+-- 'renderProgramAsNix', which erases type-only syntax). Used by the LSP
+-- formatter. Declarations are emitted before the root expression; comments are
+-- not represented in the AST, so callers must guard against destroying them.
+renderProgram :: Program -> Text
+renderProgram program =
+  render $
+    vsep $
+      map prettyAlias (programAliases program)
+        <> map prettyAmbient (programAmbient program)
+        <> maybe [] (\marked -> [prettyExpr 0 (markedValue marked)]) (programExpr program)
+
+prettyAmbient :: AmbientDecl -> Doc ann
+prettyAmbient decl =
+  prettyDecl
+    (ambientPath decl)
+    [(ambientEntryName entry, ambientEntryType entry) | entry <- ambientEntries decl]
 
 -- | Render an executable program back to plain Nix code.
 renderProgramAsNix :: Program -> Either Text Text

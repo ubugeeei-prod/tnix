@@ -200,6 +200,7 @@ handle shutdownRef ref analyze clearCache msg = case field "method" msg >>= asTe
   Just "workspace/symbol" -> workspaceSymbols ref analyze msg >>= respond stdout msg
   Just "textDocument/codeAction" -> codeActions ref analyze msg >>= respond stdout msg
   Just "textDocument/semanticTokens/full" -> semanticTokens ref analyze msg >>= respond stdout msg
+  Just "textDocument/formatting" -> formatting ref msg >>= respond stdout msg
   Just "textDocument/foldingRange" -> foldingRanges ref msg >>= respond stdout msg
   Just "textDocument/documentLink" -> documentLinks ref msg >>= respond stdout msg
   Just "textDocument/inlayHint" -> inlayHints ref analyze msg >>= respond stdout msg
@@ -300,6 +301,11 @@ semanticTokens :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
 semanticTokens ref analyze msg = do
   docs <- readIORef ref
   Session.semanticTokensDocument readFileSafe analyze docs msg
+
+formatting :: IORef Session.Documents -> Value -> IO Value
+formatting ref msg = do
+  docs <- readIORef ref
+  Session.formattingDocument readFileSafe docs msg
 
 foldingRanges :: IORef Session.Documents -> Value -> IO Value
 foldingRanges ref msg = do

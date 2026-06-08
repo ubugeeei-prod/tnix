@@ -16,6 +16,7 @@ module Session
     documentsFromList,
     documentSymbolsDocument,
     foldingRangesDocument,
+    formattingDocument,
     hoverDocument,
     inlayHintsDocument,
     lookupDocumentText,
@@ -40,7 +41,8 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Driver (Analysis (..))
+import Driver (Analysis (..), parseText)
+import Pretty (renderProgram)
 import Server
   ( applyContentChanges,
     asInt,
@@ -180,6 +182,60 @@ signatureHelpDocument readDocument analyze docs msg = do
     Right content -> do
       result <- loadDocumentAnalysis readDocument analyze docs file
       pure (signatureHelpResult result content lineNo charNo)
+
+-- | Format a whole document by re-rendering its parsed program.
+--
+-- Formatting is intentionally conservative so it can never corrupt source: it
+-- is a no-op (returns no edits) when the document contains comments — which the
+-- AST does not preserve — when it fails to parse, when re-rendering does not
+-- round-trip to the same program, or when it is already formatted.
+formattingDocument ::
+  (FilePath -> IO (Either String Text)) ->
+  Documents ->
+  Value ->
+  IO Value
+formattingDocument readDocument docs msg = do
+  let params = field "params" msg
+      file = maybe "" (normalise . uriPath) (params >>= field "textDocument" >>= field "uri" >>= asText)
+  contentResult <- loadDocumentContent readDocument docs file
+  pure $ case contentResult of
+    Left _ -> emptyEdits
+    Right content -> formattingEdits file content
+
+emptyEdits :: Value
+emptyEdits = toJSON ([] :: [Value])
+
+formattingEdits :: FilePath -> Text -> Value
+formattingEdits file content
+  | hasComment content = emptyEdits
+  | otherwise =
+      case parseText file content of
+        Left _ -> emptyEdits
+        Right program ->
+          let formatted = renderProgram program <> "\n"
+           in if formatted == content
+                then emptyEdits
+                else case parseText file formatted of
+                  Right reparsed | reparsed == program -> toJSON [fullDocumentEdit content formatted]
+                  _ -> emptyEdits
+
+-- | Whether the document contains comment syntax. Conservative: a @#@ or @/*@
+-- inside a string literal also disables formatting, which is safe (no-op).
+hasComment :: Text -> Bool
+hasComment content = "#" `Text.isInfixOf` content || "/*" `Text.isInfixOf` content
+
+-- | A single edit replacing the entire document. The end position uses a line
+-- past the last so clients clamp it to the true document end.
+fullDocumentEdit :: Text -> Text -> Value
+fullDocumentEdit content newText =
+  object
+    [ "range"
+        .= object
+          [ "start" .= object ["line" .= (0 :: Int), "character" .= (0 :: Int)],
+            "end" .= object ["line" .= (length (Text.lines content) + 1), "character" .= (0 :: Int)]
+          ],
+      "newText" .= newText
+    ]
 
 -- | Compute completion items for the requested position.
 --
