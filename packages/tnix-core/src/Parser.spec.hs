@@ -393,18 +393,26 @@ instance Arbitrary RoundTripExpr where
   arbitrary = sized (fmap RoundTripExpr . genExpr)
   shrink (RoundTripExpr expr) = RoundTripExpr <$> shrinkExpr expr
 
+-- | Depth-limited generator that nests operators, applications, and
+-- control-flow inside one another so the round-trip property exercises
+-- precedence-sensitive parenthesization (e.g. control flow as an operator
+-- operand, or an application inside a list element).
 genExpr :: Int -> Gen Expr
-genExpr _ =
-  oneof
-    [ genLeafExpr,
-      EBinaryOp <$> genBinOp <*> genLeafExpr <*> genLeafExpr,
-      EUnaryOp OpNot <$> genLeafExpr,
-      (EIf . EBool <$> arbitrary) <*> genLeafExpr <*> genLeafExpr,
-      EList <$> resize 3 (listOf genLeafExpr),
-      EAttrSet <$> resize 3 (listOf genAttr)
-    ]
+genExpr depth
+  | depth <= 0 = genLeafExpr
+  | otherwise =
+      oneof
+        [ genLeafExpr,
+          EBinaryOp <$> genBinOp <*> sub <*> sub,
+          EUnaryOp OpNot <$> sub,
+          EApp <$> sub <*> sub,
+          EIf <$> sub <*> sub <*> sub,
+          EList <$> resize 3 (listOf sub),
+          EAttrSet <$> resize 3 (listOf genAttr)
+        ]
   where
-    genAttr = AttrField <$> genName <*> genLeafExpr
+    sub = genExpr (depth `div` 2)
+    genAttr = AttrField <$> genName <*> sub
 
 genBinOp :: Gen BinOp
 genBinOp = elements [OpAdd, OpSub, OpMul, OpConcat, OpUpdate, OpEq, OpNeq, OpLt, OpGt, OpLe, OpGe, OpAnd, OpOr]
@@ -425,7 +433,8 @@ shrinkExpr :: Expr -> [Expr]
 shrinkExpr = \case
   EBinaryOp _ left right -> [left, right]
   EUnaryOp _ operand -> [operand]
-  EIf _ yes no -> [yes, no]
+  EApp f x -> [f, x]
+  EIf cond yes no -> [cond, yes, no]
   EList items -> items
   EAttrSet items -> [expr | AttrField _ expr <- items]
   _ -> []

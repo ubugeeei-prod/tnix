@@ -85,19 +85,32 @@ prettyExpr p = \case
   EBool False -> "false"
   ENull -> "null"
   EPath path -> pretty path
+  -- Control-flow forms extend to the right, so they must be parenthesized
+  -- whenever they appear in any tighter position (p > 0).
   ELambda pattern' body -> parenIf (p > 0) (prettyPattern pattern' <> ":" <+> prettyExpr 0 body)
-  EApp f x -> parenIf (p > 1) (prettyExpr 1 f <+> prettyExpr 2 x)
-  EBinaryOp op left right -> parenIf (p > 0) (prettyExpr 1 left <+> pretty (binOpSymbol op) <+> prettyExpr 1 right)
-  EUnaryOp OpNot operand -> parenIf (p > 0) ("!" <> prettyExpr 1 operand)
-  ELet items body -> vsep ["let", indent 2 (vsep (map (prettyLet . markedValue) items)), "in" <+> prettyExpr 0 body]
+  EIf a b c -> parenIf (p > 0) (vsep ["if" <+> prettyExpr 0 a, "then" <+> prettyExpr 0 b, "else" <+> prettyExpr 0 c])
+  ELet items body -> parenIf (p > 0) (vsep ["let", indent 2 (vsep (map (prettyLet . markedValue) items)), "in" <+> prettyExpr 0 body])
+  EAssert cond body -> parenIf (p > 0) ("assert" <+> prettyExpr 0 cond <> ";" <+> prettyExpr 0 body)
+  -- Operators: each level parenthesizes only when the surrounding context binds
+  -- tighter than the operator, and the non-associative operand side is bumped by
+  -- one so equal-precedence nesting parenthesizes correctly.
+  EBinaryOp op left right ->
+    let q = binOpPrec op
+        (leftP, rightP) =
+          if binOpRightAssoc op
+            then (q + 1, q)
+            else (q, q + 1)
+     in parenIf (p > q) (prettyExpr leftP left <+> pretty (binOpSymbol op) <+> prettyExpr rightP right)
+  EUnaryOp OpNot operand -> parenIf (p > 6) ("!" <> prettyExpr 6 operand)
+  EHasAttr base path -> parenIf (p > 10) (prettyExpr 11 base <+> "?" <+> hcat (punctuate "." (map prettyAttrName path)))
+  ECast expr ty -> parenIf (p > 11) (prettyExpr 11 expr <+> "as" <+> prettyType 0 ty)
+  EApp f x -> parenIf (p > 12) (prettyExpr 12 f <+> prettyExpr 13 x)
+  ESelect base steps -> parenIf (p > 13) (prettyExpr 13 base <> foldMap prettySelectStep steps)
+  -- Self-delimiting atoms never need outer parentheses; list/application
+  -- operands are rendered tightly so nested calls and operators stay grouped.
   EAttrSet items -> vsep ["{", indent 2 (vsep (map prettyAttr items)), "}"]
   ERec items -> vsep ["rec {", indent 2 (vsep (map prettyAttr items)), "}"]
-  ESelect base steps -> parenIf (p > 2) (prettyExpr 2 base <> foldMap prettySelectStep steps)
-  EHasAttr base path -> parenIf (p > 0) (prettyExpr 1 base <+> "?" <+> hcat (punctuate "." (map prettyAttrName path)))
-  EAssert cond body -> parenIf (p > 0) ("assert" <+> prettyExpr 0 cond <> ";" <+> prettyExpr 0 body)
-  EIf a b c -> vsep ["if" <+> prettyExpr 0 a, "then" <+> prettyExpr 0 b, "else" <+> prettyExpr 0 c]
-  EList items -> "[" <+> hsep (map (prettyExpr 0) items) <+> "]"
-  ECast expr ty -> parenIf (p > 0) (prettyExpr 1 expr <+> "as" <+> prettyType 0 ty)
+  EList items -> "[" <+> hsep (map (prettyExpr 13) items) <+> "]"
 
 prettyLet :: LetItem -> Doc ann
 prettyLet = \case
@@ -190,6 +203,31 @@ prettyKind p = \case
 parenIf :: Bool -> Doc ann -> Doc ann
 parenIf True = parens
 parenIf False = id
+
+-- | Binding tightness of each binary operator (higher binds tighter), matching
+-- the parser's precedence ladder so re-parsing reproduces the same tree.
+binOpPrec :: BinOp -> Int
+binOpPrec = \case
+  OpOr -> 1
+  OpAnd -> 2
+  OpEq -> 3
+  OpNeq -> 3
+  OpLt -> 4
+  OpGt -> 4
+  OpLe -> 4
+  OpGe -> 4
+  OpUpdate -> 5
+  OpAdd -> 7
+  OpSub -> 7
+  OpMul -> 8
+  OpConcat -> 9
+
+-- | List concatenation and attribute-set update are right-associative.
+binOpRightAssoc :: BinOp -> Bool
+binOpRightAssoc = \case
+  OpUpdate -> True
+  OpConcat -> True
+  _ -> False
 
 binOpSymbol :: BinOp -> Text
 binOpSymbol = \case
