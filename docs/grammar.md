@@ -51,7 +51,7 @@ ambient_entry = attr_name "::" type ";"
 
 The expression grammar is layered from loosest binding to tightest:
 `expression < or < and < equality < relational < update < not < addition <
-multiplication < concat < cast < application < postfix < atom`.
+multiplication < concat < has_attr < cast < application < postfix < atom`.
 
 ```ebnf
 expression       = if_expr
@@ -104,7 +104,9 @@ update_expr         = not_expr ("//" update_expr)?
 not_expr            = "!" not_expr | addition_expr
 addition_expr       = multiplication_expr (("+" | "-") multiplication_expr)*
 multiplication_expr = concat_expr ("*" concat_expr)*
-concat_expr         = cast_expr ("++" concat_expr)?
+concat_expr         = has_attr_expr ("++" concat_expr)?
+has_attr_expr       = cast_expr ("?" attr_path)?
+attr_path           = attr_name ("." attr_name)*
 
 cast_expr        = application_expr ("as" type)*
 application_expr = postfix_expr+
@@ -115,7 +117,7 @@ select_step      = "." (attr_name | "${" expression "}")
 All binary operators are left-associative except list concatenation `++` and
 attribute-set update `//`, which are right-associative. Precedence runs
 (loosest to tightest) `||` < `&&` < `==`/`!=` < relational < `//` <
-prefix `!` < `+`/`-` < `*` < `++`, so
+prefix `!` < `+`/`-` < `*` < `++` < `?`, so
 `a + 1 < limit && ok || done` parses as
 `(((a + 1) < limit) && ok) || done`. `cast_expr` is left-associative:
 `expr as A as B` desugars to `(expr as A) as B`. `application_expr` is also
@@ -262,9 +264,10 @@ From loosest to tightest binding:
 | 8 | `+`, `-` (additive) | left |
 | 9 | `*` (multiplicative) | left |
 | 10 | `++` (list concatenation) | right |
-| 11 | `expr as Type` (cast) | left |
-| 12 | function application `f x` | left |
-| 13 | `.field` and `.${expr}` (postfix select) | left |
+| 11 | `e ? attrpath` (has-attr) | (non-associative) |
+| 12 | `expr as Type` (cast) | left |
+| 13 | function application `f x` | left |
+| 14 | `.field` and `.${expr}` (postfix select) | left |
 
 Type-level precedence, from loosest to tightest:
 
@@ -317,7 +320,6 @@ of the full Nix language. These forms are still outside the supported surface:
   `"${expr}"` and `''${expr}''`
 - recursive attribute sets with `rec { ... }`
 - `with scope; expr`
-- attribute-presence tests with `?`
 - assertions with `assert condition; expr`
 - nested attribute-path declarations such as `a.b.c = value;`
 - Nix's full indented-string indentation stripping and escape rules

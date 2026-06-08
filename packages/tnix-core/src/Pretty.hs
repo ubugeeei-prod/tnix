@@ -92,6 +92,7 @@ prettyExpr p = \case
   ELet items body -> vsep ["let", indent 2 (vsep (map (prettyLet . markedValue) items)), "in" <+> prettyExpr 0 body]
   EAttrSet items -> vsep ["{", indent 2 (vsep (map prettyAttr items)), "}"]
   ESelect base steps -> parenIf (p > 2) (prettyExpr 2 base <> foldMap prettySelectStep steps)
+  EHasAttr base path -> parenIf (p > 0) (prettyExpr 1 base <+> "?" <+> hcat (punctuate "." (map prettyAttrName path)))
   EIf a b c -> vsep ["if" <+> prettyExpr 0 a, "then" <+> prettyExpr 0 b, "else" <+> prettyExpr 0 c]
   EList items -> "[" <+> hsep (map (prettyExpr 0) items) <+> "]"
   ECast expr ty -> parenIf (p > 0) (prettyExpr 1 expr <+> "as" <+> prettyType 0 ty)

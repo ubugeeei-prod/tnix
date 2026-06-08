@@ -260,6 +260,7 @@ exprAnnotations = \case
   ELet items body -> foldMap (letItemAnnotations . markedValue) items <> exprAnnotations body
   EAttrSet items -> foldMap attrAnnotations items
   ESelect base steps -> exprAnnotations base <> foldMap selectStepAnnotations steps
+  EHasAttr base _ -> exprAnnotations base
   EIf cond yesExpr noExpr -> foldMap exprAnnotations [cond, yesExpr, noExpr]
   EList members -> foldMap exprAnnotations members
   ECast expr ty -> exprAnnotations expr <> [ty]

@@ -29,6 +29,7 @@ eraseExpr expr =
     ELet items body -> ELet [eraseMarkedLetItem item | item <- items, isLetBinding (markedValue item)] (eraseExpr body)
     EAttrSet items -> EAttrSet (map eraseAttrItem items)
     ESelect base fields -> ESelect (eraseExpr base) (map eraseSelectStep fields)
+    EHasAttr base path -> EHasAttr (eraseExpr base) path
     EIf cond yesExpr noExpr -> EIf (eraseExpr cond) (eraseExpr yesExpr) (eraseExpr noExpr)
     EList members -> EList (map eraseExpr members)
     ECast inner _ -> eraseExpr inner

@@ -125,6 +125,13 @@ spec = describe "parseProgram" $ do
     programExpr program
       `shouldBe` Just (plain (EBinaryOp OpConcat (EVar "xs") (EBinaryOp OpConcat (EVar "ys") (EVar "zs"))))
 
+  it "parses the attribute-presence test with a dotted attribute path" $ do
+    program <- expectRight $ parseProgram "main.tnix" "a ? b"
+    programExpr program `shouldBe` Just (plain (EHasAttr (EVar "a") ["b"]))
+    nested <- expectRight $ parseProgram "main.tnix" "a.b ? c.d"
+    programExpr nested
+      `shouldBe` Just (plain (EHasAttr (ESelect (EVar "a") [SelectName "b"]) ["c", "d"]))
+
   it "parses right-associative attribute-set update binding tighter than comparison" $ do
     program <- expectRight $ parseProgram "main.tnix" "a // b // c"
     programExpr program
