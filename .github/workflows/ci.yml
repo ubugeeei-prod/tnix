@@ -263,6 +263,41 @@ jobs:
           nix develop --accept-flake-config --command pnpm --filter tnix build
           nix develop --accept-flake-config --command pnpm --filter tnix exec vsce package --no-dependencies --out /tmp/tnix-ci.vsix
 
+  vscode-integration:
+    name: VS Code Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.8.0 --activate
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install VS Code runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libnss3 libatk-bridge2.0-0 libdrm2 libgbm1 libgtk-3-0 \
+            libasound2t64 libxshmfence1 libsecret-1-0 libdbus-1-3
+
+      - name: Run VS Code integration tests
+        run: xvfb-run -a pnpm --filter tnix test:integration
+
   zed:
     name: Zed Extension
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
@@ -486,6 +521,7 @@ jobs:
       - haskell
       - fixtures
       - vscode
+      - vscode-integration
       - zed
       - neovim
       - lint

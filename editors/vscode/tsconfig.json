@@ -10,5 +10,6 @@
     "rootDir": "src",
     "types": ["node", "vscode"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/test/**"]
 }

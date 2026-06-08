@@ -1,0 +1,4 @@
+let
+  greeting :: String;
+  greeting = "hello";
+in greeting
