@@ -544,6 +544,7 @@ inferBinaryOp ctx env op left right =
     OpAdd -> inferArithmetic ctx env op left right
     OpSub -> inferArithmetic ctx env op left right
     OpMul -> inferArithmetic ctx env op left right
+    OpConcat -> inferConcat ctx env left right
     OpEq -> inferEquality ctx env left right
     OpNeq -> inferEquality ctx env left right
     OpLt -> inferRelational ctx env left right
@@ -616,6 +617,46 @@ inferLogical ctx env left right = do
   rightTy <- inferExpr ctx env right
   _ <- constrain ctx rightTy tBool
   pure tBool
+
+-- | List concatenation (`++`) requires list-like operands on both sides and
+-- produces a plain @List@ whose element type joins the two element types.
+-- Fixed-shape sequences (vectors, tuples) participate via their structural
+-- list view; precise length information is intentionally not tracked here.
+inferConcat :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
+inferConcat ctx env left right = do
+  leftTy <- inferExpr ctx env left >>= zonk
+  rightTy <- inferExpr ctx env right >>= zonk
+  let aliases = checkAliases ctx
+      leftResolved = resolveType aliases leftTy
+      rightResolved = resolveType aliases rightTy
+  if leftResolved == tAny || rightResolved == tAny
+    then pure tAny
+    else
+      if leftResolved == tDynamic || rightResolved == tDynamic
+        then pure tDynamic
+        else case (listElementType leftResolved, listElementType rightResolved) of
+          (Just leftElem, Just rightElem) -> pure (tList (joinTypes aliases leftElem rightElem))
+          _ ->
+            lift
+              ( Left
+                  ( withCode
+                      TC0020NotConcatenable
+                      ("cannot concatenate " <> showType leftResolved <> " with " <> showType rightResolved)
+                  )
+              )
+
+-- | Extract the element type of a list-like type: a plain @List a@ directly,
+-- or any fixed-shape sequence (vector, tuple) via its structural list view.
+listElementType :: Type -> Maybe Type
+listElementType ty =
+  case plainListElement ty of
+    Just elemTy -> Just elemTy
+    Nothing -> sequenceListView ty >>= plainListElement
+  where
+    plainListElement candidate =
+      case collectApps candidate of
+        (TCon "List", [elemTy]) -> Just elemTy
+        _ -> Nothing
 
 additionTarget :: Type -> Type -> Type
 additionTarget left right =

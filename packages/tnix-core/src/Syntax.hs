@@ -107,13 +107,15 @@ data Expr
 -- | Binary operators preserved by the compiler.
 --
 -- The set mirrors the executable Nix surface tnix understands: numeric
--- addition, structural equality, ordered comparisons, and short-circuiting
--- boolean connectives. Each operator is erased back to the identical Nix
--- spelling, so this enum doubles as the round-trip representation.
+-- arithmetic, list concatenation, structural equality, ordered comparisons,
+-- and short-circuiting boolean connectives. Each operator is erased back to
+-- the identical Nix spelling, so this enum doubles as the round-trip
+-- representation.
 data BinOp
   = OpAdd
   | OpSub
   | OpMul
+  | OpConcat
   | OpEq
   | OpNeq
   | OpLt

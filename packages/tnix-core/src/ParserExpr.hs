@@ -160,7 +160,12 @@ additionParser =
 -- | Parse left-associated multiplicative arithmetic (`*`), binding tighter
 -- than additive operators.
 multiplicationParser :: Parser Expr
-multiplicationParser = chainLeft1 castParser (EBinaryOp OpMul <$ symbol "*")
+multiplicationParser = chainLeft1 concatParser (EBinaryOp OpMul <$ symbol "*")
+
+-- | Parse right-associated list concatenation (`++`), binding tighter than
+-- arithmetic so `xs ++ ys ++ zs` groups as `xs ++ (ys ++ zs)`.
+concatParser :: Parser Expr
+concatParser = chainRight1 castParser (EBinaryOp OpConcat <$ symbol "++")
 
 -- | Parse left-associated application chains.
 applicationParser :: Parser Expr
@@ -266,3 +271,13 @@ chainLeft1 item op = do
           rest (f acc next)
       )
         <|> pure acc
+
+chainRight1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+chainRight1 item op = do
+  first <- item
+  ( do
+      f <- op
+      rest <- chainRight1 item op
+      pure (f first rest)
+    )
+    <|> pure first

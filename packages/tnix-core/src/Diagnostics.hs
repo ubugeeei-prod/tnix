@@ -56,6 +56,7 @@ data DiagnosticCode
   | TC0017MissingPlaceholder
   | TC0018NotCallable
   | TC0019NotComparable
+  | TC0020NotConcatenable
   | -- Driver / project (TD)
     TD0001ReadFailed
   | TD0002DuplicateAmbientDeclaration
@@ -97,6 +98,7 @@ diagnosticCodeText code = case code of
   TC0017MissingPlaceholder -> "TC0017"
   TC0018NotCallable -> "TC0018"
   TC0019NotComparable -> "TC0019"
+  TC0020NotConcatenable -> "TC0020"
   TD0001ReadFailed -> "TD0001"
   TD0002DuplicateAmbientDeclaration -> "TD0002"
   TD0003DuplicateAmbientEntry -> "TD0003"

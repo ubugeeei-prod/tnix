@@ -183,6 +183,15 @@ any operands; only ordered comparisons require comparable types.
 **Fix:** compare numbers with numbers or strings with strings. A gradual
 boundary (`dynamic`, `any`) on either side suppresses the error.
 
+### `TC0020` — operands are not concatenable
+
+List concatenation (`++`) was applied to operands that are not both list-like.
+Fixed-shape sequences (vectors, tuples) and plain `List a` values all count as
+list-like; the result is a plain `List` joining both element types.
+
+**Fix:** concatenate lists with lists. A gradual boundary (`dynamic`, `any`)
+on either side suppresses the error.
+
 ## Driver / Project (`TDxxxx`)
 
 ### `TD0001` — failed to read
