@@ -97,6 +97,18 @@ spec = describe "analysis" $ do
     analysisRoot analysis
       `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("diff", TFun One tNat (TFun One tNat tInt))])))
 
+  it "concatenates annotated lists into a joined list element type" $ do
+    analysis <- analyzeText "main.nix" "{ cat = (xs :: List Int): (ys :: List Int): xs ++ ys; }" >>= expectRight
+    analysisRoot analysis
+      `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("cat", TFun One (tList tInt) (TFun One (tList tInt) (tList tInt)))])))
+
+  it "concatenates list literals into a structural list" $ do
+    analysis <- analyzeText "main.tnix" "[1 2] ++ [3 4]" >>= expectRight
+    fmap renderScheme (analysisRoot analysis) `shouldSatisfy` maybe False (Text.isInfixOf "List")
+
+  it "rejects concatenating non-list operands" $
+    analyzeText "main.tnix" "1 ++ 2" >>= (`expectLeftContaining` "cannot concatenate")
+
   it "infers Bool from relational, equality, and boolean operators" $ do
     lt <- analyzeText "main.tnix" "1 < 2" >>= expectRight
     analysisRoot lt `shouldBe` Just (Scheme [] tBool)

@@ -193,6 +193,7 @@ binOpSymbol = \case
   OpAdd -> "+"
   OpSub -> "-"
   OpMul -> "*"
+  OpConcat -> "++"
   OpEq -> "=="
   OpNeq -> "!="
   OpLt -> "<"

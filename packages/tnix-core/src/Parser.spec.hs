@@ -120,6 +120,11 @@ spec = describe "parseProgram" $ do
     programExpr sub
       `shouldBe` Just (plain (EBinaryOp OpSub (EBinaryOp OpSub (EVar "a") (EVar "b")) (EVar "c")))
 
+  it "parses right-associative list concatenation" $ do
+    program <- expectRight $ parseProgram "main.tnix" "xs ++ ys ++ zs"
+    programExpr program
+      `shouldBe` Just (plain (EBinaryOp OpConcat (EVar "xs") (EBinaryOp OpConcat (EVar "ys") (EVar "zs"))))
+
   it "parses boolean connectives and prefix negation" $ do
     program <- expectRight $ parseProgram "main.tnix" "true && false"
     programExpr program `shouldBe` Just (plain (EBinaryOp OpAnd (EBool True) (EBool False)))
@@ -375,7 +380,7 @@ genExpr _ =
     genAttr = AttrField <$> genName <*> genLeafExpr
 
 genBinOp :: Gen BinOp
-genBinOp = elements [OpAdd, OpSub, OpMul, OpEq, OpNeq, OpLt, OpGt, OpLe, OpGe, OpAnd, OpOr]
+genBinOp = elements [OpAdd, OpSub, OpMul, OpConcat, OpEq, OpNeq, OpLt, OpGt, OpLe, OpGe, OpAnd, OpOr]
 
 genLeafExpr :: Gen Expr
 genLeafExpr =
