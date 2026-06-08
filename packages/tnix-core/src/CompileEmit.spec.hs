@@ -116,6 +116,21 @@ spec = describe "compile and emit" $ do
     "&&" `Text.isInfixOf` output `shouldBe` True
     "==" `Text.isInfixOf` output `shouldBe` True
 
+  it "preserves subtraction and multiplication when compiling to nix" $ do
+    output <-
+      compileText
+        "main.tnix"
+        ( source
+            [ "let",
+              "  a = 6;",
+              "  b = 2;",
+              "in a - b * a"
+            ]
+        )
+        >>= expectRight
+    " - " `Text.isInfixOf` output `shouldBe` True
+    " * " `Text.isInfixOf` output `shouldBe` True
+
   it "emits field-wise declarations for attrset roots" $ do
     output <- emitText "main.tnix" "{ name = \"tnix\"; count = 1; }" >>= expectRight
     program <- expectRight (parseDecl "main.d.tnix" output)

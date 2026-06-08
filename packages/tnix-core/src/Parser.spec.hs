@@ -110,6 +110,16 @@ spec = describe "parseProgram" $ do
     neq <- expectRight $ parseProgram "main.tnix" "1 != 2"
     programExpr neq `shouldBe` Just (plain (EBinaryOp OpNeq (EInt 1) (EInt 2)))
 
+  it "parses additive and multiplicative arithmetic with correct precedence" $ do
+    -- a + b * c  ==>  a + (b * c)
+    program <- expectRight $ parseProgram "main.tnix" "a + b * c"
+    programExpr program
+      `shouldBe` Just (plain (EBinaryOp OpAdd (EVar "a") (EBinaryOp OpMul (EVar "b") (EVar "c"))))
+    -- a - b - c  ==>  (a - b) - c (left-associative)
+    sub <- expectRight $ parseProgram "main.tnix" "a - b - c"
+    programExpr sub
+      `shouldBe` Just (plain (EBinaryOp OpSub (EBinaryOp OpSub (EVar "a") (EVar "b")) (EVar "c")))
+
   it "parses boolean connectives and prefix negation" $ do
     program <- expectRight $ parseProgram "main.tnix" "true && false"
     programExpr program `shouldBe` Just (plain (EBinaryOp OpAnd (EBool True) (EBool False)))
@@ -365,7 +375,7 @@ genExpr _ =
     genAttr = AttrField <$> genName <*> genLeafExpr
 
 genBinOp :: Gen BinOp
-genBinOp = elements [OpAdd, OpEq, OpNeq, OpLt, OpGt, OpLe, OpGe, OpAnd, OpOr]
+genBinOp = elements [OpAdd, OpSub, OpMul, OpEq, OpNeq, OpLt, OpGt, OpLe, OpGe, OpAnd, OpOr]
 
 genLeafExpr :: Gen Expr
 genLeafExpr =

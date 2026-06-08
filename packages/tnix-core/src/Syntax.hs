@@ -112,6 +112,8 @@ data Expr
 -- spelling, so this enum doubles as the round-trip representation.
 data BinOp
   = OpAdd
+  | OpSub
+  | OpMul
   | OpEq
   | OpNeq
   | OpLt
