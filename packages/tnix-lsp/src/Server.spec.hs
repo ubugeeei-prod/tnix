@@ -47,6 +47,7 @@ spec = do
                       ],
                   "codeActionProvider" .= True,
                   "documentHighlightProvider" .= True,
+                  "documentFormattingProvider" .= True,
                   "documentLinkProvider" .= object ["resolveProvider" .= False],
                   "foldingRangeProvider" .= True,
                   "inlayHintProvider" .= object ["resolveProvider" .= False],

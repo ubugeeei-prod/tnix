@@ -20,6 +20,7 @@ Haskell is the core implementation language. Editor integrations stay thin and a
   - diagnostics
   - hover
   - signature help
+  - document formatting (re-render; no-op when comments are present)
   - go to definition
   - declaration lookup
 
@@ -99,6 +100,7 @@ Haskell is the core implementation language. Editor integrations stay thin and a
 - diagnostics push
 - hover
 - signature help
+- document formatting
 - semantic tokens in a later phase
 
 ### Zed

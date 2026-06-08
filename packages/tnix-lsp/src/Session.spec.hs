@@ -133,6 +133,21 @@ spec = do
       sig <- signatureHelpDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", "1")]) (hoverMessage "/tmp/main.tnix" 0 1)
       sig `shouldBe` Null
 
+  describe "formattingDocument" $ do
+    it "formats a comment-free document by re-rendering it" $ do
+      edits <- formattingDocument readNever (documentsFromList [("/tmp/main.tnix", "{ a = 1; b = 2; }")]) (documentSymbolMessage "/tmp/main.tnix")
+      case formattingEditTexts edits of
+        [text] -> ("a = 1;" `Text.isInfixOf` text) `shouldBe` True
+        other -> expectationFailure ("expected one edit, got " <> show other)
+
+    it "is a no-op when the document contains comments" $ do
+      edits <- formattingDocument readNever (documentsFromList [("/tmp/main.tnix", "{ a = 1; } # keep me")]) (documentSymbolMessage "/tmp/main.tnix")
+      formattingEditTexts edits `shouldBe` []
+
+    it "is a no-op when the document cannot be parsed" $ do
+      edits <- formattingDocument readNever (documentsFromList [("/tmp/main.tnix", "let x = ;")]) (documentSymbolMessage "/tmp/main.tnix")
+      formattingEditTexts edits `shouldBe` []
+
   describe "completionDocument" $ do
     it "returns field completions from the current analyzed buffer" $ do
       completions <- completionDocument readNever analyzeCompletion (documentsFromList [("/tmp/main.tnix", "box.")]) (completionMessage "/tmp/main.tnix" 0 4)
@@ -496,6 +511,16 @@ hoverText value =
             _ -> "missing hover value"
         _ -> "missing hover contents"
     _ -> "unexpected hover payload"
+
+formattingEditTexts :: Value -> [Text]
+formattingEditTexts value =
+  case value of
+    Array edits ->
+      [ text
+      | Object edit <- toList edits,
+        Just (String text) <- [KeyMap.lookup "newText" edit]
+      ]
+    _ -> []
 
 signatureLabels :: Value -> [Text]
 signatureLabels value =
