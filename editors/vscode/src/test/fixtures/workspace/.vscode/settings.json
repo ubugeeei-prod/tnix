@@ -1,0 +1,5 @@
+{
+  "tnix.server.path": "node",
+  "tnix.server.args": ["stub-server.mjs"],
+  "tnix.trace.server": "off"
+}

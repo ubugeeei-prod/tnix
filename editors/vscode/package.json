@@ -89,19 +89,25 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && ./node_modules/.bin/esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
-    "check": "tsc --noEmit -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "tsc -p tsconfig.json && node --test dist/*.spec.js",
-    "fmt": "prettier --check src package.json tsconfig.json language-configuration.json README.md",
+    "pretest:integration": "pnpm run build && tsc -p tsconfig.test.json && node -e \"require('fs').writeFileSync('out/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\"",
+    "test:integration": "vscode-test",
+    "fmt": "prettier --check src package.json tsconfig.json tsconfig.test.json .vscode-test.mjs language-configuration.json README.md",
     "package": "vsce package --no-dependencies"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.9.1",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^25.9.0",
     "@types/vscode": "^1.110.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.9.1",
     "esbuild": "^0.25.3",
+    "mocha": "^11.7.4",
     "ovsx": "^0.10.12",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3"
