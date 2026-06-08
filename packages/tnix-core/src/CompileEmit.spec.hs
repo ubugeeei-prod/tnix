@@ -256,6 +256,19 @@ spec = describe "compile and emit" $ do
     output <- compileText "math.nix" "{ inc = x: x + 1; }" >>= expectRight
     "x + 1" `Text.isInfixOf` output `shouldBe` True
 
+  it "preserves with expressions when compiling to nix" $ do
+    output <-
+      compileText
+        "main.tnix"
+        ( source
+            [ "let",
+              "  scope = { a = 1; };",
+              "in with scope; a"
+            ]
+        )
+        >>= expectRight
+    "with scope;" `Text.isInfixOf` output `shouldBe` True
+
   it "preserves string interpolation when compiling to nix" $ do
     output <-
       compileText

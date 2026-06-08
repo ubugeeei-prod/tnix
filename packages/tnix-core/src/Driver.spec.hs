@@ -167,6 +167,17 @@ spec = describe "analysis" $ do
   it "reports unbound names used inside interpolation" $
     analyzeText "main.tnix" "\"value is ${missing}\"" >>= (`expectLeftContaining` "unbound name")
 
+  it "brings a record scope's fields into scope with `with`" $ do
+    analysis <- analyzeText "main.tnix" "with { a = 1; }; a" >>= expectRight
+    analysisRoot analysis `shouldBe` Just (Scheme [] (TLit (LInt 1)))
+
+  it "still reports names absent from a known `with` record scope" $
+    analyzeText "main.tnix" "with { a = 1; }; b" >>= (`expectLeftContaining` "unbound name")
+
+  it "stays lenient for names resolved through a gradual `with` scope" $ do
+    analysis <- analyzeText "main.tnix" "(pkgs :: dynamic): with pkgs; somePackage" >>= expectRight
+    fmap renderScheme (analysisRoot analysis) `shouldSatisfy` maybe False ("dynamic" `Text.isInfixOf`)
+
   it "reports missing fields" $
     analyzeText "main.tnix" "{ value = 1; }.missing" >>= (`expectLeftContaining` "missing field")
 

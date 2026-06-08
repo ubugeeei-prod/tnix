@@ -263,6 +263,7 @@ exprAnnotations = \case
   ESelect base steps -> exprAnnotations base <> foldMap selectStepAnnotations steps
   EHasAttr base _ -> exprAnnotations base
   EAssert cond body -> exprAnnotations cond <> exprAnnotations body
+  EWith scope body -> exprAnnotations scope <> exprAnnotations body
   EIf cond yesExpr noExpr -> foldMap exprAnnotations [cond, yesExpr, noExpr]
   EList members -> foldMap exprAnnotations members
   EInterp _ parts -> foldMap (\case StrExpr expr -> exprAnnotations expr; StrText _ -> []) parts

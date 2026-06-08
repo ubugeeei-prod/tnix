@@ -57,6 +57,7 @@ multiplication < concat < has_attr < cast < application < postfix < atom`.
 expression       = if_expr
                  | let_expr
                  | assert_expr
+                 | with_expr
                  | lambda_expr
                  | or_expr
 ```
@@ -67,6 +68,8 @@ expression       = if_expr
 if_expr  = "if" expression "then" expression "else" expression
 
 assert_expr = "assert" expression ";" expression
+
+with_expr   = "with" expression ";" expression
 
 let_expr = "let" let_item* "in" expression
 let_item = let_signature | let_binding
@@ -213,7 +216,7 @@ attr_name       = identifier | string_literal
 
 reserved        = "true" | "false" | "null" | "let" | "in"
                 | "if" | "then" | "else" | "inherit"
-                | "type" | "declare" | "import" | "rec"
+                | "type" | "declare" | "import" | "rec" | "with"
                 | "as" | "assert" | "forall" | "extends" | "infer"
                 | "any" | "dynamic" | "unknown"
                 | "Tuple"
@@ -324,6 +327,5 @@ expressions, declarations, and lists can all span multiple lines freely.
 The parser intentionally accepts a production-ready Nix-shaped subset instead
 of the full Nix language. These forms are still outside the supported surface:
 
-- `with scope; expr`
 - nested attribute-path declarations such as `a.b.c = value;`
 - Nix's full indented-string indentation stripping and escape rules

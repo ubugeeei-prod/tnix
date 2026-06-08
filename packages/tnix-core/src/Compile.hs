@@ -32,6 +32,7 @@ eraseExpr expr =
     ESelect base fields -> ESelect (eraseExpr base) (map eraseSelectStep fields)
     EHasAttr base path -> EHasAttr (eraseExpr base) path
     EAssert cond body -> EAssert (eraseExpr cond) (eraseExpr body)
+    EWith scope body -> EWith (eraseExpr scope) (eraseExpr body)
     EIf cond yesExpr noExpr -> EIf (eraseExpr cond) (eraseExpr yesExpr) (eraseExpr noExpr)
     EList members -> EList (map eraseExpr members)
     EInterp form parts -> EInterp form (map eraseStringPart parts)

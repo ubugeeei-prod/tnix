@@ -111,6 +111,7 @@ prettyExpr p = \case
   EIf a b c -> parenIf (p > 0) (vsep ["if" <+> prettyExpr 0 a, "then" <+> prettyExpr 0 b, "else" <+> prettyExpr 0 c])
   ELet items body -> parenIf (p > 0) (vsep ["let", indent 2 (vsep (map (prettyLet . markedValue) items)), "in" <+> prettyExpr 0 body])
   EAssert cond body -> parenIf (p > 0) ("assert" <+> prettyExpr 0 cond <> ";" <+> prettyExpr 0 body)
+  EWith scope body -> parenIf (p > 0) ("with" <+> prettyExpr 0 scope <> ";" <+> prettyExpr 0 body)
   -- Operators: each level parenthesizes only when the surrounding context binds
   -- tighter than the operator, and the non-associative operand side is bumped by
   -- one so equal-precedence nesting parenthesizes correctly.

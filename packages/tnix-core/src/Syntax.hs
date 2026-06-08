@@ -104,6 +104,7 @@ data Expr
   | ESelect Expr [SelectStep]
   | EHasAttr Expr [Name]
   | EAssert Expr Expr
+  | EWith Expr Expr
   | EIf Expr Expr Expr
   | EList [Expr]
   | ECast Expr Type

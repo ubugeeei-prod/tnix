@@ -131,6 +131,11 @@ spec = describe "parseProgram" $ do
       `shouldBe` Just (plain (ERec [AttrField "a" (EInt 1), AttrField "b" (EVar "a")]))
     parseProgram "main.tnix" "let rec = 1; in rec" `shouldSatisfy` isLeft
 
+  it "parses with expressions and reserves the keyword" $ do
+    program <- expectRight $ parseProgram "main.tnix" "with scope; body"
+    programExpr program `shouldBe` Just (plain (EWith (EVar "scope") (EVar "body")))
+    parseProgram "main.tnix" "let with = 1; in with" `shouldSatisfy` isLeft
+
   it "parses assert expressions and reserves the keyword" $ do
     program <- expectRight $ parseProgram "main.tnix" "assert x; y"
     programExpr program `shouldBe` Just (plain (EAssert (EVar "x") (EVar "y")))
@@ -426,6 +431,7 @@ genExpr depth
           EUnaryOp OpNot <$> sub,
           EApp <$> sub <*> sub,
           EIf <$> sub <*> sub <*> sub,
+          EWith <$> sub <*> sub,
           EList <$> resize 3 (listOf sub),
           EAttrSet <$> resize 3 (listOf genAttr),
           EInterp <$> elements [InterpDouble, InterpIndented] <*> genInterpParts sub
@@ -462,6 +468,7 @@ shrinkExpr = \case
   EBinaryOp _ left right -> [left, right]
   EUnaryOp _ operand -> [operand]
   EApp f x -> [f, x]
+  EWith scope body -> [scope, body]
   EIf cond yes no -> [cond, yes, no]
   EList items -> items
   EAttrSet items -> [expr | AttrField _ expr <- items]

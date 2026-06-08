@@ -64,7 +64,7 @@ ambientEntry = do
 
 -- | Parse any expression form supported by the prototype.
 expressionParser :: Parser Expr
-expressionParser = choice [ifParser, letParser, assertParser, try lambdaParser, orParser]
+expressionParser = choice [ifParser, letParser, assertParser, withParser, try lambdaParser, orParser]
 
 -- | Parse a Nix-style conditional expression.
 ifParser :: Parser Expr
@@ -83,6 +83,14 @@ assertParser = do
   cond <- expressionParser
   _ <- symbol ";"
   EAssert cond <$> expressionParser
+
+-- | Parse a Nix-style `with scope; body` expression.
+withParser :: Parser Expr
+withParser = do
+  reserved "with"
+  scope <- expressionParser
+  _ <- symbol ";"
+  EWith scope <$> expressionParser
 
 -- | Parse a `let ... in ...` block with optional type signatures.
 letParser :: Parser Expr

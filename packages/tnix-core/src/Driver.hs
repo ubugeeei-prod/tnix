@@ -76,7 +76,7 @@ analyzeText path input = do
     localAmbient <- collectAmbient path program
     let aliases = mkAliasEnv (programAliases program <> worldAliases supportWorld)
         ambient = localAmbient <> worldAmbient supportWorld
-        context = CheckContext{checkAliases = aliases, checkAmbient = ambient, checkFile = path}
+        context = CheckContext{checkAliases = aliases, checkAmbient = ambient, checkFile = path, checkOpenScope = False}
     result <- checkProgram context program
     pure
       Analysis
