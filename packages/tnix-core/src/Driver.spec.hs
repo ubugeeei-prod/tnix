@@ -115,6 +115,13 @@ spec = describe "analysis" $ do
     absent <- analyzeText "main.tnix" "{ a = 1; } ? b" >>= expectRight
     analysisRoot absent `shouldBe` Just (Scheme [] tBool)
 
+  it "types an assert expression as the type of its body" $ do
+    analysis <- analyzeText "main.tnix" "assert true; 1" >>= expectRight
+    analysisRoot analysis `shouldBe` Just (Scheme [] (TLit (LInt 1)))
+
+  it "rejects an assert whose condition is not Bool" $
+    analyzeText "main.tnix" "assert 1; 2" >>= (`expectLeftContaining` "type mismatch")
+
   it "merges attribute sets with the update operator, right side overriding" $ do
     analysis <- analyzeText "main.tnix" "{ a = 1; } // { a = 2; b = 3; }" >>= expectRight
     analysisRoot analysis

@@ -100,6 +100,7 @@ data Expr
   | EAttrSet [AttrItem]
   | ESelect Expr [SelectStep]
   | EHasAttr Expr [Name]
+  | EAssert Expr Expr
   | EIf Expr Expr Expr
   | EList [Expr]
   | ECast Expr Type

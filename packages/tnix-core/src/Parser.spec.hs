@@ -125,6 +125,11 @@ spec = describe "parseProgram" $ do
     programExpr program
       `shouldBe` Just (plain (EBinaryOp OpConcat (EVar "xs") (EBinaryOp OpConcat (EVar "ys") (EVar "zs"))))
 
+  it "parses assert expressions and reserves the keyword" $ do
+    program <- expectRight $ parseProgram "main.tnix" "assert x; y"
+    programExpr program `shouldBe` Just (plain (EAssert (EVar "x") (EVar "y")))
+    parseProgram "main.tnix" "let assert = 1; in assert" `shouldSatisfy` isLeft
+
   it "parses the attribute-presence test with a dotted attribute path" $ do
     program <- expectRight $ parseProgram "main.tnix" "a ? b"
     programExpr program `shouldBe` Just (plain (EHasAttr (EVar "a") ["b"]))

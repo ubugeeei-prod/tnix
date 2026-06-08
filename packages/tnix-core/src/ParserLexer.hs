@@ -167,7 +167,7 @@ brackets = between (symbol "[") (symbol "]")
 
 reservedWords :: [Text]
 reservedWords =
-  ["Tuple", "any", "as", "declare", "dynamic", "else", "extends", "false", "forall", "if", "import", "in", "infer", "inherit", "let", "null", "then", "true", "type", "unknown"]
+  ["Tuple", "any", "as", "assert", "declare", "dynamic", "else", "extends", "false", "forall", "if", "import", "in", "infer", "inherit", "let", "null", "then", "true", "type", "unknown"]
 
 identStart, identCont, pathChar, pathSegmentStart :: Char -> Bool
 identStart c = isLetter c || c == '_'

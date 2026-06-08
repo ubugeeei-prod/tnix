@@ -343,6 +343,7 @@ validateExpr = \case
   EAttrSet items -> traverse_ validateAttrItem items
   ESelect base steps -> validateExpr base *> traverse_ validateSelectStep steps
   EHasAttr base _ -> validateExpr base
+  EAssert cond body -> validateExpr cond *> validateExpr body
   EIf cond yesExpr noExpr -> validateExpr cond *> validateExpr yesExpr *> validateExpr noExpr
   EList items -> traverse_ validateExpr items
   ECast expr ty -> validateExpr expr *> validateType "term annotation" ty
