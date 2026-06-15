@@ -113,14 +113,14 @@ jobs:
 
       - name: Mount Cabal package cache
         if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-cabal-packages-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
           path: ~/.cabal/packages
 
       - name: Mount Cabal store
         if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-cabal-store-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
           path: ~/.cabal/store
@@ -171,14 +171,14 @@ jobs:
 
       - name: Mount Cabal package cache
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-cabal-packages-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
           path: ~/.cabal/packages
 
       - name: Mount Cabal store
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-cabal-store-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
           path: ~/.cabal/store
@@ -235,7 +235,7 @@ jobs:
 
       - name: Mount pnpm store
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -276,7 +276,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
 
@@ -324,21 +324,21 @@ jobs:
 
       - name: Mount Cargo git cache
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-cargo-git-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
           path: ~/.cargo/git
 
       - name: Mount Cargo registry cache
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-cargo-registry-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
           path: ~/.cargo/registry
 
       - name: Mount Zed target cache
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-zed-target-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
           path: editors/zed/target
@@ -423,7 +423,7 @@ jobs:
 
       - name: Mount pnpm store
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -445,21 +445,21 @@ jobs:
 
       - name: Mount Cargo git cache
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-cargo-git-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
           path: ~/.cargo/git
 
       - name: Mount Cargo registry cache
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-cargo-registry-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
           path: ~/.cargo/registry
 
       - name: Mount Zed target cache
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-zed-target-${{ runner.os }}-${{ hashFiles('editors/zed/Cargo.lock', 'editors/zed/Cargo.toml') }}
           path: editors/zed/target
