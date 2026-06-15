@@ -109,7 +109,7 @@
     "esbuild": "^0.25.3",
     "mocha": "^11.7.4",
     "ovsx": "^0.10.12",
-    "prettier": "^3.8.3",
+    "prettier": "^3.8.4",
     "typescript": "^6.0.3"
   }
 }
