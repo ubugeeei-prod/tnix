@@ -106,7 +106,7 @@
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.9.1",
-    "esbuild": "^0.25.3",
+    "esbuild": "^0.28.1",
     "mocha": "^11.7.4",
     "ovsx": "^0.10.12",
     "prettier": "^3.8.3",
