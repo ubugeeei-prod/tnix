@@ -40,38 +40,38 @@ jobs:
     steps:
       - name: Check out sources (Blacksmith)
         if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        uses: useblacksmith/checkout@6fd481652155169ed4d2f25ebaf97464f685175f # v1
         with:
           persist-credentials: false
 
       - name: Check out sources
         if: ${{ !startsWith(matrix.os, 'blacksmith-') }}
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Mount Cabal package cache
         if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
+        uses: useblacksmith/stickydisk@6d373c96a74cbde0c99fedc5ea5d3a7ba66ba494 # v1.4.0
         with:
           key: ${{ github.repository }}-cabal-packages-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
           path: ~/.cabal/packages
 
       - name: Mount Cabal store
         if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
+        uses: useblacksmith/stickydisk@6d373c96a74cbde0c99fedc5ea5d3a7ba66ba494 # v1.4.0
         with:
           key: ${{ github.repository }}-cabal-store-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
           path: ~/.cabal/store
 
       - name: Cache Cabal dependencies
         if: ${{ !startsWith(matrix.os, 'blacksmith-') }}
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: |
             ~/.cabal/packages
@@ -88,14 +88,14 @@ jobs:
 
       - name: Mount pnpm store
         if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
+        uses: useblacksmith/stickydisk@6d373c96a74cbde0c99fedc5ea5d3a7ba66ba494 # v1.4.0
         with:
           key: ${{ github.repository }}-pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ${{ steps.pnpm-store.outputs.path }}
 
       - name: Cache pnpm store
         if: ${{ !startsWith(matrix.os, 'blacksmith-') }}
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -169,7 +169,7 @@ jobs:
           upload-release-assets: false
 
       - name: Attest release archive, checksum, and SBOM
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
         with:
           subject-path: |
             ${{ matrix.archive }}
@@ -200,18 +200,18 @@ jobs:
     steps:
       - name: Check out sources (Blacksmith)
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        uses: useblacksmith/checkout@6fd481652155169ed4d2f25ebaf97464f685175f # v1
         with:
           persist-credentials: false
 
       - name: Check out sources
         if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -223,14 +223,14 @@ jobs:
 
       - name: Mount pnpm store
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
+        uses: useblacksmith/stickydisk@6d373c96a74cbde0c99fedc5ea5d3a7ba66ba494 # v1.4.0
         with:
           key: ${{ github.repository }}-pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ${{ steps.pnpm-store.outputs.path }}
 
       - name: Cache pnpm store
         if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -259,7 +259,7 @@ jobs:
           upload-release-assets: false
 
       - name: Attest VS Code extension and SBOM
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
         with:
           subject-path: |
             ./tnix-vscode-${{ env.REF_NAME }}.vsix
@@ -293,7 +293,7 @@ jobs:
           merge-multiple: true
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: ./release-artifacts/*
           generate_release_notes: true
@@ -315,18 +315,18 @@ jobs:
     steps:
       - name: Check out sources (Blacksmith)
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        uses: useblacksmith/checkout@6fd481652155169ed4d2f25ebaf97464f685175f # v1
         with:
           persist-credentials: false
 
       - name: Check out sources
         if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -338,14 +338,14 @@ jobs:
 
       - name: Mount pnpm store
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
+        uses: useblacksmith/stickydisk@6d373c96a74cbde0c99fedc5ea5d3a7ba66ba494 # v1.4.0
         with:
           key: ${{ github.repository }}-pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ${{ steps.pnpm-store.outputs.path }}
 
       - name: Cache pnpm store
         if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
