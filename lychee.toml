@@ -5,10 +5,10 @@
 # Match links across markdown and select project metadata files.
 include_verbatim = false
 
-# Treat anchors that point to repo files but contain unresolvable fragments as
-# warnings rather than errors. Anchors inside generated GitHub UI pages cannot
-# be verified locally without HTML rendering.
-include_fragments = false
+# Disable fragment checking entirely. Anchors inside generated GitHub UI pages
+# cannot be verified locally without HTML rendering. Since lychee 0.24 this
+# option takes one of "none", "anchor-only", "text-only", or "full".
+include_fragments = "none"
 
 # Skip mailto:, javascript:, and similar non-HTTP schemes.
 exclude_path = [
