@@ -1,9 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "Node",
-    "ignoreDeprecations": "6.0",
     "outDir": "out",
     "rootDir": "src",
     "types": ["node", "vscode", "mocha"]
