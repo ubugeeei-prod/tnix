@@ -5,7 +5,7 @@ import {
   LanguageClientOptions,
   ServerOptions,
   State,
-} from "vscode-languageclient/node.js";
+} from "vscode-languageclient/node";
 import { resolveRuntimeConfig } from "./runtime.js";
 
 let client: LanguageClient | undefined;
