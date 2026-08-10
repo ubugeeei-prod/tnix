@@ -61,5 +61,8 @@ jobs:
           gh pr create \
             --title "chore(deps): update flake.lock" \
             --body "Automated weekly \`nix flake update\`. Review the input revision changes before merging." \
-            --label dependencies \
             --base "${GITHUB_REF_NAME}"
+          # Labelling is cosmetic: a missing label must not strand the branch we
+          # just pushed without a pull request.
+          gh pr edit "$branch" --add-label dependencies \
+            || echo "::warning::could not add the 'dependencies' label"
