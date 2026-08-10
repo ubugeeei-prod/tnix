@@ -1,0 +1,4 @@
+{
+  "//": "Integration tests are compiled to CommonJS (see tsconfig.test.json) because the VS Code test runner loads them with require(). TypeScript derives the emit format from the nearest package.json, so this marker keeps src/test in CommonJS mode while the extension itself stays ESM.",
+  "type": "commonjs"
+}
