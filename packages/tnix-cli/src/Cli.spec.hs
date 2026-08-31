@@ -424,12 +424,179 @@ spec = do
             Text.isInfixOf "ok src/main.tnix" report `shouldBe` True
           Left err ->
             expectationFailure ("expected ok, got error: " <> err)
+
+  describe "project discovery" $ do
+    it "honours include and exclude filters" $
+      withTempTree
+        [ ("tnix.config.tnix", projectConfig ["include = [ ./src/keep ];", "exclude = [ ./src/keep/skipped.tnix ];"]),
+          ("flake.nix", "{}"),
+          ("src/keep/kept.tnix", "1"),
+          ("src/keep/skipped.tnix", "1"),
+          ("src/dropped/other.tnix", "1")
+        ]
+        ( \root -> do
+            report <- executeCommand (CheckProject (Just root) JsonFormat) >>= expectRight
+            report `shouldSatisfy` Text.isInfixOf "kept.tnix"
+            report `shouldSatisfy` (not . Text.isInfixOf "skipped.tnix")
+            report `shouldSatisfy` (not . Text.isInfixOf "other.tnix")
+        )
+
+    it "never treats a declaration file as a project source" $
+      withTempTree
+        [ ("tnix.config.tnix", projectConfig []),
+          ("flake.nix", "{}"),
+          ("src/main.tnix", "1"),
+          ("src/types.d.tnix", "declare \"./lib.nix\" { default :: Int; };")
+        ]
+        ( \root -> do
+            report <- executeCommand (CheckProject (Just root) JsonFormat) >>= expectRight
+            report `shouldSatisfy` Text.isInfixOf "main.tnix"
+            report `shouldSatisfy` (not . Text.isInfixOf "types.d.tnix")
+        )
+
+    it "reports a project with no discovered sources as an error" $
+      withTempTree
+        [ ("tnix.config.tnix", projectConfig []),
+          ("flake.nix", "{}")
+        ]
+        ( \root -> do
+            result <- executeCommand (CheckProject (Just root) TextFormat)
+            expectLeftContaining result "no project source files discovered"
+        )
+
+    it "reports a missing config rather than guessing a layout" $
+      withTempTree
+        [("flake.nix", "{}")]
+        ( \root -> do
+            result <- executeCommand (CheckProject (Just root) TextFormat)
+            expectLeftContaining result "missing tnix.config.tnix"
+        )
+
+  describe "config decoding" $ do
+    it "rejects a duplicate field" $
+      expectConfigError
+        (source ["{", "  name = \"a\";", "  name = \"b\";", "}"])
+        "duplicate config field: name"
+
+    it "rejects a root that is not an attribute set" $
+      expectConfigError "1" "must evaluate to an attrset"
+
+    it "rejects inherit in the root attribute set" $
+      expectConfigError
+        (source ["{", "  inherit name;", "}"])
+        "does not support inherit"
+
+    it "rejects a field whose type does not match" $ do
+      expectConfigError (source ["{ name = 1; }"]) "expected string field"
+      expectConfigError (source ["{ builtins = 1; }"]) "expected Bool for builtins"
+      expectConfigError (source ["{ sourceDir = 1; }"]) "expected path-like field for sourceDir"
+      expectConfigError (source ["{ entries = 1; }"]) "expected list of path-like values for entries"
+      expectConfigError (source ["{ entries = [ 1 ]; }"]) "expected path-like item in entries"
+
+  describe "json reports" $ do
+    it "stamps every machine-readable payload with the schema version" $
+      withTempTree
+        [ ("tnix.config.tnix", projectConfig []),
+          ("flake.nix", "{}"),
+          ("src/main.tnix", "1")
+        ]
+        ( \root -> do
+            forM_ [CheckProject (Just root) JsonFormat, BuildProject (Just root) JsonFormat, EmitProject (Just root) JsonFormat] $ \command -> do
+              report <- executeCommand command >>= expectRight
+              report `shouldSatisfy` Text.isInfixOf "\"schemaVersion\":1"
+            renderVersion "1.2.3" JsonFormat `shouldSatisfy` Text.isInfixOf "\"schemaVersion\":1"
+        )
+
+    it "names the action that produced each report" $
+      withTempTree
+        [ ("tnix.config.tnix", projectConfig []),
+          ("flake.nix", "{}"),
+          ("src/main.tnix", "1")
+        ]
+        ( \root -> do
+            check <- executeCommand (CheckProject (Just root) JsonFormat) >>= expectRight
+            build <- executeCommand (BuildProject (Just root) JsonFormat) >>= expectRight
+            emit <- executeCommand (EmitProject (Just root) JsonFormat) >>= expectRight
+            check `shouldSatisfy` Text.isInfixOf "\"action\":\"check-project\""
+            build `shouldSatisfy` Text.isInfixOf "\"action\":\"build\""
+            emit `shouldSatisfy` Text.isInfixOf "\"action\":\"emit-project\""
+        )
+
+    it "summarises how many files passed and failed" $
+      withTempTree
+        [ ("tnix.config.tnix", projectConfig []),
+          ("flake.nix", "{}"),
+          ("src/ok.tnix", "1"),
+          ("src/bad.tnix", "missing")
+        ]
+        ( \root -> do
+            result <- executeCommand (CheckProject (Just root) JsonFormat)
+            case result of
+              Right report -> expectationFailure ("expected a failing report, got " <> Text.unpack report)
+              Left report -> do
+                report `shouldSatisfy` isInfixOf "\"total\":2"
+                report `shouldSatisfy` isInfixOf "\"ok\":1"
+                report `shouldSatisfy` isInfixOf "\"failed\":1"
+        )
+
+  describe "writeOutput" $ do
+    it "creates missing parent directories" $
+      withTempTree
+        []
+        ( \root -> do
+            let target = root </> "a/b/c/out.nix"
+            writeOutput (Just target) "value"
+            -- File output is written verbatim; only stdout gets a trailing
+            -- newline, because the content is the artifact.
+            readFileText target `shouldReturn` "value"
+        )
+
+    it "leaves no temporary file behind" $
+      withTempTree
+        []
+        ( \root -> do
+            let target = root </> "out.nix"
+            writeOutput (Just target) "value"
+            entries <- listDirectory root
+            entries `shouldBe` ["out.nix"]
+        )
+
+    it "replaces existing content rather than appending to it" $
+      withTempTree
+        [("out.nix", "old\n")]
+        ( \root -> do
+            let target = root </> "out.nix"
+            writeOutput (Just target) "new"
+            readFileText target `shouldReturn` "new"
+        )
   where
     parserInfo = info commandParser mempty
     parserPrefs :: ParserPrefs
     parserPrefs = defaultPrefs
     parse = getParseResult . execParserPure parserPrefs parserInfo
     parserResult = execParserPure parserPrefs parserInfo
+
+-- | A `tnix.config.tnix` with the standard layout plus any extra fields.
+projectConfig :: [Text] -> Text
+projectConfig extra =
+  source $
+    ["{", "  name = \"spec\";", "  sourceDir = ./src;", "  entry = ./src/main.tnix;", "  builtins = false;"]
+      <> map ("  " <>) extra
+      <> ["}"]
+
+-- | Load a project whose config is expected to be rejected, and check the
+-- reason surfaced to the user.
+expectConfigError :: Text -> String -> Expectation
+expectConfigError config needle =
+  withTempTree
+    [("tnix.config.tnix", config), ("flake.nix", "{}")]
+    ( \root -> do
+        result <- executeCommand (CheckProject (Just root) TextFormat)
+        expectLeftContaining result needle
+    )
+
+readFileText :: FilePath -> IO Text
+readFileText = TextIO.readFile
 
 expectRight :: (Show e) => Either e a -> IO a
 expectRight (Right value) = pure value
