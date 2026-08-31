@@ -167,7 +167,7 @@ prettyAttrName name
 prettyStringLiteral :: StringLiteral -> Doc ann
 prettyStringLiteral = \case
   DoubleQuoted value -> prettyQuoted value
-  Indented value -> "''" <> pretty (escapeIndented True True value) <> "''"
+  Indented value -> "''" <> verbatim (escapeIndented True True value) <> "''"
 
 -- | Render an interpolated string back to its surface form, restoring `${...}`
 -- antiquotations around the embedded expressions.
@@ -187,10 +187,9 @@ prettyInterp form parts =
 prettyStringPart :: InterpForm -> Bool -> Bool -> StringPart -> Doc ann
 prettyStringPart form atStart atEnd = \case
   StrText text ->
-    pretty $
-      case form of
-        InterpDouble -> escapeDoubleQuoted text
-        InterpIndented -> escapeIndented atStart atEnd text
+    case form of
+      InterpDouble -> pretty (escapeDoubleQuoted text)
+      InterpIndented -> verbatim (escapeIndented atStart atEnd text)
   StrExpr expr -> "${" <> prettyExpr 0 expr <> "}"
 
 prettyType :: Int -> Type -> Doc ann
@@ -230,6 +229,15 @@ prettyType p ty =
             TForall vars body -> parenIf (p > 0) ("forall" <+> hsep (pretty <$> vars) <> "." <+> prettyType 0 body)
             TConditional a b c d -> parenIf (p > 0) (prettyType 2 a <+> "extends" <+> prettyType 2 b <+> "?" <+> prettyType 0 c <+> ":" <+> prettyType 0 d)
             TInfer name -> "infer" <+> pretty name
+
+-- | Emit text with its own line breaks, immune to the surrounding layout.
+--
+-- An indented string keeps its body verbatim, so the renderer must not add the
+-- enclosing block's indentation after each newline: doing so changes the string
+-- and compounds every time the file is compiled again. Resetting the nesting
+-- level to zero for the body keeps rendering idempotent.
+verbatim :: Text -> Doc ann
+verbatim text = nesting (\level -> nest (negate level) (pretty text))
 
 -- | Render text as a Nix double-quoted string literal, escaping every
 -- character that would otherwise change how the result re-parses.

@@ -105,6 +105,44 @@ spec = do
                 <> [StrText trailing | not (Text.null trailing)]
          in roundTripsAsExpr (EInterp form parts)
 
+  describe "multi-line string bodies" $ do
+    it "does not pick up the enclosing indentation" $ do
+      let rendered = renderExpr (EAttrSet [AttrField "hook" (EString (Indented "\nline one\nline two\n"))])
+      rendered `shouldBe` "{\n  hook = ''\nline one\nline two\n'';\n}"
+
+    it "round-trips a multi-line indented string nested in an attribute set" $
+      expectExprRoundTrip
+        (EAttrSet [AttrField "hook" (EString (Indented "\n  echo 'go'\n  export DIR=\"$HOME\"\n"))])
+
+    it "round-trips a multi-line indented string nested two levels deep" $
+      expectExprRoundTrip
+        ( EAttrSet
+            [ AttrField
+                "outer"
+                (EAttrSet [AttrField "hook" (EString (Indented "\n  a\n  b\n"))])
+            ]
+        )
+
+    it "round-trips a multi-line interpolated indented string" $
+      expectExprRoundTrip
+        ( EAttrSet
+            [ AttrField
+                "hook"
+                ( EInterp
+                    InterpIndented
+                    [StrText "\n  echo ", StrExpr (EVar "name"), StrText "\n  done\n"]
+                )
+            ]
+        )
+
+    it "keeps compilation idempotent for indented strings" $ do
+      -- Re-rendering an already-rendered program must not keep adding
+      -- indentation to the string body.
+      let program = EAttrSet [AttrField "hook" (EString (Indented "\n  body\n"))]
+          once = renderExpr program
+      reparsed <- parseExprOrFail once
+      renderExpr reparsed `shouldBe` once
+
   describe "attribute names" $ do
     it "quotes and escapes names that are not bare identifiers" $ do
       renderExpr (EAttrSet [AttrField "with space" (EInt 1)])
@@ -226,6 +264,15 @@ instance Arbitrary NastyForm where
 
 nastyAlphabet :: [Char]
 nastyAlphabet = ['\'', '"', '\\', '$', '{', '}', '\n', '\t', 'a', ' ']
+
+parseExprOrFail :: Text -> IO Expr
+parseExprOrFail input =
+  case parseProgram "pretty.tnix" input of
+    Left err -> expectationFailure (Text.unpack err) >> fail "parse failed"
+    Right program ->
+      case markedValue <$> programExpr program of
+        Just expr -> pure expr
+        Nothing -> expectationFailure "expected a root expression" >> fail "no root"
 
 expectStringRoundTrip :: Text -> Expectation
 expectStringRoundTrip raw = expectExprRoundTrip (EString (DoubleQuoted raw))
