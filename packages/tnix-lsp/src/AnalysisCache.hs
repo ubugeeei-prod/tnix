@@ -22,10 +22,8 @@ module AnalysisCache
   )
 where
 
-import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Ord (Down (..))
 import Data.Text (Text)
 import Driver (Analysis)
 
@@ -75,16 +73,29 @@ insertAnalysisCache :: AnalysisKey -> Either String Analysis -> AnalysisCache ->
 insertAnalysisCache key value cache =
   let nextSeq = analysisCacheNext cache
       added = Map.insert key (nextSeq, value) (analysisCacheEntries cache)
-      bounded =
-        if Map.size added > analysisCacheCapacity
-          then
-            Map.fromList
-              ( take
-                  analysisCacheCapacity
-                  ( sortOn
-                      (Down . (\(_, (seqNo, _)) -> seqNo))
-                      (Map.toList added)
-                  )
-              )
-          else added
-   in AnalysisCache bounded (nextSeq + 1)
+   in AnalysisCache (evictToCapacity added) (nextSeq + 1)
+
+-- | Drop least-recently-used entries until the cache fits.
+--
+-- An insert can only push the cache one entry over, so this normally deletes a
+-- single key. Deleting is the point: rebuilding the whole map from a sorted
+-- list re-compares every key, and the keys hold full document text — on a
+-- 256-entry cache that turned each keystroke into hundreds of text
+-- comparisons. Finding the oldest entry is one linear scan over the sequence
+-- numbers, and removing it is a single logarithmic delete.
+evictToCapacity :: Map AnalysisKey (Int, Either String Analysis) -> Map AnalysisKey (Int, Either String Analysis)
+evictToCapacity entries
+  | Map.size entries <= analysisCacheCapacity = entries
+  | otherwise =
+      case oldestKey entries of
+        Nothing -> entries
+        Just key -> evictToCapacity (Map.delete key entries)
+
+-- | The key with the lowest sequence number, i.e. the least recently used.
+oldestKey :: Map AnalysisKey (Int, value) -> Maybe AnalysisKey
+oldestKey = fmap fst . Map.foldrWithKey step Nothing
+  where
+    step key (seqNo, _) acc =
+      case acc of
+        Just (_, bestSeq) | bestSeq <= seqNo -> acc
+        _ -> Just (key, seqNo)

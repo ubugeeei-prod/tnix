@@ -2,10 +2,14 @@
 
 module Main (main) where
 
+import Compile (compileProgram)
+import Control.Monad (when)
 import Data.Map.Strict qualified as Map
+import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Driver (compileFile, compileText, emitFile, emitFileTo, emitText, parseText)
+import Parser (parseProgram)
 import Syntax
 import System.FilePath ((</>))
 import Test.Hspec
@@ -538,10 +542,93 @@ spec = describe "compile and emit" $ do
           Text.isInfixOf "declare \"../../src/main.nix\"" output `shouldBe` True
       )
 
+  describe "compiled output is a fixed point" $ do
+    -- Compilation renders the erased AST back to Nix source. Two things have
+    -- to hold for that to be trustworthy, and neither is implied by the exact
+    -- output tests above: the result must re-parse, and compiling it again
+    -- must change nothing. The second is what catches layout that leaks into
+    -- verbatim string bodies, where the drift compounds per compile.
+    it "re-parses and compiles to itself for every corpus entry" $
+      mapM_ expectCompileFixedPoint compileCorpus
+
+    it "erases every type-only construct" $
+      mapM_ expectNoTypeSyntax compileCorpus
+
   describe "golden regressions" $
     mapM_ goldenFixtureSpec compileEmitFixtures
   where
     parseDecl = parseText
+
+expectCompileFixedPoint :: (String, Text) -> Expectation
+expectCompileFixedPoint (label, input) = do
+  once <- compileOrFail label input
+  twice <- compileOrFail (label <> " (second pass)") once
+  when (twice /= once) $
+    expectationFailure
+      (label <> ": compiling twice changed the output\nfirst:\n" <> Text.unpack once <> "\nsecond:\n" <> Text.unpack twice)
+
+expectNoTypeSyntax :: (String, Text) -> Expectation
+expectNoTypeSyntax (label, input) = do
+  compiled <- compileOrFail label input
+  mapM_
+    ( \needle ->
+        when (needle `Text.isInfixOf` compiled) $
+          expectationFailure (label <> ": compiled output still contains " <> show needle <> "\n" <> Text.unpack compiled)
+    )
+    [" :: ", "type ", "declare ", " as "]
+
+compileOrFail :: String -> Text -> IO Text
+compileOrFail label input =
+  case parseProgram "corpus.tnix" input of
+    Left err -> expectationFailure (label <> ": parse failed: " <> Text.unpack err) >> fail "parse failed"
+    Right program ->
+      case compileProgram program of
+        Left err -> expectationFailure (label <> ": compile failed: " <> Text.unpack err) >> fail "compile failed"
+        Right compiled -> pure compiled
+
+-- | Sources chosen to cover the executable grammar, with the type-only syntax
+-- that has to be erased woven through them.
+compileCorpus :: [(String, Text)]
+compileCorpus =
+  [ ("literals", "{ int = 1; float = 1.5; neg = -2; str = \"a\"; nul = null; yes = true; }"),
+    ("escaped strings", "{ quote = \"say \\\"hi\\\"\"; slash = \"a\\\\b\"; dollar = \"a\\${b}\"; }"),
+    ("indented string", source ["{", "  hook = ''", "    echo 'go'", "    export DIR=\"$HOME\"", "  '';", "}"]),
+    ("nested indented string", source ["{", "  outer = {", "    hook = ''", "      line one", "      line two", "    '';", "  };", "}"]),
+    ("interpolation", "let name = \"world\"; in \"hello ${name} and ${\"more\"}\""),
+    ("indented interpolation", source ["let name = \"x\";", "in ''", "  value ${name}", "''"]),
+    ("lambdas and application", "let add = a: b: a + b; in add 1 2"),
+    ("annotated lambdas", "let f :: Int -> Int; f = (x :: Int): x + 1; in f 1"),
+    ("attrset patterns", "{ self, nixpkgs, ... }: { inherit self; }"),
+    ("operators", "let a = 1; b = 2; in (a + b) * 3 - 4 == 5 && !(a < b) || a >= b"),
+    ("concat and update", "{ xs = [ 1 2 ] ++ [ 3 ]; merged = { a = 1; } // { b = 2; }; }"),
+    ("has-attr", "let r = { a = 1; }; in r ? a"),
+    ("control flow", "if 1 < 2 then (assert true; 1) else (with { x = 1; }; x)"),
+    ("rec and inherit", "let outer = 1; in rec { inner = outer; alias = inner; inherit outer; }"),
+    ("selections", "let r = { a = { b = 1; }; }; k = \"a\"; in [ r.a.b r.${k} ]"),
+    ("quoted attribute names", "{ \"with space\" = 1; \"0lead\" = 2; }"),
+    ("paths", "{ here = ./lib.nix; up = ../shared.nix; root = /etc/hosts; }"),
+    ("casts", "let value = ({ a = 1; } as { a :: Int; }); in value"),
+    ( "aliases and ambient declarations",
+      source
+        [ "type Option a = { tag :: \"some\"; value :: a; } | { tag :: \"none\"; };",
+          "declare \"./legacy.nix\" { mkPkg :: { name :: String; } -> dynamic; };",
+          "let",
+          "  opt :: Option Int;",
+          "  opt = { tag = \"some\"; value = 1; };",
+          "in opt"
+        ]
+    ),
+    ( "indexed annotations",
+      source
+        [ "let",
+          "  xs :: Vec (Range 2 4 Nat) Int;",
+          "  xs = [ 1 2 3 ];",
+          "  grid :: Matrix 2 2 Int;",
+          "  grid = [ [ 1 2 ] [ 3 4 ] ];",
+          "in { inherit xs grid; }"
+        ]
+    )
+  ]
 
 compileEmitFixtures :: [FilePath]
 compileEmitFixtures =

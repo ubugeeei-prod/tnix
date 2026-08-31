@@ -47,9 +47,8 @@ percentEncode =
     encodeChar char
       | isUnreserved char || char == '/' = T.singleton char
       | otherwise = T.concat (map encodeByte (BS.unpack (TextEncoding.encodeUtf8 (T.singleton char))))
-    encodeByte byte =
-      let hex = showHex byte ""
-       in T.pack ['%', toUpper (head (pad hex)), toUpper (pad hex !! 1)]
+    encodeByte byte = T.pack ('%' : map toUpper (pad (showHex byte "")))
+    -- Percent-encoding always spells a byte with two hex digits.
     pad [digit] = ['0', digit]
     pad digits = digits
     isUnreserved char = isAsciiLower char || isAsciiUpper char || isDigit char || char `elem` ['-', '.', '_', '~']

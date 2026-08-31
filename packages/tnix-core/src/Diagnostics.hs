@@ -19,6 +19,7 @@
 -- the documentation and stop emitting it; do not reuse the number.
 module Diagnostics
   ( DiagnosticCode (..),
+    allDiagnosticCodes,
     diagnosticCodeText,
     withCode,
   )
@@ -67,7 +68,16 @@ data DiagnosticCode
   | TD0006ConfigBadItem
   | TD0007DeclarationOnlyCompile
   | TD0008DeclarationOnlyEmit
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
+
+-- | Every code in the catalogue.
+--
+-- Tooling and tests enumerate this rather than restating the list, so a code
+-- added to 'DiagnosticCode' is automatically held to the same rules as the
+-- rest: a unique identifier, an entry in @docs/diagnostics.md@, and at least
+-- one place that emits it.
+allDiagnosticCodes :: [DiagnosticCode]
+allDiagnosticCodes = [minBound .. maxBound]
 
 -- | Render a code as the short identifier embedded in messages.
 diagnosticCodeText :: DiagnosticCode -> String

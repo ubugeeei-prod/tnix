@@ -20,12 +20,17 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Diagnostics (DiagnosticCode (..), withCode)
 import ParserExpr
 import ParserLexer
 import Syntax
 import Text.Megaparsec
-  ( PosState (..),
+  ( ParseErrorBundle,
+    PosState (..),
+    ShowErrorComponent,
     SourcePos (..),
+    TraversableStream,
+    VisualStream,
     bundleErrors,
     bundlePosState,
     eof,
@@ -77,6 +82,7 @@ mapDirectiveError _ (Left message) =
 
 -- | Lift the first error in a Megaparsec bundle into our structured form,
 -- recovering the offending source line/column from the parser's PosState.
+megaparsecError :: (TraversableStream s, VisualStream s, ShowErrorComponent e) => ParseErrorBundle s e -> ParseError
 megaparsecError bundle =
   let firstError :| _ = bundleErrors bundle
       (_, finalState) = reachOffset (errorOffset firstError) (bundlePosState bundle)
@@ -84,9 +90,10 @@ megaparsecError bundle =
       humanMessage = Text.pack (errorBundlePretty bundle)
       compactMessage = Text.pack (parseErrorTextPretty firstError)
       message =
-        if Text.null humanMessage
-          then compactMessage
-          else humanMessage
+        withCodeText TP0004ParseError $
+          if Text.null humanMessage
+            then compactMessage
+            else humanMessage
    in ParseError
         { parseErrorLine = unPos srcLine,
           parseErrorColumn = unPos srcColumn,
@@ -97,12 +104,14 @@ scanDiagnosticDirectives :: Text -> Either Text DirectiveTargets
 scanDiagnosticDirectives input = go 1 Nothing Map.empty (Text.lines input)
   where
     go _ Nothing acc [] = Right acc
-    go lineNo (Just _) _ [] = Left ("dangling tnix diagnostic directive before end of file at line " <> Text.pack (show (lineNo - 1)))
+    go lineNo (Just _) _ [] =
+      Left (withCodeText TP0001DanglingDirective ("dangling tnix diagnostic directive before end of file at line " <> Text.pack (show (lineNo - 1))))
     go lineNo pending acc (line : rest) =
       case parseDirective line of
         Just directive ->
           case pending of
-            Just _ -> Left ("multiple tnix diagnostic directives target the same next line before line " <> Text.pack (show lineNo))
+            Just _ ->
+              Left (withCodeText TP0002DuplicateDirectiveSameLine ("multiple tnix diagnostic directives target the same next line before line " <> Text.pack (show lineNo)))
             Nothing -> go (lineNo + 1) (Just directive) acc rest
         Nothing
           | isSkippableLine line -> go (lineNo + 1) pending acc rest
@@ -111,7 +120,8 @@ scanDiagnosticDirectives input = go 1 Nothing Map.empty (Text.lines input)
                 Nothing -> go (lineNo + 1) Nothing acc rest
                 Just directive ->
                   case Map.lookup lineNo acc of
-                    Just _ -> Left ("duplicate tnix diagnostic directives for line " <> Text.pack (show lineNo))
+                    Just _ ->
+                      Left (withCodeText TP0003DuplicateDirectivePerLine ("duplicate tnix diagnostic directives for line " <> Text.pack (show lineNo)))
                     Nothing -> go (lineNo + 1) Nothing (Map.insert lineNo directive acc) rest
 
 parseDirective :: Text -> Maybe DiagnosticDirective
@@ -133,3 +143,7 @@ isSkippableLine raw =
   case Text.strip raw of
     "" -> True
     trimmed -> "#" `Text.isPrefixOf` trimmed
+
+-- | 'Diagnostics.withCode' for the 'Text'-shaped messages the parser produces.
+withCodeText :: DiagnosticCode -> Text -> Text
+withCodeText code message = Text.pack (withCode code "") <> message

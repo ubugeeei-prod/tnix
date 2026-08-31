@@ -29,38 +29,23 @@ module Session
   )
 where
 
-import Control.Applicative ((<|>))
-import Control.Monad (forM)
 import Data.Aeson (Value (..), object, toJSON, (.=))
-import Data.Aeson.Key qualified as Key
-import Data.Aeson.KeyMap qualified as KeyMap
-import Data.Char (isAlphaNum, isDigit, isLetter, isUpper, toLower)
-import Data.List (isSuffixOf, nub, sortOn)
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
-import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import Data.List (nub)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Driver (Analysis (..), parseText)
 import Pretty (renderProgram)
 import Server
-  ( applyContentChanges,
-    asInt,
+  ( asInt,
     asText,
     completionResult,
     documentHighlight,
-    documentPath,
     field,
-    findDefinitionRange,
-    findFieldRange,
     hoverResult,
     location,
-    pathUri,
     signatureHelpResult,
-    textOffsetToUtf16Column,
-    textRangeToUtf16Columns,
     uriPath,
-    wordAt,
   )
 import SessionDiagnostics
   ( closestCandidate,
@@ -95,34 +80,17 @@ import SessionSemanticTokens (encodeSemanticTokens, semanticTokensFor)
 import SessionSymbols
   ( documentCandidateNames,
     documentIndexedSymbols,
-    findDeclareRange,
     indexedSymbolInformation,
-    kindForType,
-    locationFromRange,
     workspaceIndexedSymbols,
   )
-import SessionText (wordChar)
 import SessionTypes
-  ( CachedDocument (..),
-    Documents (..),
+  ( Documents (..),
     IndexedSymbol (..),
-    MatchMode (..),
     ReferenceTarget (..),
-    SemanticToken (..),
     WorkspaceDocument (..),
   )
-import SessionWorkspace
-  ( findBuiltinsFile,
-    findWorkspaceRoot,
-    hasWorkspaceMarker,
-    ignoredDirectory,
-    isSourceFile,
-    workspaceFilesFor,
-  )
-import Subtyping (resolveType)
-import Syntax
-import System.FilePath (normalise, takeDirectory, (</>))
-import Type
+import SessionWorkspace (findBuiltinsFile)
+import System.FilePath (normalise, takeDirectory)
 
 -- Document cache, workspace, symbol index, reference, and semantic-token
 -- data types live in 'SessionTypes'; this module re-imports them so existing

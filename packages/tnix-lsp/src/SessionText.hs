@@ -63,18 +63,26 @@ fieldSpans line symbol =
 -- A boundary is the start/end of the line or any character that is not
 -- considered part of a tnix identifier ('wordChar').
 wordSpans :: Text -> Text -> [Int]
-wordSpans line symbol =
-  mapMaybe validOffset offsets
+wordSpans line symbol
+  | Text.null symbol = []
+  | otherwise = mapMaybe validOffset (Text.breakOnAll symbol line)
   where
-    offsets = map (Text.length . fst) (Text.breakOnAll symbol line)
-    validOffset startChar =
-      if boundary (startChar - 1) && boundary (startChar + Text.length symbol)
-        then Just startChar
-        else Nothing
-    boundary ix
-      | ix < 0 = True
-      | ix >= Text.length line = True
-      | otherwise = not (wordChar (Text.index line ix))
+    symbolLength = Text.length symbol
+    -- `breakOnAll` hands back the text on either side of each match, so both
+    -- neighbours are reachable without indexing into `line`. `Text.index` is
+    -- O(n) on `Text`, which made checking every match quadratic in the length
+    -- of the line.
+    validOffset (prefix, suffix)
+      | boundaryBefore prefix && boundaryAfter suffix = Just (Text.length prefix)
+      | otherwise = Nothing
+    boundaryBefore prefix =
+      case Text.unsnoc prefix of
+        Nothing -> True
+        Just (_, before) -> not (wordChar before)
+    boundaryAfter suffix =
+      case Text.uncons (Text.drop symbolLength suffix) of
+        Nothing -> True
+        Just (after, _) -> not (wordChar after)
 
 -- | Predicate for characters that count as part of a tnix identifier.
 --

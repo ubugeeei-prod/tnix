@@ -37,6 +37,7 @@ where
 import Alias
 import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust, mapMaybe)
+import Data.Set qualified as Set
 import Indexed
 import Type
 
@@ -62,27 +63,43 @@ import Type
 --   => Int
 -- @
 resolveType :: AliasEnv -> Type -> Type
-resolveType env = go 0 . normalizeIndexedType . expandAliases env . eraseForall
+resolveType env = go 0 . prepare . eraseForall
   where
+    -- Alias expansion and indexed normalization are both whole-tree walks, so
+    -- running them once up front leaves nothing for the structural pass below
+    -- to re-expand. Only a reduced conditional can introduce fresh aliases,
+    -- and that branch re-prepares explicitly.
+    prepare :: Type -> Type
+    prepare = normalizeIndexedType . expandAliases env
+
     go :: Int -> Type -> Type
     go depth ty
-      | depth > 32 = ty
+      | depth > conditionalReductionBudget = ty
       | otherwise =
-          case normalizeIndexedType (expandAliases env ty) of
-            TTypeList items -> TTypeList (map (go (depth + 1)) items)
-            TFun mult a b -> TFun mult (go (depth + 1) a) (go (depth + 1) b)
-            TRecord fields -> TRecord (fmap (go (depth + 1)) fields)
-            TUnion members -> flattenUnion (TUnion (map (go (depth + 1)) members))
-            TApp f x -> TApp (go (depth + 1) f) (go (depth + 1) x)
-            TForall vars body -> TForall vars (go (depth + 1) body)
+          case ty of
+            TTypeList items -> TTypeList (map (go depth) items)
+            TFun mult a b -> TFun mult (go depth a) (go depth b)
+            TRecord fields -> TRecord (fmap (go depth) fields)
+            TUnion members -> flattenUnion (TUnion (map (go depth) members))
+            TApp f x -> TApp (go depth f) (go depth x)
+            TForall vars body -> TForall vars (go depth body)
             TConditional a b c d ->
               case matchPattern (go (depth + 1) a) (go (depth + 1) b) of
-                Just subst -> go (depth + 1) (substituteTypeVars subst c)
+                Just subst -> go (depth + 1) (prepare (substituteTypeVars subst c))
                 Nothing ->
                   if isSubtype env a b
                     then go (depth + 1) c
                     else go (depth + 1) d
             other -> other
+
+-- | Maximum number of chained conditional-type reductions.
+--
+-- Reducing a conditional can substitute into a branch that reduces again, so
+-- the walk needs a budget to stay total on accidentally self-referential
+-- conditional aliases. Ordinary structural descent is not counted: the type
+-- tree is finite, so recursing into it always terminates on its own.
+conditionalReductionBudget :: Int
+conditionalReductionBudget = 32
 
 -- | Resolve a field selection against a record-like type.
 --
@@ -257,7 +274,14 @@ isSubtype env left right = go (resolveType env left) (resolveType env right)
     go ty other | ty == tFloat, other == tNumber = True
     go (TTypeList xs) (TTypeList ys) = length xs == length ys && and (zipWith go xs ys)
     go (TUnion leftMembers) (TUnion rightMembers) =
-      all (\member -> any (go member) rightMembers) leftMembers
+      -- Every left member must be covered by some right member. An exact match
+      -- is by far the common case (identical or overlapping unions), and `go`
+      -- already answers True for equal types, so consult a set first and only
+      -- fall back to the quadratic scan for members with no exact counterpart.
+      let rightSet = Set.fromList rightMembers
+       in all
+            (\member -> Set.member member rightSet || any (go member) rightMembers)
+            leftMembers
     go a (TUnion members) = any (go a) members
     go (TUnion members) b = all (`go` b) members
     go a b

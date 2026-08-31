@@ -2,10 +2,9 @@
 
 module Main (main) where
 
-import Data.Aeson (Value, encode, object, (.=))
+import Data.Aeson (encode)
 import Data.ByteString.Lazy.Char8 qualified as LBS
 import Data.Map.Strict qualified as Map
-import Data.Text (Text)
 import Data.Text qualified as Text
 import Driver (Analysis (..))
 import SessionInlayHints
@@ -81,8 +80,7 @@ spec = do
               }
           analysis = stubAnalysis program (Map.fromList [("identity", scheme)])
           hints = inlayHintsFor content (Right analysis)
-      length hints `shouldBe` 1
-      inlayHintLabel (head hints) `shouldBe` ":: forall a. a -> a"
+      map inlayHintLabel hints `shouldBe` [":: forall a. a -> a"]
 
     it "returns no hints when analysis failed" $
       inlayHintsFor "let value = 1; in value" (Left "boom") `shouldBe` []

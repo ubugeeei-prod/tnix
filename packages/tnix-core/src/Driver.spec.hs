@@ -6,7 +6,7 @@ module Main (main) where
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
-import Driver (Analysis (..), analyzeFile, analyzeText, compileFile, emitFile)
+import Driver (Analysis (..), analyzeFile, analyzeFileWith, analyzeText, compileFile, emitFile, newSupportCache)
 import Pretty (renderScheme)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
@@ -699,6 +699,71 @@ spec = describe "analysis" $ do
           analysis <- analyzeFile (root <> "/app/main.tnix") >>= expectRight
           analysisRoot analysis
             `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("label", tString), ("value", tInt)])))
+      )
+
+  it "gives a shared support cache the same answers as an uncached analysis" $
+    withTempTree
+      [ ("flake.nix", "{}"),
+        ("types.d.tnix", "declare \"./lib.nix\" { default :: { value :: Int; }; };"),
+        ("other.d.tnix", "declare \"./other.nix\" { default :: String; };"),
+        ("a.tnix", "import ./lib.nix"),
+        ("b.tnix", "import ./other.nix"),
+        ("c.tnix", "1 + 1")
+      ]
+      ( \root -> do
+          let files = [root </> name | name <- ["a.tnix", "b.tnix", "c.tnix"]]
+          uncached <- traverse analyzeFile files
+          cache <- newSupportCache
+          cached <- traverse (analyzeFileWith cache) files
+          map (fmap analysisRoot) cached `shouldBe` map (fmap analysisRoot) uncached
+      )
+
+  it "keeps declaration support separate per workspace root when sharing a cache" $
+    withTempTree
+      [ ("one/flake.nix", "{}"),
+        ("one/types.d.tnix", "declare \"./lib.nix\" { default :: { value :: Int; }; };"),
+        ("one/main.tnix", "import ./lib.nix"),
+        ("two/flake.nix", "{}"),
+        ("two/types.d.tnix", "declare \"./lib.nix\" { default :: { value :: String; }; };"),
+        ("two/main.tnix", "import ./lib.nix")
+      ]
+      ( \root -> do
+          cache <- newSupportCache
+          first <- analyzeFileWith cache (root </> "one/main.tnix") >>= expectRight
+          second <- analyzeFileWith cache (root </> "two/main.tnix") >>= expectRight
+          analysisRoot first
+            `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("value", tInt)])))
+          analysisRoot second
+            `shouldBe` Just (Scheme [] (TRecord (Map.fromList [("value", tString)])))
+      )
+
+  it "still excludes a declaration file from its own support when cached" $
+    withTempTree
+      [ ("flake.nix", "{}"),
+        ("self.d.tnix", "declare \"./self.nix\" { default :: Int; };"),
+        ("main.tnix", "import ./self.nix")
+      ]
+      ( \root -> do
+          cache <- newSupportCache
+          -- Analyzing the declaration file itself must not fail on a duplicate
+          -- ambient target, and must not poison the entry a sibling source sees.
+          _ <- analyzeFileWith cache (root </> "self.d.tnix")
+          analysis <- analyzeFileWith cache (root </> "main.tnix") >>= expectRight
+          analysisRoot analysis `shouldBe` Just (Scheme [] tInt)
+      )
+
+  it "surfaces a broken declaration file through the cache too" $
+    withTempTree
+      [ ("flake.nix", "{}"),
+        ("broken.d.tnix", "declare \"./lib.nix\" { default :: ; };"),
+        ("main.tnix", "1")
+      ]
+      ( \root -> do
+          cache <- newSupportCache
+          first <- analyzeFileWith cache (root </> "main.tnix")
+          second <- analyzeFileWith cache (root </> "main.tnix")
+          expectLeftContaining first "failed to load declaration file"
+          expectLeftContaining second "failed to load declaration file"
       )
 
   it "loads ambient declarations from the workspace root for nested source files" $

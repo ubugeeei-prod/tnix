@@ -11,6 +11,8 @@ module Check
   ( CheckContext (..),
     CheckResult (..),
     checkProgram,
+    collapseParentSegments,
+    resolvePath,
   )
 where
 
@@ -785,19 +787,20 @@ resolvePath from target
   | otherwise = collapseParentSegments (takeDirectory from </> target)
 
 -- | Normalize `.` and `..` path segments without escaping an absolute root.
+--
+-- Segments accumulate in reverse so the most recent one is the head of the
+-- list: dropping a segment for `..` is then O(1) instead of the O(n) reverse
+-- and append the forward-ordered version needed on every step.
 collapseParentSegments :: FilePath -> FilePath
-collapseParentSegments = joinPath . foldl step [] . splitDirectories . normalise
+collapseParentSegments = joinPath . reverse . foldl step [] . splitDirectories . normalise
   where
     step acc "." = acc
-    step [root] ".." | isAbsoluteRoot root = [root]
-    step [] ".." = [".."]
     step acc ".." =
-      case reverse acc of
+      case acc of
         [] -> [".."]
-        root : rest
-          | isAbsoluteRoot root -> reverse (root : rest)
-        _ : rest -> reverse rest
-    step acc part = acc <> [part]
+        [root] | isAbsoluteRoot root -> acc
+        _ : rest -> rest
+    step acc part = part : acc
     isAbsoluteRoot part = part == "/"
 
 duplicateNames :: (Ord a) => [a] -> [a]

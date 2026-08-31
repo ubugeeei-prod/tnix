@@ -9,27 +9,35 @@
 -- and tests use it to exercise end-to-end behavior.
 module Driver
   ( Analysis (..),
+    SupportCache,
     analyzeFile,
+    analyzeFileWith,
     analyzeText,
+    analyzeTextWith,
     compileFile,
+    compileFileWith,
     compileText,
     emitFileAs,
+    emitFileAsWith,
     emitFile,
     emitFileTo,
     emitText,
     emitTextAs,
     emitTextTo,
     lookupSymbolType,
+    newSupportCache,
     parseText,
   )
 where
 
 import Alias
-import Check
+import Check hiding (resolvePath)
+import Check qualified
 import Compile
 import Control.Applicative ((<|>))
 import Control.Exception (IOException, displayException, try)
 import Control.Monad (foldM, forM)
+import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (group, isSuffixOf, nub, sort)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -66,8 +74,12 @@ parseText path = either (Left . Text.unpack) Right . parseProgram path
 
 -- | Analyze an in-memory source buffer, loading nearby declaration support.
 analyzeText :: FilePath -> Text -> IO (Either String Analysis)
-analyzeText path input = do
-  support <- loadSupport path
+analyzeText path input = newSupportCache >>= \cache -> analyzeTextWith cache path input
+
+-- | 'analyzeText' reusing declaration support already loaded into @cache@.
+analyzeTextWith :: SupportCache -> FilePath -> Text -> IO (Either String Analysis)
+analyzeTextWith cache path input = do
+  support <- loadSupportWith cache path
   pure $ do
     supportWorld <- support
     program <- parseText path input
@@ -89,17 +101,28 @@ analyzeText path input = do
 
 -- | Read and analyze a file from disk.
 analyzeFile :: FilePath -> IO (Either String Analysis)
-analyzeFile path = readTextFile path >>= either (pure . Left) (analyzeText path)
+analyzeFile path = newSupportCache >>= \cache -> analyzeFileWith cache path
+
+-- | 'analyzeFile' reusing declaration support already loaded into @cache@.
+analyzeFileWith :: SupportCache -> FilePath -> IO (Either String Analysis)
+analyzeFileWith cache path = readTextFile path >>= either (pure . Left) (analyzeTextWith cache path)
 
 -- | Compile an in-memory `.tnix` buffer into `.nix` text.
 compileText :: FilePath -> Text -> IO (Either String Text)
-compileText path input = do
-  checked <- analyzeText path input
+compileText path input = newSupportCache >>= \cache -> compileTextWith cache path input
+
+compileTextWith :: SupportCache -> FilePath -> Text -> IO (Either String Text)
+compileTextWith cache path input = do
+  checked <- analyzeTextWith cache path input
   pure $ checked >>= \analysis -> either (Left . Text.unpack) Right (compileProgram (analysisProgram analysis))
 
 -- | Compile a file from disk.
 compileFile :: FilePath -> IO (Either String Text)
-compileFile path = readTextFile path >>= either (pure . Left) (compileText path)
+compileFile path = newSupportCache >>= \cache -> compileFileWith cache path
+
+-- | 'compileFile' reusing declaration support already loaded into @cache@.
+compileFileWith :: SupportCache -> FilePath -> IO (Either String Text)
+compileFileWith cache path = readTextFile path >>= either (pure . Left) (compileTextWith cache path)
 
 -- | Emit a declaration file for an in-memory source buffer.
 emitText :: FilePath -> Text -> IO (Either String Text)
@@ -116,8 +139,12 @@ emitTextTo source declarationPath input = do
   emitTextAs source runtimeTarget declarationPath input
 
 emitTextAs :: FilePath -> FilePath -> FilePath -> Text -> IO (Either String Text)
-emitTextAs source runtimeTarget declarationPath input = do
-  checked <- analyzeText source input
+emitTextAs source runtimeTarget declarationPath input =
+  newSupportCache >>= \cache -> emitTextAsWith cache source runtimeTarget declarationPath input
+
+emitTextAsWith :: SupportCache -> FilePath -> FilePath -> FilePath -> Text -> IO (Either String Text)
+emitTextAsWith cache source runtimeTarget declarationPath input = do
+  checked <- analyzeTextWith cache source input
   pure $ do
     analysis <- checked
     root <- maybe (Left (withCode TD0008DeclarationOnlyEmit "cannot emit declarations from a declaration-only file")) Right (analysisRoot analysis)
@@ -131,7 +158,13 @@ emitFileTo :: FilePath -> FilePath -> IO (Either String Text)
 emitFileTo source declarationPath = readTextFile source >>= either (pure . Left) (emitTextTo source declarationPath)
 
 emitFileAs :: FilePath -> FilePath -> FilePath -> IO (Either String Text)
-emitFileAs source runtimeTarget declarationPath = readTextFile source >>= either (pure . Left) (emitTextAs source runtimeTarget declarationPath)
+emitFileAs source runtimeTarget declarationPath =
+  newSupportCache >>= \cache -> emitFileAsWith cache source runtimeTarget declarationPath
+
+-- | 'emitFileAs' reusing declaration support already loaded into @cache@.
+emitFileAsWith :: SupportCache -> FilePath -> FilePath -> FilePath -> IO (Either String Text)
+emitFileAsWith cache source runtimeTarget declarationPath =
+  readTextFile source >>= either (pure . Left) (emitTextAsWith cache source runtimeTarget declarationPath)
 
 -- | Look up a top-level symbol type exposed by an analysis result.
 --
@@ -156,30 +189,75 @@ data DeclarationSupportFile = DeclarationSupportFile
 builtinsAmbientKey :: FilePath
 builtinsAmbientKey = "builtins"
 
-loadSupport :: FilePath -> IO (Either String World)
-loadSupport path = do
+-- | Declaration support discovered for one workspace root.
+--
+-- Discovery, reading, and parsing depend only on the root, so the expensive
+-- part is shared by every source file under it. Only the final filter — a
+-- declaration file never contributes support to itself — is per-source, and
+-- that is cheap enough to redo.
+data SupportBundle = SupportBundle
+  { bundleFiles :: [DeclarationSupportFile],
+    bundleWorlds :: [Either String World]
+  }
+
+-- | Memo table for 'SupportBundle's, keyed by workspace root.
+--
+-- Without it, analyzing @n@ sources against @m@ declaration files re-walks the
+-- workspace and re-parses every declaration file @n@ times. Callers that
+-- analyze more than one file — @check-project@, @build@, @emit-project@, and
+-- the language server's workspace-wide requests — should create one cache and
+-- thread it through, which collapses that to a single pass.
+--
+-- The cache holds no invalidation logic on purpose: its scope is one CLI
+-- command or one LSP request, so it can never serve a stale read.
+newtype SupportCache = SupportCache (IORef (Map FilePath (Either String SupportBundle)))
+
+-- | Create an empty 'SupportCache'.
+newSupportCache :: IO SupportCache
+newSupportCache = SupportCache <$> newIORef Map.empty
+
+loadSupportWith :: SupportCache -> FilePath -> IO (Either String World)
+loadSupportWith (SupportCache ref) path = do
   root <- findSupportRoot path
+  cached <- Map.lookup root <$> readIORef ref
+  bundle <- case cached of
+    Just hit -> pure hit
+    Nothing -> do
+      loaded <- loadSupportBundle root
+      modifyIORef' ref (Map.insert root loaded)
+      pure loaded
+  pure (bundle >>= supportWorldFor path)
+
+loadSupportBundle :: FilePath -> IO (Either String SupportBundle)
+loadSupportBundle root = do
   exists <- doesDirectoryExist root
   if not exists
-    then pure (Right (World [] Map.empty))
+    then pure (Right (SupportBundle [] []))
     else do
       workspaceFiles <- map (\file -> DeclarationSupportFile file file) <$> findWorkspaceDeclarationFiles root
       configuredFilesResult <- loadConfiguredDeclarationFiles root
       case configuredFilesResult of
         Left err -> pure (Left err)
         Right configuredFiles -> do
-          let declarationFiles =
-                dedupeDeclarationFiles path (workspaceFiles <> configuredFiles)
+          let declarationFiles = dedupeDeclarationFiles (workspaceFiles <> configuredFiles)
           worlds <- traverse loadDeclarationFile declarationFiles
-          pure $ do
-            loaded <- sequence worlds
-            mergeLoadedWorlds declarationFiles loaded
+          pure (Right (SupportBundle declarationFiles worlds))
 
-dedupeDeclarationFiles :: FilePath -> [DeclarationSupportFile] -> [DeclarationSupportFile]
-dedupeDeclarationFiles source =
+-- | Assemble the world visible from @source@, dropping the entry for the file
+-- being analyzed so a declaration file never declares itself.
+supportWorldFor :: FilePath -> SupportBundle -> Either String World
+supportWorldFor source bundle = do
+  let kept =
+        filter
+          ((/= normalise source) . declarationLoadPath . fst)
+          (zip (bundleFiles bundle) (bundleWorlds bundle))
+  loaded <- traverse snd kept
+  mergeLoadedWorlds (map fst kept) loaded
+
+dedupeDeclarationFiles :: [DeclarationSupportFile] -> [DeclarationSupportFile]
+dedupeDeclarationFiles =
   nub
     . sort
-    . filter ((/= normalise source) . declarationLoadPath)
     . map normalizeDeclarationSupportFile
 
 normalizeDeclarationSupportFile :: DeclarationSupportFile -> DeclarationSupportFile
@@ -346,11 +424,15 @@ findWorkspaceDeclarationFiles root = go root
                 else go path
             else pure [normalise path | ".d.tnix" `isSuffixOf` name]
 
+-- | Resolve an ambient declaration target.
+--
+-- Import resolution must agree exactly with the checker, so this delegates to
+-- 'Check.resolvePath' rather than keeping a second copy of the same rules. The
+-- one addition is the synthetic `builtins` target, which names the ambient
+-- world rather than a file on disk.
 resolvePath :: FilePath -> FilePath -> FilePath
 resolvePath _ "builtins" = builtinsAmbientKey
-resolvePath from target
-  | isAbsolute target = collapseParentSegments target
-  | otherwise = collapseParentSegments (takeDirectory from </> target)
+resolvePath from target = Check.resolvePath from target
 
 findSupportRoot :: FilePath -> IO FilePath
 findSupportRoot path = go start
@@ -417,18 +499,3 @@ readTextFile path = do
     case result of
       Left err -> Left (withCode TD0001ReadFailed ("failed to read " <> path <> ": " <> displayException err))
       Right input -> Right input
-
-collapseParentSegments :: FilePath -> FilePath
-collapseParentSegments = joinPath . foldl step [] . splitDirectories . normalise
-  where
-    step acc "." = acc
-    step [root] ".." | isAbsoluteRoot root = [root]
-    step [] ".." = [".."]
-    step acc ".." =
-      case reverse acc of
-        [] -> [".."]
-        root : rest
-          | isAbsoluteRoot root -> reverse (root : rest)
-        _ : rest -> reverse rest
-    step acc part = acc <> [part]
-    isAbsoluteRoot part = part == "/"

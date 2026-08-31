@@ -15,6 +15,7 @@ where
 
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Set qualified as Set
 import Type
 
 -- | Environment keyed by alias name.
@@ -31,17 +32,25 @@ mkAliasEnv = Map.fromList . map (\alias -> (typeAliasName alias, alias))
 --
 -- This keeps joins and alias expansion from producing deeply nested `a | (b |
 -- c)` shapes that are annoying for both users and subsequent algorithms.
+--
+-- A repeated member keeps the position of its /last/ occurrence, which is what
+-- callers already depend on for stable rendering. Deduplication runs through a
+-- 'Set' rather than a linear membership scan, so a wide union costs
+-- @O(n log n)@ instead of @O(n^2)@ — joins over unions of a few hundred
+-- members were the dominant cost in the checker before that change.
 flattenUnion :: Type -> Type
 flattenUnion (TUnion members) =
-  case foldr insert [] (concatMap expand members) of
+  case reverse (dedupe Set.empty (reverse (concatMap expand members))) of
     [] -> TUnion []
     [single] -> single
     xs -> TUnion xs
   where
     expand (TUnion xs) = concatMap expand xs
     expand other = [other]
-    insert item acc | item `elem` acc = acc
-    insert item acc = item : acc
+    dedupe _ [] = []
+    dedupe seen (item : rest)
+      | item `Set.member` seen = dedupe seen rest
+      | otherwise = item : dedupe (Set.insert item seen) rest
 flattenUnion other = other
 
 -- | Split a left-associated type application into its head and arguments.
@@ -54,6 +63,16 @@ collectApps = go []
     go acc (TApp f x) = go (x : acc) f
     go acc headTy = (headTy, acc)
 
+-- | Maximum number of chained alias expansions performed on any one path.
+--
+-- The budget exists to stop self-referential aliases from diverging. It counts
+-- /expansions/, not structural depth, so an ordinary type stays fully expanded
+-- no matter how deeply it nests — the previous depth-per-node accounting
+-- silently stopped expanding aliases below 32 levels of nesting and therefore
+-- made 'expandAliases' non-idempotent on large types.
+aliasExpansionBudget :: Int
+aliasExpansionBudget = 32
+
 -- | Expand type aliases up to a fixed recursion budget.
 --
 -- The implementation is intentionally eager enough to make hovers and emitted
@@ -64,20 +83,20 @@ expandAliases env = go 0
   where
     go :: Int -> Type -> Type
     go depth ty
-      | depth > 32 = ty
+      | depth > aliasExpansionBudget = ty
       | otherwise =
           case ty of
             TCon name
               | Just alias <- Map.lookup name env,
                 null (typeAliasParams alias) ->
                   go (depth + 1) (typeAliasBody alias)
-            TTypeList items -> TTypeList (map (go (depth + 1)) items)
-            TFun mult a b -> TFun mult (go (depth + 1) a) (go (depth + 1) b)
-            TRecord fields -> TRecord (fmap (go (depth + 1)) fields)
-            TUnion members -> flattenUnion (TUnion (map (go (depth + 1)) members))
-            TApp f x -> reduce depth (go (depth + 1) f) (go (depth + 1) x)
-            TForall vars body -> TForall vars (go (depth + 1) body)
-            TConditional a b c d -> TConditional (go (depth + 1) a) (go (depth + 1) b) (go (depth + 1) c) (go (depth + 1) d)
+            TTypeList items -> TTypeList (map (go depth) items)
+            TFun mult a b -> TFun mult (go depth a) (go depth b)
+            TRecord fields -> TRecord (fmap (go depth) fields)
+            TUnion members -> flattenUnion (TUnion (map (go depth) members))
+            TApp f x -> reduce depth (go depth f) (go depth x)
+            TForall vars body -> TForall vars (go depth body)
+            TConditional a b c d -> TConditional (go depth a) (go depth b) (go depth c) (go depth d)
             other -> other
 
     reduce :: Int -> Type -> Type -> Type

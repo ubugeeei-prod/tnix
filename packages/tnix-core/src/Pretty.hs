@@ -90,7 +90,7 @@ prettyAlias alias =
 prettyDecl :: FilePath -> [(Name, Type)] -> Doc ann
 prettyDecl path entries =
   vsep
-    [ "declare" <+> dquotes (pretty path) <+> "{",
+    [ "declare" <+> prettyQuoted (Text.pack path) <+> "{",
       indent 2 (vsep [prettyAttrName name <+> "::" <+> prettyType 0 ty <> ";" | (name, ty) <- entries]),
       "};"
     ]
@@ -162,25 +162,34 @@ prettyAttr = \case
 prettyAttrName :: Name -> Doc ann
 prettyAttrName name
   | isBareAttrName name && name /= "inherit" = pretty name
-  | otherwise = dquotes (pretty name)
+  | otherwise = prettyQuoted name
 
 prettyStringLiteral :: StringLiteral -> Doc ann
 prettyStringLiteral = \case
-  DoubleQuoted value -> dquotes (pretty value)
-  Indented value -> "''" <> pretty value <> "''"
+  DoubleQuoted value -> prettyQuoted value
+  Indented value -> "''" <> verbatim (escapeIndented True True value) <> "''"
 
 -- | Render an interpolated string back to its surface form, restoring `${...}`
 -- antiquotations around the embedded expressions.
 prettyInterp :: InterpForm -> [StringPart] -> Doc ann
 prettyInterp form parts =
-  let body = hcat (map prettyStringPart parts)
+  let lastIndex = length parts - 1
+      body = hcat [prettyStringPart form (index == 0) (index == lastIndex) part | (index, part) <- zip [0 ..] parts]
    in case form of
         InterpDouble -> dquotes body
         InterpIndented -> "''" <> body <> "''"
 
-prettyStringPart :: StringPart -> Doc ann
-prettyStringPart = \case
-  StrText text -> pretty text
+-- | Render one segment of an interpolated string.
+--
+-- The two flags say whether the segment touches the opening or the closing
+-- delimiter, which is what decides whether a boundary @\'@ inside an indented
+-- run has to be escaped.
+prettyStringPart :: InterpForm -> Bool -> Bool -> StringPart -> Doc ann
+prettyStringPart form atStart atEnd = \case
+  StrText text ->
+    case form of
+      InterpDouble -> pretty (escapeDoubleQuoted text)
+      InterpIndented -> verbatim (escapeIndented atStart atEnd text)
   StrExpr expr -> "${" <> prettyExpr 0 expr <> "}"
 
 prettyType :: Int -> Type -> Doc ann
@@ -199,7 +208,7 @@ prettyType p ty =
             TVar name -> pretty name
             TCon name -> pretty name
             TMeta n -> pretty ("?" <> show n)
-            TLit (LString text) -> dquotes (pretty text)
+            TLit (LString text) -> prettyQuoted text
             TLit (LFloat n) -> pretty (prettyFloat n)
             TLit (LInt n) -> pretty n
             TLit (LBool True) -> "true"
@@ -220,6 +229,65 @@ prettyType p ty =
             TForall vars body -> parenIf (p > 0) ("forall" <+> hsep (pretty <$> vars) <> "." <+> prettyType 0 body)
             TConditional a b c d -> parenIf (p > 0) (prettyType 2 a <+> "extends" <+> prettyType 2 b <+> "?" <+> prettyType 0 c <+> ":" <+> prettyType 0 d)
             TInfer name -> "infer" <+> pretty name
+
+-- | Emit text with its own line breaks, immune to the surrounding layout.
+--
+-- An indented string keeps its body verbatim, so the renderer must not add the
+-- enclosing block's indentation after each newline: doing so changes the string
+-- and compounds every time the file is compiled again. Resetting the nesting
+-- level to zero for the body keeps rendering idempotent.
+verbatim :: Text -> Doc ann
+verbatim text = nesting (\level -> nest (negate level) (pretty text))
+
+-- | Render text as a Nix double-quoted string literal, escaping every
+-- character that would otherwise change how the result re-parses.
+prettyQuoted :: Text -> Doc ann
+prettyQuoted = dquotes . pretty . escapeDoubleQuoted
+
+-- | Escape text for a Nix double-quoted string literal.
+--
+-- Quotes, backslashes, and the control characters Nix spells with an escape
+-- are rewritten to their escaped forms. A @$@ is escaped only when it would
+-- otherwise open an antiquotation, so ordinary shell-ish text stays readable.
+escapeDoubleQuoted :: Text -> Text
+escapeDoubleQuoted = Text.pack . go . Text.unpack
+  where
+    go [] = []
+    go ('"' : rest) = '\\' : '"' : go rest
+    go ('\\' : rest) = '\\' : '\\' : go rest
+    go ('\n' : rest) = '\\' : 'n' : go rest
+    go ('\r' : rest) = '\\' : 'r' : go rest
+    go ('\t' : rest) = '\\' : 't' : go rest
+    go ('$' : '{' : rest) = '\\' : '$' : '{' : go rest
+    go (char : rest) = char : go rest
+
+-- | Escape text for a Nix indented (@\'\'@) string literal.
+--
+-- Antiquotation openers become @\'\'${@. A single quote only needs escaping
+-- when it would pair up with a neighbouring quote and be read back as
+-- something else: at the opening delimiter, at the closing delimiter, before
+-- another quote, or immediately before an escaped @${@. Everywhere else a
+-- bare quote round-trips as itself, which keeps embedded shell snippets
+-- legible.
+--
+-- @atStart@ and @atEnd@ say whether this run of text touches the opening or
+-- the closing delimiter; interpolated strings pass 'False' for the segments
+-- that sit next to an antiquotation instead.
+escapeIndented :: Bool -> Bool -> Text -> Text
+escapeIndented atStart atEnd = Text.pack . go atStart . Text.unpack
+  where
+    go _ [] = []
+    go _ ('$' : '{' : rest) = '\'' : '\'' : '$' : '{' : go False rest
+    go atBoundary ('\'' : rest)
+      | needsEscape atBoundary rest = '\'' : '\'' : '\\' : '\'' : go False rest
+      | otherwise = '\'' : go False rest
+    go _ (char : rest) = char : go False rest
+
+    needsEscape atBoundary rest =
+      atBoundary
+        || (atEnd && null rest)
+        || take 1 rest == "'"
+        || take 2 rest == "${"
 
 isBareAttrName :: Text -> Bool
 isBareAttrName name =

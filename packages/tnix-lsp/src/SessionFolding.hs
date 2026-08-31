@@ -16,7 +16,7 @@ where
 
 import Data.Aeson (Value, object, (.=))
 import Data.Char (isDigit, isLetter)
-import Data.List (foldl', sortOn)
+import Data.List (sortOn)
 import Data.Text (Text)
 import Data.Text qualified as Text
 

@@ -36,7 +36,7 @@ import Data.Aeson (Value (..), object, toJSON, (.=))
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Char (toLower)
-import Data.List (foldl', sortOn)
+import Data.List (sortOn)
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text

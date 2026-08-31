@@ -213,7 +213,12 @@ freeMetasScheme = freeMetas . schemeType
 -- instantiation all route through this one operation so they share the same
 -- binder-avoidance behavior.
 substituteTypeVars :: Map Name Type -> Type -> Type
-substituteTypeVars env = go
+substituteTypeVars env
+  -- Instantiating a monomorphic scheme substitutes nothing, and that is by far
+  -- the most common call in the checker. Returning the argument untouched
+  -- avoids rebuilding the whole type tree to produce an identical copy.
+  | Map.null env = id
+  | otherwise = go
   where
     go = \case
       TVar name -> Map.findWithDefault (TVar name) name env
@@ -232,7 +237,12 @@ substituteTypeVars env = go
 -- Unlike 'substituteTypeVars', this walk recursively chases already-solved
 -- metas so callers get a normalized view of the inference state.
 substituteMetas :: Map Int Type -> Type -> Type
-substituteMetas env = go
+substituteMetas env
+  -- `zonk` runs on every inference step, including before any meta has been
+  -- solved. With no substitution to apply the walk can only ever rebuild an
+  -- identical tree, so skip it.
+  | Map.null env = id
+  | otherwise = go
   where
     go = \case
       TMeta n -> maybe (TMeta n) go (Map.lookup n env)

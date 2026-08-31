@@ -101,17 +101,22 @@ letParser = do
   ELet items <$> expressionParser
 
 -- | Parse either a type signature or a value binding inside a `let`.
+--
+-- Both forms open with the same identifier, so it is parsed once and the two
+-- tails are tried after it. Committing to the shared prefix keeps `many
+-- letItemParser` from re-lexing every binding name, and still stops cleanly at
+-- `in`, where `identifier` fails without consuming.
 letItemParser :: Parser LetItem
-letItemParser = try sigParser <|> bindParser
+letItemParser = do
+  name <- identifier
+  signatureFor name <|> bindingFor name
   where
-    sigParser = do
-      name <- identifier
+    signatureFor name = do
       _ <- symbol "::"
       ty <- typeParser
       _ <- symbol ";"
       pure (LetSignature name ty)
-    bindParser = do
-      name <- identifier
+    bindingFor name = do
       _ <- symbol "="
       expr <- expressionParser
       _ <- symbol ";"
@@ -288,13 +293,28 @@ doubleTextChar =
 indentedTextPart :: Parser StringPart
 indentedTextPart = StrText . Text.concat <$> some indentedChunk
 
--- | A literal chunk inside an indented string. `''${` escapes a literal `${`
--- and `'''` escapes a literal `''`; other characters are preserved verbatim.
+-- | A literal chunk inside an indented string.
+--
+-- The escapes mirror Nix: `''${` and `''$` produce a literal dollar, `'''`
+-- produces a literal `''`, and `''\\` takes the following character literally
+-- (with the usual `n`/`r`/`t` spellings). Every other character is preserved
+-- verbatim.
 indentedChunk :: Parser Text.Text
 indentedChunk =
   (try (string "''${") $> "${")
+    <|> (try (string "''$") $> "$")
     <|> (try (string "'''") $> "''")
+    <|> (Text.singleton <$> (try (string "''\\") *> indentedEscapeChar))
     <|> (Text.singleton <$> (notFollowedBy (string "${") *> notFollowedBy (string "''") *> anySingle))
+
+-- | Decode the character following an `''\\` escape inside an indented string.
+indentedEscapeChar :: Parser Char
+indentedEscapeChar = decode <$> anySingle
+  where
+    decode 'n' = '\n'
+    decode 'r' = '\r'
+    decode 't' = '\t'
+    decode other = other
 
 -- | Collapse parsed segments into a plain 'EString' when there is no
 -- interpolation; otherwise keep the interpolated representation.

@@ -15,11 +15,17 @@
 
         haskellPackages = pkgs.haskellPackages;
         haskellLib = pkgs.haskell.lib;
+        # The core test suites read two things from outside the package:
+        # the bundled declaration registry, and the diagnostic-code catalogue
+        # they hold the compiler to. Both are copied in so `nix flake check`
+        # runs the same suite `cabal test` does.
         tnixCoreSource = pkgs.runCommand "tnix-core-source" { } ''
           mkdir -p "$out"
           cp -R ${./packages/tnix-core}/. "$out"/
           chmod -R u+w "$out"
           cp -R ${./registry} "$out/registry"
+          mkdir -p "$out/docs"
+          cp ${./docs/diagnostics.md} "$out/docs/diagnostics.md"
         '';
         tnixHaskellPackages =
           haskellPackages.extend
