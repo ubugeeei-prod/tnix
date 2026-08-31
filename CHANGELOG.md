@@ -19,6 +19,7 @@
   - `substituteMetas` with an empty substitution: **323 ns -> 18 ns**. Instantiating a monomorphic scheme and zonking before the first solved meta both rebuilt the whole type to produce an identical copy.
 - `expandAliases` charges its recursion budget for expansions rather than for structural descent. Past 32 levels of nesting it silently stopped expanding aliases, which also made the result non-idempotent.
 - `SessionText.wordSpans` no longer calls the O(n) `Text.index` once per match, and `collapseParentSegments` no longer rebuilds its accumulator per segment.
+- The language server's analysis cache evicts a single least-recently-used entry instead of sorting and rebuilding the whole map. The keys hold full document text, so the rebuild re-compared hundreds of documents on every keystroke once the cache was full.
 
 ### Changed
 
@@ -28,11 +29,11 @@
 
 ### Tests
 
-- `cabal test all` runs 25 suites and 600 examples, up from 20 suites and 447.
+- `cabal test all` runs 24 suites and 605 examples, up from 20 suites and 447.
 - New suites: `Pretty.spec` (render/parse round-trip, including 300 generated cases over an alphabet of quotes, backslashes, and antiquotation markers), `Type.spec` (substitution and meta-closure laws), `Diagnostics.spec` (every code is uniquely identified, documented, and actually emitted by some non-test source), and `Check.spec` (import path resolution).
 - Compiled output is now asserted to be a fixed point over a corpus covering the executable grammar: compiling twice must produce the same text, and the result must contain no type-only syntax.
 - Property coverage for the algorithms replaced above: `flattenUnion` is idempotent and duplicate-free, `expandAliases` and `resolveType` reach a fixed point, `joinTypes` is an upper bound of both sides, union subtyping agrees with its member-by-member definition, and `wordSpans` agrees with a direct scan over every offset.
-- `Kind.spec` grew from 5 examples to 19 and `Indexed.spec` from 12 to 25; `Cli.spec` covers project discovery filters, config decoding errors, and the JSON report contract.
+- `Kind.spec` grew from 5 examples to 19, `Indexed.spec` from 12 to 25, and `AnalysisCache.spec` from 6 to 11; `Cli.spec` covers project discovery filters, config decoding errors, and the JSON report contract.
 
 ### CI / Tooling
 
