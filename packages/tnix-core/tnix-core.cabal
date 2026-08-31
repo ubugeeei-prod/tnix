@@ -123,6 +123,11 @@ test-suite tnix-emit-spec
   type: exitcode-stdio-1.0
   main-is: Emit.spec.hs
 
+test-suite tnix-pretty-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Pretty.spec.hs
+
 source-repository head
   type: git
   location: https://github.com/ubugeeei/tnix.git

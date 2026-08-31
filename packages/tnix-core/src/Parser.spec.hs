@@ -457,8 +457,14 @@ genLeafExpr =
     [ EInt <$> chooseInteger (0, 1000),
       EBool <$> arbitrary,
       pure ENull,
-      EString . DoubleQuoted . Text.pack <$> listOf (elements ['a' .. 'z'])
+      EString . DoubleQuoted <$> genStringBody,
+      EString . Indented <$> genStringBody
     ]
+
+-- | String bodies drawn from an alphabet weighted towards the characters that
+-- have to survive escaping: quotes, backslashes, and antiquotation markers.
+genStringBody :: Gen Text.Text
+genStringBody = Text.pack <$> listOf (elements (['a' .. 'e'] <> ['\'', '"', '\\', '$', '{', '}', ' ']))
 
 genName :: Gen Text.Text
 genName = Text.pack <$> ((:) <$> elements ['a' .. 'z'] <*> listOf (elements (['a' .. 'z'] <> ['0' .. '9'])))
