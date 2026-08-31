@@ -128,6 +128,21 @@ test-suite tnix-pretty-spec
   type: exitcode-stdio-1.0
   main-is: Pretty.spec.hs
 
+test-suite tnix-diagnostics-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Diagnostics.spec.hs
+
+test-suite tnix-type-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Type.spec.hs
+
+test-suite tnix-check-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Check.spec.hs
+
 source-repository head
   type: git
   location: https://github.com/ubugeeei/tnix.git

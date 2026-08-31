@@ -31,7 +31,8 @@ module Driver
 where
 
 import Alias
-import Check
+import Check hiding (resolvePath)
+import Check qualified
 import Compile
 import Control.Applicative ((<|>))
 import Control.Exception (IOException, displayException, try)
@@ -423,11 +424,15 @@ findWorkspaceDeclarationFiles root = go root
                 else go path
             else pure [normalise path | ".d.tnix" `isSuffixOf` name]
 
+-- | Resolve an ambient declaration target.
+--
+-- Import resolution must agree exactly with the checker, so this delegates to
+-- 'Check.resolvePath' rather than keeping a second copy of the same rules. The
+-- one addition is the synthetic `builtins` target, which names the ambient
+-- world rather than a file on disk.
 resolvePath :: FilePath -> FilePath -> FilePath
 resolvePath _ "builtins" = builtinsAmbientKey
-resolvePath from target
-  | isAbsolute target = collapseParentSegments target
-  | otherwise = collapseParentSegments (takeDirectory from </> target)
+resolvePath from target = Check.resolvePath from target
 
 findSupportRoot :: FilePath -> IO FilePath
 findSupportRoot path = go start
@@ -494,18 +499,3 @@ readTextFile path = do
     case result of
       Left err -> Left (withCode TD0001ReadFailed ("failed to read " <> path <> ": " <> displayException err))
       Right input -> Right input
-
-collapseParentSegments :: FilePath -> FilePath
-collapseParentSegments = joinPath . foldl step [] . splitDirectories . normalise
-  where
-    step acc "." = acc
-    step [root] ".." | isAbsoluteRoot root = [root]
-    step [] ".." = [".."]
-    step acc ".." =
-      case reverse acc of
-        [] -> [".."]
-        root : rest
-          | isAbsoluteRoot root -> reverse (root : rest)
-        _ : rest -> reverse rest
-    step acc part = acc <> [part]
-    isAbsoluteRoot part = part == "/"

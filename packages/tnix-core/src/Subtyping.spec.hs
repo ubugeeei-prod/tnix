@@ -3,7 +3,7 @@
 
 module Main (main) where
 
-import Alias (mkAliasEnv)
+import Alias (AliasEnv, mkAliasEnv)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Subtyping (isConsistent, isSubtype, joinTypes, lookupRecordField, resolveType)
@@ -19,6 +19,33 @@ spec = describe "subtyping and type reduction" $ do
   it "keeps generated concrete types reflexive under subtyping" $
     property $ \(ConcreteType ty) ->
       isSubtype mempty ty ty === True
+
+  it "resolves types to a fixed point" $
+    property $ \(ConcreteType ty) ->
+      let env = sampleAliasEnv
+       in resolveType env (resolveType env ty) === resolveType env ty
+
+  it "treats consistency as symmetric" $
+    property $ \(ConcreteType left) (ConcreteType right) ->
+      isConsistent mempty left right === isConsistent mempty right left
+
+  it "joins to a common supertype of both sides" $
+    property $ \(ConcreteType left) (ConcreteType right) ->
+      let joined = joinTypes mempty left right
+       in counterexample ("joined as " <> show joined) $
+            isSubtype mempty left joined .&&. isSubtype mempty right joined
+
+  it "keeps a join with itself at the same type" $
+    property $ \(ConcreteType ty) ->
+      joinTypes mempty ty ty === resolveType mempty ty
+
+  it "decides union subtyping member-by-member" $
+    -- The relation is "every left member is covered by some right member".
+    -- The implementation short-circuits through a set of the right-hand
+    -- members, so state the definition separately and require them to agree.
+    property $ \(UnionPair leftMembers rightMembers) ->
+      isSubtype mempty (TUnion leftMembers) (TUnion rightMembers)
+        === all (\left -> any (isSubtype mempty left) rightMembers) leftMembers
 
   it "treats literal values as subtypes of primitive constructors" $ do
     isSubtype mempty (TLit (LString "tnix")) tString `shouldBe` True
@@ -221,3 +248,43 @@ shrinkType = \case
   TFun _ input output -> [input, output]
   TRecord fields -> Map.elems fields
   _ -> []
+
+-- | Environment used by the fixed-point property: nullary and parameterized
+-- aliases, a chain, and a self-referential alias that must not diverge.
+sampleAliasEnv :: AliasEnv
+sampleAliasEnv =
+  mkAliasEnv
+    [ TypeAlias "Leaf" [] tInt,
+      TypeAlias "Box" ["a"] (TRecord (Map.fromList [("value", TVar "a")])),
+      TypeAlias "A" [] (TCon "B"),
+      TypeAlias "B" [] tString,
+      TypeAlias "Loop" [] (TCon "Loop")
+    ]
+
+-- | Two union member lists drawn from a shared pool, so overlap between them
+-- is common enough to exercise both sides of the set short-circuit.
+data UnionPair = UnionPair [Type] [Type]
+  deriving (Show)
+
+instance Arbitrary UnionPair where
+  arbitrary =
+    UnionPair
+      <$> resize 5 (listOf (elements unionPool))
+      <*> resize 5 (listOf (elements unionPool))
+  shrink (UnionPair left right) =
+    [UnionPair left' right | left' <- shrinkList (const []) left]
+      <> [UnionPair left right' | right' <- shrinkList (const []) right]
+
+unionPool :: [Type]
+unionPool =
+  [ tInt,
+    tString,
+    tBool,
+    tNat,
+    tNumber,
+    tDynamic,
+    TLit (LInt 1),
+    TLit (LInt 2),
+    TLit (LString "a"),
+    TRecord (Map.fromList [("x", tInt)])
+  ]
