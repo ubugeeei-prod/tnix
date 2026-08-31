@@ -264,15 +264,19 @@ genType shaped size
 genShape :: Gen Type -> Gen Type
 genShape child =
   oneof
-    [ (\len elemTy -> TApp (TApp (TCon "Vec") len) elemTy) <$> genDimension <*> child,
-      (\rows cols elemTy -> TApp (TApp (TApp (TCon "Matrix") rows) cols) elemTy)
-        <$> genDimension
-        <*> genDimension
-        <*> child,
-      (\dims elemTy -> TApp (TApp (TCon "Tensor") (TTypeList dims)) elemTy)
-        <$> resize 3 (listOf genDimension)
-        <*> child
+    [ vecType <$> genDimension <*> child,
+      matrixType <$> genDimension <*> genDimension <*> child,
+      tensorType <$> resize 3 (listOf genDimension) <*> child
     ]
+
+vecType :: Type -> Type -> Type
+vecType len = TApp (TApp (TCon "Vec") len)
+
+matrixType :: Type -> Type -> Type -> Type
+matrixType rows cols = TApp (TApp (TApp (TCon "Matrix") rows) cols)
+
+tensorType :: [Type] -> Type -> Type
+tensorType dims = TApp (TApp (TCon "Tensor") (TTypeList dims))
 
 genDimension :: Gen Type
 genDimension = TLit . LInt <$> chooseInteger (0, 4)
