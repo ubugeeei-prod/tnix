@@ -24,7 +24,7 @@ import Syntax (Program (programAliases))
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath (takeExtension, (</>))
 import Test.Hspec
-import TestSupport (fixturePath, source)
+import TestSupport (fixturePathCandidates, source)
 import Type
 
 main :: IO ()
@@ -130,7 +130,7 @@ parseFailure input = either Just (const Nothing) (parseProgram "codes.tnix" inpu
 -- backtick-delimited run right after the heading marker.
 documentedCodes :: IO [String]
 documentedCodes = do
-  path <- fixturePath "docs/diagnostics.md"
+  path <- fixturePathCandidates ["docs/diagnostics.md"]
   contents <- Text.readFile path
   pure
     [ Text.unpack identifier
@@ -139,14 +139,17 @@ documentedCodes = do
       let identifier = Text.takeWhile (/= '`') rest
     ]
 
--- | Every non-test Haskell source in the workspace, minus the catalogue itself.
+-- | Every non-test Haskell source that could emit a diagnostic, minus the
+-- catalogue itself.
 --
 -- Scanning the sources is what makes "no dead diagnostics" checkable: a code
 -- can be defined and documented while nothing ever produces it, which is
--- exactly the drift this suite exists to catch.
+-- exactly the drift this suite exists to catch. Only `tnix-core` builds
+-- diagnostics, and it is the one tree reachable from every place these tests
+-- run, including the sandboxed `nix flake check` build.
 packageSources :: IO [FilePath]
 packageSources = do
-  root <- fixturePath "packages"
+  root <- fixturePathCandidates ["src", "packages/tnix-core/src"]
   paths <- walk root
   pure
     [ path
