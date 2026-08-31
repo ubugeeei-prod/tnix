@@ -101,17 +101,22 @@ letParser = do
   ELet items <$> expressionParser
 
 -- | Parse either a type signature or a value binding inside a `let`.
+--
+-- Both forms open with the same identifier, so it is parsed once and the two
+-- tails are tried after it. Committing to the shared prefix keeps `many
+-- letItemParser` from re-lexing every binding name, and still stops cleanly at
+-- `in`, where `identifier` fails without consuming.
 letItemParser :: Parser LetItem
-letItemParser = try sigParser <|> bindParser
+letItemParser = do
+  name <- identifier
+  signatureFor name <|> bindingFor name
   where
-    sigParser = do
-      name <- identifier
+    signatureFor name = do
       _ <- symbol "::"
       ty <- typeParser
       _ <- symbol ";"
       pure (LetSignature name ty)
-    bindParser = do
-      name <- identifier
+    bindingFor name = do
       _ <- symbol "="
       expr <- expressionParser
       _ <- symbol ";"

@@ -43,9 +43,19 @@ spec = describe "subtyping and type reduction" $ do
     -- The relation is "every left member is covered by some right member".
     -- The implementation short-circuits through a set of the right-hand
     -- members, so state the definition separately and require them to agree.
+    -- The pool is deliberately free of gradual types: `dynamic` answers
+    -- through consistency instead of subtyping, which the case below records.
     property $ \(UnionPair leftMembers rightMembers) ->
       isSubtype mempty (TUnion leftMembers) (TUnion rightMembers)
         === all (\left -> any (isSubtype mempty left) rightMembers) leftMembers
+
+  it "keeps dynamic out of subtyping even when a union offers it" $ do
+    -- A one-member union collapses to that member, and `dynamic` on the left
+    -- is never a subtype of anything it is not equal to. Gradual code reaches
+    -- the same conclusion through consistency.
+    isSubtype mempty tDynamic tDynamic `shouldBe` True
+    isSubtype mempty tDynamic (TUnion [tDynamic, TLit (LString "a")]) `shouldBe` False
+    isConsistent mempty tDynamic (TUnion [tDynamic, TLit (LString "a")]) `shouldBe` True
 
   it "treats literal values as subtypes of primitive constructors" $ do
     isSubtype mempty (TLit (LString "tnix")) tString `shouldBe` True
@@ -282,7 +292,6 @@ unionPool =
     tBool,
     tNat,
     tNumber,
-    tDynamic,
     TLit (LInt 1),
     TLit (LInt 2),
     TLit (LString "a"),
