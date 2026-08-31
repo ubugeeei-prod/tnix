@@ -46,6 +46,122 @@ spec = describe "higher-kinded kind inference" $ do
     inferTypeKind mempty (TApp (tList tInt) tString)
       `shouldSatisfy` isLeft
 
+  it "gives every builtin constructor the arity its surface syntax implies" $ do
+    inferTypeKind mempty tInt `shouldBe` Right KType
+    inferTypeKind mempty (TCon "List") `shouldBe` Right (KFun KType KType)
+    inferTypeKind mempty (TCon "Vec") `shouldBe` Right (KFun KType (KFun KType KType))
+    inferTypeKind mempty (TCon "Matrix")
+      `shouldBe` Right (KFun KType (KFun KType (KFun KType KType)))
+    inferTypeKind mempty (TCon "Tensor") `shouldBe` Right (KFun KType (KFun KType KType))
+    inferTypeKind mempty (TCon "Tuple") `shouldBe` Right (KFun KType KType)
+    inferTypeKind mempty (TCon "Range")
+      `shouldBe` Right (KFun KType (KFun KType (KFun KType KType)))
+    inferTypeKind mempty (TCon "Unit") `shouldBe` Right (KFun KType (KFun KType KType))
+
+  it "gives every ground type form kind Type" $
+    mapM_
+      (\ty -> inferTypeKind mempty ty `shouldBe` Right KType)
+      [ tAny,
+        tDynamic,
+        tUnknown,
+        TLit (LInt 1),
+        TLit (LString "x"),
+        TMeta 0,
+        TTypeList [tInt, tString],
+        TFun Many tInt tString,
+        TFun One tInt tString,
+        TRecord (Map.fromList [("a", tInt)]),
+        TUnion [tInt, tString],
+        tList tInt,
+        TForall ["a"] (TFun Many (TVar "a") (TVar "a"))
+      ]
+
+  it "reports an unconstrained type as kind-polymorphic rather than as Type" $ do
+    -- A bare `forall a. a` or an unseen constructor constrains nothing, so
+    -- inference leaves a kind metavariable standing for "any kind". Callers
+    -- that need a ground answer (term annotations, ambient entries) default it
+    -- through `validateProgramKinds`.
+    inferTypeKind mempty (TForall ["a"] (TVar "a")) `shouldSatisfy` isMetaKind
+    inferTypeKind mempty (TCon "Mystery") `shouldSatisfy` isMetaKind
+
+  it "requires both branches of a conditional type to agree" $ do
+    inferTypeKind mempty (TConditional tInt tInt tString tBool) `shouldBe` Right KType
+    inferTypeKind mempty (TConditional tInt tInt (TCon "List") tBool)
+      `shouldSatisfy` isLeft
+
+  it "keeps unknown constructors flexible so ambient authoring stays incremental" $ do
+    inferTypeKind mempty (TCon "Mystery") `shouldSatisfy` isRight
+    inferTypeKind mempty (TApp (TCon "Mystery") tInt) `shouldSatisfy` isRight
+
+  it "gives an unknown constructor one consistent kind across a type" $
+    -- The same name cannot be both a constructor and a ground type.
+    inferTypeKind mempty (TFun Many (TCon "Mystery") (TApp (TCon "Mystery") tInt))
+      `shouldSatisfy` isLeft
+
+  it "infers alias arity from the body" $ do
+    kinds <-
+      expectRight $
+        inferAliasKinds
+          [ TypeAlias "Ground" [] tInt,
+            TypeAlias "Wrap" ["a"] (tList (TVar "a")),
+            TypeAlias "Const" ["a", "b"] (TVar "a")
+          ]
+    Map.lookup "Ground" kinds `shouldBe` Just KType
+    Map.lookup "Wrap" kinds `shouldBe` Just (KFun KType KType)
+    -- `Const` constrains neither parameter, so it stays kind-polymorphic: two
+    -- arguments, and a result equal to the first of them.
+    case Map.lookup "Const" kinds of
+      Just (KFun first (KFun _ result)) -> result `shouldBe` first
+      other -> expectationFailure ("expected a binary alias kind, got " <> show other)
+
+  it "returns an empty environment for an empty alias list" $
+    inferAliasKinds [] `shouldBe` Right Map.empty
+
+  it "lets a later alias definition win over an earlier one of the same name" $ do
+    kinds <-
+      expectRight $
+        inferAliasKinds
+          [ TypeAlias "Dup" ["a"] (TVar "a"),
+            TypeAlias "Dup" [] tInt
+          ]
+    Map.lookup "Dup" kinds `shouldBe` Just KType
+
+  it "rejects a self-application that would need an infinite kind" $
+    inferAliasKinds [TypeAlias "Loop" ["f"] (TApp (TVar "f") (TVar "f"))]
+      `shouldSatisfy` isLeft
+
+  it "rejects undersaturated constructors in term positions" $ do
+    program <-
+      expectRight $
+        parseProgram
+          "main.tnix"
+          (source ["let value :: List;", "    value = [];", "in value"])
+    validateProgramKinds (programAliases program) program `shouldSatisfy` isLeft
+
+  it "rejects higher-kinded ambient entries" $ do
+    program <-
+      expectRight $
+        parseProgram
+          "main.tnix"
+          (source ["declare \"./lib.nix\" { default :: Vec Int; };"])
+    validateProgramKinds (programAliases program) program `shouldSatisfy` isLeft
+
+  it "still allows alias bodies to be higher-kinded" $ do
+    program <-
+      expectRight $
+        parseProgram
+          "main.tnix"
+          (source ["type Partial = Vec 3;", "1"])
+    validateProgramKinds (programAliases program) program `shouldSatisfy` isRight
+
+  it "validates annotations buried inside expressions" $ do
+    program <-
+      expectRight $
+        parseProgram
+          "main.tnix"
+          (source ["{ value = ([] as List); }"])
+    validateProgramKinds (programAliases program) program `shouldSatisfy` isLeft
+
   it "validates higher-kinded annotations inside parsed programs" $ do
     program <-
       expectRight $
@@ -67,3 +183,5 @@ spec = describe "higher-kinded kind inference" $ do
     isLeft _ = False
     isRight (Right _) = True
     isRight _ = False
+    isMetaKind (Right (KMeta _)) = True
+    isMetaKind _ = False

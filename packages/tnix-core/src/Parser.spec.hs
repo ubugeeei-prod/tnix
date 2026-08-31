@@ -337,6 +337,32 @@ spec = describe "parseProgram" $ do
           (source ["''", "hello", "world", "''"])
     programExpr program `shouldBe` Just (plain (EString (Indented "\nhello\nworld\n")))
 
+  it "reads the Nix escapes an indented string can contain" $ do
+    expectStringBody "'' ''$ ''" " $ "
+    expectStringBody "'' ''${ ''" " ${ "
+    expectStringBody "'' ''' ''" " '' "
+    expectStringBody "'' ''\\' ''" " ' "
+    expectStringBody "'' ''\\n ''" " \n "
+    expectStringBody "'' ''\\t ''" " \t "
+    expectStringBody "'' ''\\x ''" " x "
+
+  it "keeps an escaped antiquotation out of the interpolation parts" $ do
+    program <- expectRight (parseProgram "main.tnix" "'' ''${value} ''")
+    (markedValue <$> programExpr program)
+      `shouldBe` Just (EString (Indented " ${value} "))
+
+  it "still splits a real antiquotation in an indented string" $ do
+    program <- expectRight (parseProgram "main.tnix" "'' ${value} ''")
+    (markedValue <$> programExpr program)
+      `shouldBe` Just (EInterp InterpIndented [StrText " ", StrExpr (EVar "value"), StrText " "])
+
+  it "reads the escapes a double-quoted string can contain" $ do
+    expectStringBody "\"a\\\"b\"" "a\"b"
+    expectStringBody "\"a\\\\b\"" "a\\b"
+    expectStringBody "\"a\\nb\"" "a\nb"
+    expectStringBody "\"a\\$b\"" "a$b"
+    expectStringBody "\"a\\${b}\"" "a${b}"
+
   it "parses as-casts after selections and inside list items" $ do
     castProgram <- expectRight $ parseProgram "main.tnix" "{ as = 1; }.as as Int as Number"
     listProgram <- expectRight $ parseProgram "main.tnix" "[value as Int]"
@@ -409,6 +435,14 @@ spec = describe "parseProgram" $ do
     plain = Marked Nothing
     isLeft (Left _) = True
     isLeft _ = False
+
+-- | Parse a source that is exactly one string literal and check its content.
+expectStringBody :: Text.Text -> Text.Text -> Expectation
+expectStringBody input expected = do
+  program <- expectRight (parseProgram "main.tnix" input)
+  case markedValue <$> programExpr program of
+    Just (EString literal) -> stringLiteralText literal `shouldBe` expected
+    other -> expectationFailure ("expected a plain string literal, got " <> show other)
 
 newtype RoundTripExpr = RoundTripExpr Expr
   deriving (Show)
