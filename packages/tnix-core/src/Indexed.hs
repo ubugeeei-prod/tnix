@@ -126,7 +126,34 @@ inferListType joinElem members =
 --   => List (Tensor [2] Int | Tensor [3] Int)
 -- @
 normalizeIndexedType :: Type -> Type
-normalizeIndexedType = \case
+normalizeIndexedType ty
+  -- Only `Vec`, `Matrix`, and `Tensor` applications are rewritten; every other
+  -- node is rebuilt into an identical copy. Most types mention none of them,
+  -- and the checker normalizes on every constrain/unify step, so a cheap
+  -- allocation-free scan up front pays for itself many times over.
+  | mentionsIndexedConstructor ty = normalizeIndexed ty
+  | otherwise = ty
+
+-- | Conservatively detect types that 'normalizeIndexedType' might rewrite.
+--
+-- Over-approximating is safe (it only costs a redundant rebuild); missing a
+-- mention would not be, so this looks for the constructor names themselves
+-- rather than trying to match full application shapes.
+mentionsIndexedConstructor :: Type -> Bool
+mentionsIndexedConstructor = \case
+  TCon name -> name == "Vec" || name == "Matrix" || name == "Tensor"
+  TTypeList items -> any mentionsIndexedConstructor items
+  TFun _ left right -> mentionsIndexedConstructor left || mentionsIndexedConstructor right
+  TRecord fields -> any mentionsIndexedConstructor fields
+  TUnion members -> any mentionsIndexedConstructor members
+  TApp fun arg -> mentionsIndexedConstructor fun || mentionsIndexedConstructor arg
+  TForall _ body -> mentionsIndexedConstructor body
+  TConditional actual patternTy yesTy noTy ->
+    any mentionsIndexedConstructor [actual, patternTy, yesTy, noTy]
+  _ -> False
+
+normalizeIndexed :: Type -> Type
+normalizeIndexed = \case
   TTypeList items -> TTypeList (normalizeIndexedType <$> items)
   TFun mult left right -> TFun mult (normalizeIndexedType left) (normalizeIndexedType right)
   TRecord fields -> TRecord (fmap normalizeIndexedType fields)

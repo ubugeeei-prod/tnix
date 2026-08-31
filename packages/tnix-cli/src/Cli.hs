@@ -25,7 +25,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TextEncoding
 import Data.Text.IO qualified as TextIO
-import Driver (Analysis (..), analyzeFile, compileFile, emitFile, emitFileAs)
+import Driver (Analysis (..), SupportCache, analyzeFile, analyzeFileWith, compileFile, compileFileWith, emitFile, emitFileAsWith, newSupportCache)
 import Options.Applicative
 import Pretty (renderScheme)
 import Project
@@ -186,7 +186,8 @@ executeProjectCheck target format = do
       if null sources
         then pure (renderedFailure format (projectErrorJson "check" (Just config) "no project source files discovered") "no project source files discovered")
         else do
-          entries <- traverse (\source -> (source,) <$> analyzeFile (projectSourcePath source)) sources
+          cache <- newSupportCache
+          entries <- traverse (\source -> (source,) <$> analyzeFileWith cache (projectSourcePath source)) sources
           pure (renderProjectCheck format config entries)
 
 executeProjectBuild :: Maybe FilePath -> OutputFormat -> IO (Either String Text)
@@ -199,7 +200,8 @@ executeProjectBuild target format = do
       if null sources
         then pure (renderedFailure format (projectErrorJson "build" (Just config) "no project source files discovered") "no project source files discovered")
         else do
-          plans <- traverse (planBuildOne config) sources
+          cache <- newSupportCache
+          plans <- traverse (planBuildOne cache config) sources
           case renderProjectBuild format config (reportEntries plans) of
             Left err -> pure (Left err)
             Right report -> do
@@ -216,7 +218,8 @@ executeProjectEmit target format = do
       if null sources
         then pure (renderedFailure format (projectErrorJson "emit-project" (Just config) "no project source files discovered") "no project source files discovered")
         else do
-          plans <- traverse (planEmitOne config) sources
+          cache <- newSupportCache
+          plans <- traverse (planEmitOne cache config) sources
           case renderProjectEmit format config (reportEntries plans) of
             Left err -> pure (Left err)
             Right report -> do
@@ -292,25 +295,25 @@ renderProjectCheck format config entries =
           "error" .= either Just (const Nothing) result
         ]
 
-planBuildOne :: ProjectConfig -> ProjectSource -> IO ProjectOutputPlan
-planBuildOne config source = do
+planBuildOne :: SupportCache -> ProjectConfig -> ProjectSource -> IO ProjectOutputPlan
+planBuildOne cache config source = do
   let runtimeOutput = projectBuildOutputPath config source
       declarationOutput = projectDeclarationOutputPath config source
-  compileResult <- compileFile (projectSourcePath source)
+  compileResult <- compileFileWith cache (projectSourcePath source)
   case compileResult of
     Left err -> pure (source, runtimeOutput, declarationOutput, Left err)
     Right compiled -> do
-      emitResult <- emitFileAs (projectSourcePath source) runtimeOutput declarationOutput
+      emitResult <- emitFileAsWith cache (projectSourcePath source) runtimeOutput declarationOutput
       case emitResult of
         Left err -> pure (source, runtimeOutput, declarationOutput, Left err)
         Right declaration ->
           pure (source, runtimeOutput, declarationOutput, Right [PlannedWrite runtimeOutput compiled, PlannedWrite declarationOutput declaration])
 
-planEmitOne :: ProjectConfig -> ProjectSource -> IO ProjectOutputPlan
-planEmitOne config source = do
+planEmitOne :: SupportCache -> ProjectConfig -> ProjectSource -> IO ProjectOutputPlan
+planEmitOne cache config source = do
   let runtimeOutput = projectBuildOutputPath config source
       declarationOutput = projectDeclarationOutputPath config source
-  result <- emitFileAs (projectSourcePath source) runtimeOutput declarationOutput
+  result <- emitFileAsWith cache (projectSourcePath source) runtimeOutput declarationOutput
   case result of
     Left err -> pure (source, runtimeOutput, declarationOutput, Left err)
     Right declaration ->

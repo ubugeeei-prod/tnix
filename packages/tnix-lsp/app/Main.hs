@@ -21,7 +21,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
-import Driver (Analysis (..), analyzeText)
+import Driver (Analysis (..), SupportCache, analyzeTextWith, newSupportCache)
 import Paths_tnix_lsp qualified as PackageInfo
 import Server (asText, clearDiagnostics, clientCapabilities, field, publishDiagnostics, publishDiagnosticsWithContent, respond, respondError)
 import ServerProtocol (ReadOutcome (..), notify, readMessageOutcome)
@@ -90,9 +90,8 @@ runServer logFile = do
   ref <- newIORef mempty
   cacheRef <- newIORef emptyAnalysisCache
   shutdownRef <- newIORef False
-  let analyze = cachedAnalyzeText cacheRef
-      clearCache = writeIORef cacheRef emptyAnalysisCache
-  loop logger shutdownRef ref analyze clearCache
+  let clearCache = writeIORef cacheRef emptyAnalysisCache
+  loop logger shutdownRef ref (cachedAnalyzeText cacheRef) clearCache
   where
     openLogHandle path = do
       h <- openFile path AppendMode
@@ -120,9 +119,10 @@ runServer logFile = do
 -- can still terminate; any other exception is logged, surfaced to the client
 -- via @window/logMessage@, and—if the failing message was a request—answered
 -- with a JSON-RPC internal error so the client is never left waiting.
-safeHandle :: Logger -> IORef Bool -> IORef Session.Documents -> AnalyzeFn -> IO () -> Value -> IO ()
-safeHandle logger shutdownRef ref analyze clearCache msg = do
-  result <- try (handle shutdownRef ref analyze clearCache msg)
+safeHandle :: Logger -> IORef Bool -> IORef Session.Documents -> (SupportCache -> AnalyzeFn) -> IO () -> Value -> IO ()
+safeHandle logger shutdownRef ref analyzeWith clearCache msg = do
+  supportCache <- newSupportCache
+  result <- try (handle shutdownRef ref (analyzeWith supportCache) clearCache msg)
   case result of
     Right () -> pure ()
     Left err
@@ -138,18 +138,25 @@ safeHandle logger shutdownRef ref analyze clearCache msg = do
             Just _ -> respondError stdout msg (-32603) ("internal error: " <> detail)
             Nothing -> pure ()
 
--- | Wrap 'analyzeText' with the workspace-wide analysis cache so repeated
+-- | Wrap the driver with the workspace-wide analysis cache so repeated
 -- hover / workspace-symbol / definition requests against unchanged content
 -- collapse to a single driver invocation.
-cachedAnalyzeText :: IORef AnalysisCache -> FilePath -> Text -> IO (Either String Analysis)
-cachedAnalyzeText cacheRef file content = do
+--
+-- A second, shorter-lived cache covers declaration support. One request can
+-- analyze every file in the workspace (workspace symbols, references, rename),
+-- and each of those analyses would otherwise re-walk the workspace and
+-- re-parse every `.d.tnix` file. The support cache is created per request in
+-- 'safeHandle' and discarded with it, so it can share that work without ever
+-- serving a declaration file the client has since edited.
+cachedAnalyzeText :: IORef AnalysisCache -> SupportCache -> FilePath -> Text -> IO (Either String Analysis)
+cachedAnalyzeText cacheRef supportCache file content = do
   cache <- readIORef cacheRef
   case accessAnalysisCache (file, content) cache of
     (Just result, touchedCache) -> do
       writeIORef cacheRef touchedCache
       pure result
     (Nothing, _) -> do
-      result <- analyzeText file content
+      result <- analyzeTextWith supportCache file content
       modifyIORef' cacheRef (insertAnalysisCache (file, content) result)
       pure result
 
