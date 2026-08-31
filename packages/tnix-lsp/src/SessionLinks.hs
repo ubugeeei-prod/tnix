@@ -29,7 +29,6 @@ where
 
 import Data.Aeson (Value, object, (.=))
 import Data.Char (isAlphaNum, isDigit, isLetter)
-import Data.List (foldl')
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Server (pathUri, textRangeToUtf16Columns)

@@ -288,13 +288,28 @@ doubleTextChar =
 indentedTextPart :: Parser StringPart
 indentedTextPart = StrText . Text.concat <$> some indentedChunk
 
--- | A literal chunk inside an indented string. `''${` escapes a literal `${`
--- and `'''` escapes a literal `''`; other characters are preserved verbatim.
+-- | A literal chunk inside an indented string.
+--
+-- The escapes mirror Nix: `''${` and `''$` produce a literal dollar, `'''`
+-- produces a literal `''`, and `''\\` takes the following character literally
+-- (with the usual `n`/`r`/`t` spellings). Every other character is preserved
+-- verbatim.
 indentedChunk :: Parser Text.Text
 indentedChunk =
   (try (string "''${") $> "${")
+    <|> (try (string "''$") $> "$")
     <|> (try (string "'''") $> "''")
+    <|> (Text.singleton <$> (try (string "''\\") *> indentedEscapeChar))
     <|> (Text.singleton <$> (notFollowedBy (string "${") *> notFollowedBy (string "''") *> anySingle))
+
+-- | Decode the character following an `''\\` escape inside an indented string.
+indentedEscapeChar :: Parser Char
+indentedEscapeChar = decode <$> anySingle
+  where
+    decode 'n' = '\n'
+    decode 'r' = '\r'
+    decode 't' = '\t'
+    decode other = other
 
 -- | Collapse parsed segments into a plain 'EString' when there is no
 -- interpolation; otherwise keep the interpolated representation.

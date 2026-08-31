@@ -64,6 +64,8 @@ test-suite tnix-lsp-spec
   hs-source-dirs: src
   other-modules:
       Server
+    , ServerProtocol
+    , ServerUri
   build-depends:
       aeson
     , base >=4.19 && <5
@@ -97,6 +99,11 @@ test-suite tnix-lsp-session-diagnostics-spec
   type: exitcode-stdio-1.0
   main-is: SessionDiagnostics.spec.hs
   hs-source-dirs: src
+  other-modules:
+      Server
+    , ServerProtocol
+    , ServerUri
+    , SessionDiagnostics
   build-depends:
       aeson
     , base >=4.19 && <5
@@ -170,8 +177,10 @@ test-suite tnix-lsp-session-links-spec
   main-is: SessionLinks.spec.hs
   hs-source-dirs: src
   other-modules:
-      SessionLinks
-    , Server
+      Server
+    , ServerProtocol
+    , ServerUri
+    , SessionLinks
   build-depends:
       aeson
     , base >=4.19 && <5
@@ -190,8 +199,10 @@ test-suite tnix-lsp-session-inlay-hints-spec
   main-is: SessionInlayHints.spec.hs
   hs-source-dirs: src
   other-modules:
-      SessionInlayHints
-    , Server
+      Server
+    , ServerProtocol
+    , ServerUri
+    , SessionInlayHints
   build-depends:
       aeson
     , base >=4.19 && <5
@@ -210,7 +221,10 @@ test-suite tnix-lsp-session-spec
   main-is: Session.spec.hs
   hs-source-dirs: src
   other-modules:
-      Session
+      Server
+    , ServerProtocol
+    , ServerUri
+    , Session
     , SessionDiagnostics
     , SessionDocuments
     , SessionFolding
@@ -222,7 +236,6 @@ test-suite tnix-lsp-session-spec
     , SessionText
     , SessionTypes
     , SessionWorkspace
-    , Server
   build-depends:
       aeson
     , base >=4.19 && <5

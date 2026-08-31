@@ -121,7 +121,7 @@ inferAliasBody env placeholders alias =
     Nothing ->
       -- Placeholders are constructed from the same alias list passed in here,
       -- so a missing entry signals an inference bug rather than a user error.
-      liftLeft ("internal: missing kind placeholder for alias " <> show (typeAliasName alias))
+      liftLeft (withCode TK0004MissingAliasPlaceholder ("internal: missing kind placeholder for alias " <> show (typeAliasName alias)))
     Just placeholder -> do
       let local = Map.fromList (zip (typeAliasParams alias) (placeholderParams placeholder))
       bodyKind <- inferKind env local (typeAliasBody alias)
