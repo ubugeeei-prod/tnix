@@ -28,14 +28,14 @@ jobs:
     steps:
       - name: Check out sources (Blacksmith)
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
-        uses: useblacksmith/checkout@6210cff9085b85e9591891547800ae805be7e4da # v1
+        uses: useblacksmith/checkout@0647fdbab2614a5eb86d2971070e325060d91056 # v1
 
       - name: Check out sources
         if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Nix
-        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
