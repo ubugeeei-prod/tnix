@@ -517,17 +517,18 @@ findDeclarationFiles dir = do
 
 -- | Find the `.d.tnix` files a workspace contributes.
 --
--- Only a real workspace (one with a marker such as `tnix.config.tnix`,
--- `flake.nix`, or `.git`) is searched recursively; a bare directory only
--- contributes its own files, so running tnix in `$HOME` or a temp directory
--- never walks an unbounded tree. Hidden directories, build outputs, and
--- symlinked directories (e.g. Nix `result` links into the store) are skipped.
+-- A real workspace (one with a marker such as `tnix.config.tnix`,
+-- `flake.nix`, or `.git`) is searched to any depth; a bare directory only a
+-- few levels deep, so running tnix in `$HOME` or a temp directory never walks
+-- an unbounded tree. Hidden directories, build outputs, and symlinked
+-- directories (e.g. Nix `result` links into the store) are always skipped.
 findWorkspaceDeclarationFiles :: FilePath -> IO [FilePath]
 findWorkspaceDeclarationFiles root = do
   marked <- hasWorkspaceMarker root
-  go marked root
+  go (if marked then maxBound else unmarkedSearchDepth) root
   where
-    go recursive dir = do
+    unmarkedSearchDepth = 4 :: Int
+    go depth dir = do
       names <- sort <$> listDirectory dir
       fmap concat $
         forM names $ \name -> do
@@ -536,13 +537,13 @@ findWorkspaceDeclarationFiles root = do
           isLink <- pathIsSymbolicLink path
           if isDir
             then
-              if not recursive || isLink || ignoredDirectory name
+              if depth <= 0 || isLink || ignoredDirectory name
                 then pure []
                 else do
                   nestedWorkspace <- if normalise path == normalise root then pure False else hasWorkspaceMarker path
                   if nestedWorkspace
                     then pure []
-                    else go recursive path
+                    else go (depth - 1) path
             else pure [normalise path | ".d.tnix" `isSuffixOf` name]
     ignoredDirectory name =
       take 1 name == "."

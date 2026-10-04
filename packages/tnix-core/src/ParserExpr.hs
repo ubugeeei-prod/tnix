@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Parser for top-level declarations and executable expressions.
@@ -166,10 +167,16 @@ inheritClause = do
 -- make failures exponential in the nesting depth of lambdas).
 lambdaParser :: Parser Expr
 lambdaParser = do
-  pattern' <- try (patternParser <* lambdaColon)
+  pattern' <- try (patternParser >>= \p -> p <$ lambdaColon p)
   ELambda pattern' <$> expressionParser
   where
-    lambdaColon = lexeme (char ':' <* notFollowedBy (char ':'))
+    -- As in Nix, `name:rest` with no space is a URI (`x:x`,
+    -- `github:NixOS/nixpkgs`), so a bare-name binder needs its colon to be
+    -- followed by something that cannot continue a URI.
+    lambdaColon = \case
+      PVar _ Nothing -> lexeme (char ':' <* notFollowedBy (satisfy uriChar))
+      _ -> lexeme (char ':' <* notFollowedBy (char ':'))
+    uriChar c = isAsciiLower c || isAsciiUpper c || isDigit c || c `elem` ("%/?:@&=+$,-_.!~*'" :: String)
 
 -- | Parse the pipe operators (`|>` left-associative, `<|` right-associative),
 -- which bind loosest of all operators. Mixing the two without parentheses is

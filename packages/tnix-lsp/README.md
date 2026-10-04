@@ -78,8 +78,8 @@ Context-aware; triggered on `.` and `/`.
   | `TL0001` | unused `let` binding, `inherit`, lambda parameter, pattern field, or `@` alias (names starting with `_` are exempt) | `Unnecessary` |
   | `TL0002` | use of a binding or `builtins` member whose doc comment contains `@deprecated [reason]` | `Deprecated` |
 
-  These `TLxxxx` codes belong to the language server; their entries should be
-  added to `docs/diagnostics.md` under a "Language server lints" section.
+  These `TLxxxx` codes belong to the language server and are documented in the
+  "Language Server Lints" section of `docs/diagnostics.md`.
 
 ### Code actions
 

@@ -869,7 +869,7 @@ spec = describe "analysis" $ do
       ]
       ( \root -> do
           analysis <- analyzeFile (root <> "/src/main.tnix") >>= expectRight
-          fmap renderScheme (analysisRoot analysis) `shouldBe` Just "Path | String"
+          fmap renderScheme (analysisRoot analysis) `shouldBe` Just "TnixProjectPath"
       )
 
   it "loads external declaration packs listed in tnix.config.tnix" $

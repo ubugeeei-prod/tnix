@@ -7,6 +7,7 @@ module Alias
   ( AliasEnv,
     collectApps,
     expandAliases,
+    expandAliasHead,
     flattenUnion,
     matchPattern,
     mkAliasEnv,
@@ -79,17 +80,34 @@ aliasExpansionBudget = 32
 -- declarations useful, while still guarding against runaway self-recursive
 -- aliases.
 expandAliases :: AliasEnv -> Type -> Type
-expandAliases env = go 0
+expandAliases env = goPath Set.empty 0
   where
-    go :: Int -> Type -> Type
-    go depth ty
+    -- An alias is not re-expanded below itself: a recursive alias such as
+    -- `type A = { next :: A; }` stays a named reference at the recursion
+    -- point. Without this, branching recursive aliases expanded
+    -- exponentially (to the budget's depth) and hung the checker.
+    goPath :: Set.Set Name -> Int -> Type -> Type
+    goPath seen depth ty
       | depth > aliasExpansionBudget = ty
       | otherwise =
           case ty of
             TCon name
               | Just alias <- Map.lookup name env,
-                null (typeAliasParams alias) ->
-                  go (depth + 1) (typeAliasBody alias)
+                null (typeAliasParams alias),
+                not (Set.member name seen) ->
+                  goPath (Set.insert name seen) (depth + 1) (typeAliasBody alias)
+            TApp f x
+              | (TCon name, _) <- collectApps (TApp f x),
+                Map.member name env,
+                Set.member name seen ->
+                  ty
+            _ -> goWith seen depth ty
+
+    goWith :: Set.Set Name -> Int -> Type -> Type
+    goWith seen depth ty =
+      let go = goPath seen
+          reduce = reduceWith seen
+       in case ty of
             TTypeList items -> TTypeList (map (go depth) items)
             TFun mult a b -> TFun mult (go depth a) (go depth b)
             TRecord fields -> TRecord (fmap (go depth) fields)
@@ -101,17 +119,43 @@ expandAliases env = go 0
             TConditional a b c d -> TConditional (go depth a) (go depth b) (go depth c) (go depth d)
             other -> other
 
-    reduce :: Int -> Type -> Type -> Type
-    reduce depth f x =
+    reduceWith :: Set.Set Name -> Int -> Type -> Type -> Type
+    reduceWith seen depth f x =
       case collectApps (TApp f x) of
         (TCon name, args)
           | Just alias <- Map.lookup name env,
-            length args >= length (typeAliasParams alias) ->
+            length args >= length (typeAliasParams alias),
+            not (Set.member name seen) ->
               let (used, rest) = splitAt (length (typeAliasParams alias)) args
                   subst = Map.fromList (zip (typeAliasParams alias) used)
                   body = substituteTypeVars subst (typeAliasBody alias)
-               in foldl TApp (go (depth + 1) body) rest
+               in foldl TApp (goPath (Set.insert name seen) (depth + 1) body) rest
         (headTy, args) -> foldl TApp headTy args
+
+-- | Expand aliases at the head of a type only, leaving nested types (record
+-- fields, function arguments, ...) as written. Consumers that walk a type
+-- resolve each level as they reach it, so large or recursive aliases are
+-- expanded lazily and display with their names.
+expandAliasHead :: AliasEnv -> Type -> Type
+expandAliasHead env = go 0
+  where
+    go :: Int -> Type -> Type
+    go depth ty
+      | depth > aliasExpansionBudget = ty
+      | otherwise =
+          case ty of
+            TCon name
+              | Just alias <- Map.lookup name env,
+                null (typeAliasParams alias) ->
+                  go (depth + 1) (typeAliasBody alias)
+            TApp _ _
+              | (TCon name, args) <- collectApps ty,
+                Just alias <- Map.lookup name env,
+                length args >= length (typeAliasParams alias) ->
+                  let (used, rest) = splitAt (length (typeAliasParams alias)) args
+                      subst = Map.fromList (zip (typeAliasParams alias) used)
+                   in go (depth + 1) (foldl TApp (substituteTypeVars subst (typeAliasBody alias)) rest)
+            _ -> ty
 
 -- | Match a concrete type against a pattern containing 'TInfer' placeholders.
 --

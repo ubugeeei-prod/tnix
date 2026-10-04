@@ -54,8 +54,8 @@ parseVersionLine output =
 -- | Run every check. @selfVersion@ is the version of the running `tnix`.
 doctorChecks :: IdeEnv -> Text -> IO [Check]
 doctorChecks env selfVersion = do
-  tnixCheck <- checkTool "tnix" "tnix" (Just "install it with `nix profile install github:ubugeeei/tnix#tnix` so editors and scripts find the same version") CheckWarn
-  lspCheck <- checkTool "tnix-lsp" "tnix-lsp" (Just "install it with `nix profile install github:ubugeeei/tnix#tnix-lsp`") CheckFail
+  tnixCheck <- checkTool "tnix" "tnix" (Just "install it with `nix profile install github:ubugeeei-prod/tnix#tnix` so editors and scripts find the same version") CheckWarn
+  lspCheck <- checkTool "tnix-lsp" "tnix-lsp" (Just "install it with `nix profile install github:ubugeeei-prod/tnix#tnix-lsp`") CheckFail
   projectCheck <- checkProject
   editorChecks <- checkEditors
   nixCheck <- checkNix

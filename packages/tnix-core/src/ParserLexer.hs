@@ -213,7 +213,7 @@ searchPathLiteral = lexeme $ try $ do
 uriLiteral :: Parser Text
 uriLiteral = lexeme $ try $ do
   first <- satisfy isLetter
-  schemeRest <- some (satisfy (\c -> isAlphaNum c || c `elem` ("+-." :: String)))
+  schemeRest <- many (satisfy (\c -> isAlphaNum c || c `elem` ("+-." :: String)))
   _ <- char ':'
   body <- some (satisfy uriChar)
   pure (Text.pack (first : schemeRest <> ":" <> body))

@@ -270,7 +270,7 @@ planInstall env opts = do
         (Nothing, Just "") -> []
         (Nothing, _) ->
           [ StepWarn
-              "tnix-lsp was not found on PATH or in a Nix profile; the editor will look it up at startup. Install it with `nix profile install github:ubugeeei/tnix#tnix-lsp`."
+              "tnix-lsp was not found on PATH or in a Nix profile; the editor will look it up at startup. Install it with `nix profile install github:ubugeeei-prod/tnix#tnix-lsp`."
           ]
         (Just path, _)
           | "/nix/store/" `isPrefixOf` path ->

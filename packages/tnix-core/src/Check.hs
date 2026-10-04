@@ -253,16 +253,23 @@ inferExpr ctx env = \case
       Map.lookup "import" env == Map.lookup "import" (globalEnvironment ctx) ->
         maybe (pure tDynamic) instantiate (Map.lookup (resolvePath (checkFile ctx) target) (checkAmbient ctx))
   EApp fun arg -> do
-    funTy <- inferExpr ctx env fun >>= zonk
-    argTy <- inferExpr ctx env arg
-    let resolvedFunTy = resolveType (checkAliases ctx) funTy
+    -- Only the head is zonked so that metas inside the parameter type keep
+    -- their identity (needed to widen `max 1 2` to `1 | 2`).
+    funTy <- inferExpr ctx env fun >>= zonkHead
+    let resolvedFunTy = resolveHead (checkAliases ctx) funTy
+    -- A known parameter type is pushed into a lambda argument before its
+    -- body is inferred (bidirectional checking), so `f (ps: [ ps.x ])`
+    -- sees what `ps` is.
+    argTy <- case resolvedFunTy of
+      TFun _ domTy _ -> checkAgainst ctx env arg domTy
+      _ -> inferExpr ctx env arg
     if resolvedFunTy == tDynamic
       then pure tDynamic
       else
         if resolvedFunTy == tAny
           then pure tAny
           else case resolvedFunTy of
-            TFun _ domTy outTy -> atSpanOf arg (constrain ctx argTy domTy) *> zonk outTy
+            TFun _ domTy outTy -> atSpanOf arg (constrain ctx argTy domTy) *> zonkHead outTy
             _
               | definitelyNotCallable resolvedFunTy ->
                   throwCheck (withCode TC0018NotCallable ("cannot call " <> describeNonCallable resolvedFunTy <> " as a function"))
@@ -283,7 +290,7 @@ inferExpr ctx env = \case
     pure tBool
   EUnaryOp OpNeg operand -> do
     operandTy <- inferExpr ctx env operand >>= zonk
-    let resolved = resolveType (checkAliases ctx) operandTy
+    let resolved = resolveHead (checkAliases ctx) operandTy
     if resolved == tAny || resolved == tDynamic
       then pure resolved
       else do
@@ -301,7 +308,7 @@ inferExpr ctx env = \case
     inferExpr ctx env body
   EWith scope body -> do
     scopeTy <- inferExpr ctx env scope >>= zonk
-    case resolveType (checkAliases ctx) scopeTy of
+    case resolveHead (checkAliases ctx) scopeTy of
       -- A known record contributes its fields (lexical bindings still win), and
       -- truly-unbound names in the body remain errors.
       TRecord fields -> inferExpr ctx (Map.union env (Map.map (Scheme []) fields)) body
@@ -379,7 +386,7 @@ pathIsKnown :: CheckContext -> TypeEnv -> Type -> [SelectStep] -> InferM Bool
 pathIsKnown _ _ _ [] = pure True
 pathIsKnown ctx env ty (step : rest) = do
   ty' <- zonk ty
-  case resolveType (checkAliases ctx) ty' of
+  case resolveHead (checkAliases ctx) ty' of
     TMeta _ -> pure False
     TOpenRecord fields (TMeta _)
       | SelectName name <- step,
@@ -428,6 +435,34 @@ isNullLiteral expr =
   case unloc expr of
     ENull -> True
     _ -> False
+
+-- | Infer an expression while a target type is known. Lambdas take their
+-- parameter type from the target before the body is inferred, and their body
+-- is checked against the target result; everything else is plain inference.
+-- Callers still constrain the result against the target.
+checkAgainst :: CheckContext -> TypeEnv -> Expr -> Type -> InferM Type
+checkAgainst ctx env expr expected =
+  case expr of
+    ELoc region inner -> withSpan region (checkAgainst ctx env inner expected)
+    ELambda pattern' body -> do
+      target <- functionTarget . resolveHead (checkAliases ctx) <$> zonk expected
+      case target of
+        Just (domTy, codTy) -> do
+          (argTy, patternEnv) <- inferPatternBindings ctx env pattern'
+          -- The expected parameter flows *into* the pattern (contravariance).
+          _ <- catchInfer (constrain ctx domTy argTy)
+          bodyTy <- checkAgainst ctx (patternEnv <> env) body codTy
+          pure (TFun (inferLambdaMultiplicity pattern' body) argTy bodyTy)
+        Nothing -> inferExpr ctx env expr
+    _ -> inferExpr ctx env expr
+  where
+    functionTarget = \case
+      TFun _ domTy codTy -> Just (domTy, codTy)
+      TUnion members ->
+        case [(d, c) | TFun _ d c <- map (resolveHead (checkAliases ctx)) members] of
+          [single] -> Just single
+          _ -> Nothing
+      _ -> Nothing
 
 -- | Apply a callee whose type is not known yet. Its parameter type is
 -- inferred from this argument, widened so one call site's literal does not
@@ -610,7 +645,7 @@ inferLet ctx env items = do
         let directive = inlineDirective <|> Map.lookup name (sigDirectivesOf items)
         attempt <-
           catchInfer $ do
-            actual <- inferExpr ctx groupEnv expr
+            actual <- checkAgainst ctx groupEnv expr expected
             _ <- atSpanOf expr (constrain ctx actual expected)
             zonk expected
         resolved <-
@@ -651,7 +686,12 @@ inferLet ctx env items = do
 inferRecAttrSet :: CheckContext -> TypeEnv -> [AttrItem] -> InferM Type
 inferRecAttrSet ctx env rawItems = do
   (items, dynamicEntries) <- normalizeAttrItems rawItems
-  let fieldNames = [name | AttrField name _ <- items]
+  -- Inherited names are rec fields too: `rec { inherit (src) version;
+  -- name = "x-${version}"; }` refers to the inherited `version`.
+  let fieldNames =
+        [name | AttrField name _ <- items]
+          <> concat [names | AttrInheritFrom _ names <- items]
+          <> concat [names | AttrInherit names <- items]
   placeholders <- Map.fromList <$> traverse (\name -> (,) name . Scheme [] <$> freshMeta) fieldNames
   let recEnv = placeholders <> env
       inferAttr = \case
@@ -665,9 +705,18 @@ inferRecAttrSet ctx env rawItems = do
             Nothing -> pure ty
           pure [(name, finalTy)]
         AttrInherit names ->
-          traverse (\name -> inferExpr ctx env (EVar name) >>= \ty -> pure (name, ty)) names
-        AttrInheritFrom source names -> inferInheritFrom ctx recEnv source names
+          traverse (\name -> inferExpr ctx env (EVar name) >>= settle name) names
+        AttrInheritFrom source names ->
+          inferInheritFrom ctx recEnv source names >>= traverse (uncurry settle)
         AttrPath _ _ -> pure []
+      -- Tie an inherited name's type to its rec placeholder.
+      settle name ty =
+        case Map.lookup name placeholders of
+          Just scheme -> do
+            expected <- instantiate scheme
+            _ <- constrain ctx ty expected
+            (,) name <$> zonk expected
+          Nothing -> pure (name, ty)
   fields <- concat <$> traverse inferAttr items
   case duplicateNames (map fst fields) of
     dup : _ -> throwCheck (withCode TC0002DuplicateAttribute ("duplicate attribute: " <> quoteName dup))
@@ -716,7 +765,7 @@ inferPatternBindings ctx env = \case
 inferStaticSelect :: CheckContext -> Type -> Name -> InferM Type
 inferStaticSelect ctx ty field =
   zonk ty >>= \resolvedTy ->
-    let base' = resolveType (checkAliases ctx) resolvedTy
+    let base' = resolveHead (checkAliases ctx) resolvedTy
      in case base' of
           -- Selecting from a not-yet-known value: record the requirement as an
           -- open row, so later selections extend it (row polymorphism).
@@ -748,8 +797,8 @@ inferDynamicSelect ctx baseTy keyTy = do
   resolvedBaseTy <- zonk baseTy
   resolvedKeyTy <- zonk keyTy
   let aliases = checkAliases ctx
-      base' = resolveType aliases resolvedBaseTy
-      key' = resolveType aliases resolvedKeyTy
+      base' = resolveHead aliases resolvedBaseTy
+      key' = resolveHead aliases resolvedKeyTy
   case () of
     _
       | base' == tAny || key' == tAny -> pure tAny
@@ -975,8 +1024,102 @@ recoverSuppressedType ctx expected = constrain ctx tDynamic expected *> zonk exp
 -- @
 constrain :: CheckContext -> Type -> Type -> InferM Type
 constrain ctx actual expected = do
-  actual' <- normalizeIndexedType <$> zonk actual
-  expected' <- normalizeIndexedType <$> zonk expected
+  decomposed <- constrainStructurally ctx actual expected
+  case decomposed of
+    Just result -> pure result
+    Nothing -> constrainResolved ctx actual expected
+
+-- | Decompose a constraint along the *unzonked* structure of the expected
+-- type, so a meta inside it (say the `a` of `List a`) is still identifiable
+-- when it is reached:
+--
+-- * `List`/`AttrsOf` are covariant: `List x <: List y` is `x <: y`, and an
+--   exact sequence (`Vec`/`Tuple`) meets `List y` through its element join;
+-- * a union on the left must fit member-wise, one on the right is tried
+--   member by member while metas remain;
+-- * a meta already solved to a literal (from an earlier argument) widens to
+--   the join when another literal of the same family arrives, so
+--   `max 1 2` and `elem 1 [ 1 2 ]` check.
+constrainStructurally :: CheckContext -> Type -> Type -> InferM (Maybe Type)
+constrainStructurally ctx actual expected = do
+  let aliases = checkAliases ctx
+  actualHead <- normalizeIndexedType . resolveHead aliases <$> zonkHead actual
+  expectedHead <- resolveHead aliases <$> zonkHead expected
+  bound <- boundMeta expected
+  actualFull <- zonk actual
+  case (actualHead, expectedHead) of
+    _
+      | Just (n, solved) <- bound,
+        literalish solved,
+        literalish actualFull,
+        sameLiteralFamily solved actualFull,
+        not (isSubtype aliases actualFull solved) -> do
+          let joined = joinTypes aliases solved actualFull
+          modify' (\st -> st{substitutions = Map.insert n joined (substitutions st)})
+          pure (Just joined)
+    (TApp (TCon c) x, TApp (TCon c') y)
+      | c == c',
+        c `elem` ["List", "AttrsOf"] ->
+          Just . TApp (TCon c) <$> constrain ctx x y
+    (_, TApp (TCon "List") y)
+      | Just listTy <- sequenceListView actualHead,
+        TApp (TCon "List") x <- listTy ->
+          Just . tList <$> constrain ctx x y
+    -- (An unsolved meta on the right simply takes the whole union.)
+    (TUnion members, _)
+      | not (isMeta expectedHead),
+        hasUnresolvedMetas actualFull expectedHead || hasMetaInside expected -> do
+          forM_ members (\member -> constrain ctx member expected)
+          Just <$> zonk expected
+    (_, TUnion members)
+      | hasUnresolvedMetas actualFull actualFull -> firstSuccess members
+    _ -> pure Nothing
+  where
+    firstSuccess [] = pure Nothing
+    firstSuccess (member : rest) = do
+      attempt <- catchInfer (constrain ctx actual member)
+      case attempt of
+        Right _ -> Just <$> zonk expected
+        Left _ -> firstSuccess rest
+    hasMetaInside ty = not (Set.null (freeMetas ty))
+
+-- | Chase a chain of solved metas at the top of a type only, leaving the
+-- children (and any metas inside them) untouched.
+zonkHead :: Type -> InferM Type
+zonkHead = \case
+  TMeta n -> gets (Map.lookup n . substitutions) >>= maybe (pure (TMeta n)) zonkHead
+  other -> pure other
+
+-- | If a type is a meta (chain) that is already solved, the meta holding the
+-- solution and the solution itself.
+boundMeta :: Type -> InferM (Maybe (Int, Type))
+boundMeta = \case
+  TMeta n -> do
+    solved <- gets (Map.lookup n . substitutions)
+    case solved of
+      Just next@(TMeta _) -> boundMeta next
+      Just ty -> Just . (,) n <$> zonk ty
+      Nothing -> pure Nothing
+  _ -> pure Nothing
+
+-- | Literal singletons and unions of them.
+literalish :: Type -> Bool
+literalish = \case
+  TLit _ -> True
+  TUnion members -> all literalish members
+  _ -> False
+
+sameLiteralFamily :: Type -> Type -> Bool
+sameLiteralFamily a b = widenLiterals a == widenLiterals b
+
+constrainResolved :: CheckContext -> Type -> Type -> InferM Type
+constrainResolved ctx actual expected = do
+  -- Aliases are expanded lazily, so resolve each side's head before
+  -- comparing structure (`Mapper a b` must meet `Int -> Int` as a function).
+  actualZ <- zonk actual
+  expectedZ <- zonk expected
+  let actual' = normalizeIndexedType (resolveHead (checkAliases ctx) actualZ)
+      expected' = normalizeIndexedType (resolveHead (checkAliases ctx) expectedZ)
   case (actual', expected') of
     _
       | Just actualList <- sequenceListView actual',
@@ -994,8 +1137,9 @@ constrain ctx actual expected = do
       rowTail <- freshMeta
       _ <- bindMeta n (TOpenRecord Map.empty rowTail)
       pure expected'
-    (TMeta n, ty) -> bindMeta n ty
-    (ty, TMeta n) -> bindMeta n ty
+    -- Metas are solved to the unresolved type so alias names survive.
+    (TMeta n, _) -> bindMeta n expectedZ
+    (_, TMeta n) -> bindMeta n actualZ
     (TTypeList xs, TTypeList ys)
       | length xs == length ys ->
           TTypeList <$> zipWithM (constrain ctx) xs ys
@@ -1005,12 +1149,21 @@ constrain ctx actual expected = do
     (TOptional a, TOptional b) -> TOptional <$> constrain ctx a b
     _
       | hasUnresolvedMetas actual' expected',
-        Just (actualFields, actualTail) <- recordView (resolveType (checkAliases ctx) actual'),
-        Just (expectedFields, _) <- recordView (resolveType (checkAliases ctx) expected') ->
-          constrainRecord ctx actualFields actualTail expectedFields $> expected'
+        Just (actualFields, actualTail) <- recordView (resolveHead (checkAliases ctx) actual'),
+        Just (expectedFields, expectedTail) <- recordView (resolveHead (checkAliases ctx) expected') -> do
+          constrainRecord ctx actualFields actualTail expectedFields
+          -- An open expected row (`{ ...r }` from a signature) captures the
+          -- fields the expectation did not mention, so `r` is solved.
+          case expectedTail of
+            Just (TMeta n) -> do
+              let extra = Map.difference actualFields expectedFields
+              _ <- bindMeta n (maybe (TRecord extra) (mkOpenRecord extra) actualTail)
+              pure ()
+            _ -> pure ()
+          zonk expected'
       | hasUnresolvedMetas actual' expected',
-        Just (actualFields, _) <- recordView (resolveType (checkAliases ctx) actual'),
-        Just valueTy <- attrsOfView (resolveType (checkAliases ctx) expected') ->
+        Just (actualFields, _) <- recordView (resolveHead (checkAliases ctx) actual'),
+        Just valueTy <- attrsOfView (resolveHead (checkAliases ctx) expected') ->
           -- A record used as a dictionary: its values must fit together, so
           -- their join (not the first field) determines the value type.
           case map unOptional (Map.elems actualFields) of
@@ -1032,8 +1185,8 @@ constrain ctx actual expected = do
 -- required field, or the first field whose type does not fit.
 recordMismatchDetail :: AliasEnv -> Type -> Type -> Maybe String
 recordMismatchDetail aliases actual expected = do
-  (actualFields, actualTail) <- recordView (resolveType aliases actual)
-  (expectedFields, _) <- recordView (resolveType aliases expected)
+  (actualFields, actualTail) <- recordView (resolveHead aliases actual)
+  (expectedFields, _) <- recordView (resolveHead aliases expected)
   let open = actualTail == Just tDynamic || actualTail == Just tAny
       missing =
         [ name
@@ -1099,8 +1252,8 @@ constrainRecord ctx actualFields actualTail expectedFields =
 -- @
 unify :: CheckContext -> Type -> Type -> InferM Type
 unify ctx left right = do
-  left' <- normalizeIndexedType <$> zonk left
-  right' <- normalizeIndexedType <$> zonk right
+  left' <- normalizeIndexedType . resolveHead (checkAliases ctx) <$> zonk left
+  right' <- normalizeIndexedType . resolveHead (checkAliases ctx) <$> zonk right
   case (left', right') of
     _
       | Just leftList <- sequenceListView left',
@@ -1195,8 +1348,10 @@ bindMeta n ty = do
 -- @
 checkCast :: CheckContext -> Type -> Type -> InferM Type
 checkCast ctx actual expected = do
-  actual' <- normalizeIndexedType <$> zonk actual
-  expected' <- normalizeIndexedType <$> zonk expected
+  -- Aliases are expanded lazily, so resolve each side's head before
+  -- comparing structure (`Mapper a b` must meet `Int -> Int` as a function).
+  actual' <- normalizeIndexedType . resolveHead (checkAliases ctx) <$> zonk actual
+  expected' <- normalizeIndexedType . resolveHead (checkAliases ctx) <$> zonk expected
   let aliases = checkAliases ctx
   if hasUnresolvedMetas actual' expected'
     then unify ctx actual' expected' $> expected
@@ -1238,8 +1393,8 @@ inferArithmetic ctx env op left right = do
   leftTy <- inferExpr ctx env left >>= zonk
   rightTy <- inferExpr ctx env right >>= zonk
   let aliases = checkAliases ctx
-      leftResolved = resolveType aliases leftTy
-      rightResolved = resolveType aliases rightTy
+      leftResolved = resolveHead aliases leftTy
+      rightResolved = resolveHead aliases rightTy
   if leftResolved == tAny || rightResolved == tAny
     then pure tAny
     else
@@ -1295,11 +1450,12 @@ inferRelational ctx env left right = do
   leftTy <- inferExpr ctx env left >>= zonk
   rightTy <- inferExpr ctx env right >>= zonk
   let aliases = checkAliases ctx
-      leftResolved = resolveType aliases leftTy
-      rightResolved = resolveType aliases rightTy
+      leftResolved = resolveHead aliases leftTy
+      rightResolved = resolveHead aliases rightTy
       gradual ty = ty == tAny || ty == tDynamic
       comparable ty = isSubtype aliases ty tNumber || isSubtype aliases ty tString || isSubtype aliases ty tPath
       comparisonBase ty
+        | Just family <- numericFamily ty = widenSingleNumericFamily family
         | isSubtype aliases ty tNumber = tNumber
         | isSubtype aliases ty tPath = tPath
         | otherwise = tString
@@ -1339,8 +1495,8 @@ inferConcat ctx env left right = do
   leftTy <- inferExpr ctx env left >>= zonk
   rightTy <- inferExpr ctx env right >>= zonk
   let aliases = checkAliases ctx
-      leftResolved = resolveType aliases leftTy
-      rightResolved = resolveType aliases rightTy
+      leftResolved = resolveHead aliases leftTy
+      rightResolved = resolveHead aliases rightTy
   if leftResolved == tAny || rightResolved == tAny
     then pure tAny
     else
@@ -1372,8 +1528,8 @@ inferUpdate ctx env left right = do
   leftTy <- inferExpr ctx env left >>= zonk
   rightTy <- inferExpr ctx env right >>= zonk
   let aliases = checkAliases ctx
-      leftResolved = resolveType aliases leftTy
-      rightResolved = resolveType aliases rightTy
+      leftResolved = resolveHead aliases leftTy
+      rightResolved = resolveHead aliases rightTy
   if leftResolved == tAny || rightResolved == tAny
     then pure tAny
     else
@@ -1683,6 +1839,8 @@ hasDynamic = \case
   TTypeList items -> any hasDynamic items
   TFun _ left right -> hasDynamic left || hasDynamic right
   TRecord fields -> any hasDynamic fields
+  TOpenRecord fields tail' -> any hasDynamic fields || hasDynamic tail'
+  TOptional inner -> hasDynamic inner
   TUnion members -> any hasDynamic members
   TApp fun arg -> hasDynamic fun || hasDynamic arg
   TForall _ body -> hasDynamic body
