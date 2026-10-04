@@ -46,7 +46,7 @@ let
 in {
   loud = strings.shout "hello";
   csv = strings.join "," [ "a" "b" ];
-  version = strings.version;
+  inherit (strings) version;
 }
 ```
 
@@ -68,11 +68,7 @@ strings :: {
 ```
 
 `strings` is no longer `dynamic`, so mistakes surface: `strings.shout 42`
-reports `[TC0013] type mismatch: 42 vs String`.
-
-> [!NOTE]
-> **Upcoming syntax.** `inherit (strings) version;` is being added. Until then
-> write `version = strings.version;`.
+reports `[TC0013] type mismatch: 42 vs String`, pointing at the `42`.
 
 ### How declaration files are found
 
@@ -90,7 +86,11 @@ Two consequences:
   the same file is `[TD0002] duplicate ambient declarations`, and it fails
   every check in the workspace until you remove one.
 - A nested directory that has its own workspace marker (say, a vendored repo
-  with its own `.git`) is skipped.
+  with its own `.git`) is skipped, and so are hidden directories,
+  `node_modules`, `dist-newstyle`, `result*` build links and symlinked
+  directories.
+- Without any workspace marker, only the `.d.tnix` files directly next to the
+  checked file are loaded. Discovery never walks an arbitrary directory tree.
 
 ## Default exports
 
@@ -113,51 +113,65 @@ This example also shows that a `declare` block can sit at the top of a regular
 `.tnix` file, before its expression. Inline declarations are handy for one-off
 imports; shared ones belong in a `.d.tnix` file.
 
-## Typing `builtins`
+## Typed `builtins`
 
-`builtins` is `dynamic` until you declare it. A declaration target of
-`"builtins"` (a string, not a path) describes it:
+You never have to declare `builtins` yourself. Every tnix binary embeds a
+**built-in prelude** that types every Nix builtin, so `builtins.*` members and
+the globals Nix exposes without the prefix (`toString`, `map`, `throw`,
+`import`, `derivation`, `baseNameOf`, `dirOf`, `fetchTarball`, `isNull`,
+`removeAttrs`, `placeholder`, ...) are checked with no project setup:
+
+```tnix [lists.tnix]
+let
+  n = builtins.length [ 1 2 3 ];
+  inc = (x :: Int): x + 1;
+  xs = map inc [ 1 2 ];
+  names = builtins.attrNames { b = 1; a = 2; };
+  label = "${toString n} items";
+in { inherit n xs names label; }
+```
+
+```text
+root: {
+  label :: String;
+  n :: Int;
+  names :: List String;
+  xs :: List Int;
+}
+inc :: Int %1 -> Int
+label :: String
+n :: Int
+names :: List String
+xs :: List Int
+```
+
+The prelude also defines aliases you can use in your own annotations, such as
+`Derivation`, `DerivationArgs`, `FetchedSource`, `PathLike`, `FileType`,
+`TypeName` and `NameValuePair a`. Its source is
+[`registry/workspace/builtins.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/builtins.d.tnix);
+see [builtins and the registry](../reference/builtins.md).
+
+`builtins` is a closed record: a misspelled member such as
+`builtins.readFlie` is `` [TC0009] missing field `readFlie` ``.
+
+### Overriding the prelude
+
+A declaration target of `"builtins"` (a string, not a path) replaces the
+prelude for the whole workspace:
 
 ```tnix [types/builtins.d.tnix]
 declare "builtins" {
   head :: forall a. List a -> a;
   length :: forall a. List a -> Int;
   map :: forall a b. (a -> b) -> List a -> List b;
-  toString :: dynamic -> String;
+  toString :: unknown -> String;
 };
 ```
 
-```tnix [lists.tnix]
-let
-  n = builtins.length [ 1 2 3 ];
-  inc = (x :: Int): x + 1;
-  xs = builtins.map inc [ 1 2 ];
-in { inherit n xs; }
-```
-
-```text
-root: {
-  n :: Int;
-  xs :: List Int;
-}
-inc :: Int %1 -> Int
-n :: Int
-xs :: List Int
-```
-
-Once `builtins` is declared, it is a closed record: using a builtin that your
-declaration does not list, such as `builtins.readFile`, is
-`` [TC0009] missing field `readFile` ``. You do not have to write the full list
-yourself. The repository ships a complete declaration of the Nix builtins in
-[`registry/workspace/builtins.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/builtins.d.tnix),
-and `tnix init` (step 11) scaffolds a starter file. See
-[builtins and the registry](../reference/builtins.md).
-
-> [!NOTE]
-> **Upcoming.** Global builtins such as `toString`, `map`, `throw` and
-> `derivation`, which Nix exposes without the `builtins.` prefix, are being
-> added to the checker's environment. Today, spell them `builtins.toString` and
-> so on.
+The replacement is complete, not a merge: with this file in place,
+`builtins.readFile` is a missing field. That is useful to pin the builtins to
+an older Nix version or to forbid some of them. Otherwise, do not declare
+`builtins` at all. Delete this file again before you continue the tutorial.
 
 ## Generate declarations with `tnix emit`
 
@@ -209,7 +223,8 @@ path, which is what other modules will import at runtime.
 - `declare "./file.nix" { member :: Type; };` describes an existing module.
 - All `.d.tnix` files under the workspace root are loaded automatically.
 - Use `default` for modules that are not attribute sets.
-- `declare "builtins" { ... }` types the builtins.
+- `builtins` and global builtins such as `toString` are typed out of the box;
+  a workspace `declare "builtins" { ... }` replaces that prelude.
 - `tnix emit` writes declarations for your own `.tnix` files.
 
 <div class="tx-pager">

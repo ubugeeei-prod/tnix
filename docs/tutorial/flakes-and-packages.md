@@ -49,7 +49,9 @@ type NixpkgsInput = {
 
 This file only contains aliases, and aliases from workspace declaration files
 are visible to every file in the workspace. Records are structural, so the real
-nixpkgs values, which have far more attributes, fit these narrow types.
+nixpkgs values, which have far more attributes, fit these narrow types. The
+built-in prelude already defines a complete `Derivation`; a workspace alias
+with the same name takes precedence, which keeps this example small.
 
 > [!TIP]
 > The repository ships much larger alias packs for nixpkgs, `lib`, and popular
@@ -60,20 +62,21 @@ nixpkgs values, which have far more attributes, fit these narrow types.
 ## A package
 
 `callPackage` inspects a function's attribute-set pattern to decide which
-arguments to pass, so a package must keep the `{ stdenv, fetchurl }:` shape.
-Pattern-bound names start out untyped, so give them their types with a cast at
-the point of use:
+arguments to pass, so a package keeps the usual `{ stdenv, fetchurl }:` shape.
+Annotate the pattern fields you want checked. The annotations are erased, so
+`callPackage` still sees exactly the pattern it expects:
 
 ```tnix [package.tnix]
-{ stdenv, fetchurl }:
-(stdenv as Stdenv).mkDerivation {
+{ stdenv :: Stdenv, fetchurl :: FetchUrl, doCheck ? true }:
+stdenv.mkDerivation {
   pname = "hello";
   version = "2.12.1";
-  src = (fetchurl as FetchUrl) {
+  src = fetchurl {
     url = "mirror://gnu/hello/hello-2.12.1.tar.gz";
     hash = "sha256-jZkUKv2SV28wsM18tCqNxoCZmLxdYH2Idh9RLibH2yA=";
   };
-  meta = { description = "A program that produces a familiar, friendly greeting"; };
+  inherit doCheck;
+  meta.description = "A program that produces a familiar, friendly greeting";
 }
 ```
 
@@ -83,6 +86,7 @@ tnix check package.tnix
 
 ```text
 root: {
+  doCheck? :: Bool;
   fetchurl :: FetchUrl;
   stdenv :: Stdenv;
 } -> {
@@ -91,23 +95,13 @@ root: {
 }
 ```
 
-The casts did more than allow the field access: they fixed the types of the
-pattern's fields, so the whole file now has the type "a function from
-`{ stdenv; fetchurl; }` to a derivation". Forget `version` and the check
-fails, naming exactly what was expected:
+The file now has the type "a function from `{ stdenv; fetchurl; doCheck?; }` to
+a derivation". `doCheck ? true` became an optional `Bool` field. Forget
+`version` and the check fails at the `mkDerivation` argument, naming the
+missing field:
 
 ```text
-[TC0013] type mismatch: {
-  pname :: "hello";
-  src :: Path;
-} vs {
-  pname :: String;
-  src :: Path | {
-    name :: String;
-    outPath :: String;
-  };
-  version :: String;
-}
+2:21: [TC0009] missing field `version`: expected { pname :: String; src :: Path | { name :: String; outPath :: String; }; version :: String; } but got { doCheck :: Bool; meta :: { description :: "A program that produces a familiar, friendly greeting"; }; pname :: "hello"; src :: Path; }
 ```
 
 Compile it to the `package.nix` that `callPackage` will load:
@@ -117,60 +111,69 @@ tnix compile package.tnix -o package.nix
 ```
 
 ```nix [package.nix]
-{ stdenv, fetchurl }: stdenv.mkDerivation {
+{ stdenv, fetchurl, doCheck ? true }: stdenv.mkDerivation {
   pname = "hello";
   version = "2.12.1";
   src = fetchurl {
     url = "mirror://gnu/hello/hello-2.12.1.tar.gz";
     hash = "sha256-jZkUKv2SV28wsM18tCqNxoCZmLxdYH2Idh9RLibH2yA=";
   };
-  meta = {
-    description = "A program that produces a familiar, friendly greeting";
-  };
+  inherit doCheck;
+  meta.description = "A program that produces a familiar, friendly greeting";
 }
 ```
 
-> [!NOTE]
-> **Upcoming syntax.** Default arguments and `@` binders
-> (`{ stdenv, fetchurl, withDocs ? false, ... }@args:`), `inherit (lib) licenses;`,
-> nested attribute paths (`meta.license = ...;`), and `<nixpkgs>` lookups
-> (`import <nixpkgs> { }`) are being added to the parser. Until they land,
-> list pattern fields without defaults, write `meta = { license = ...; };`, and
-> pass nixpkgs in explicitly.
+### Unannotated dependencies stay gradual
+
+You can also leave the pattern unannotated. tnix then treats the injected
+dependencies as *gradual*: it records which fields you select, but calling one
+of them does not fix its type from that single call site.
+
+```tnix [package-untyped.tnix]
+{ stdenv, fetchurl }:
+stdenv.mkDerivation {
+  pname = "hello";
+  version = "2.12.1";
+  src = fetchurl { url = "mirror://gnu/hello/hello-2.12.1.tar.gz"; };
+}
+```
+
+```text
+root: {
+  fetchurl :: dynamic -> dynamic;
+  stdenv :: {
+    mkDerivation :: dynamic -> dynamic;
+    ...
+  };
+} -> dynamic
+```
+
+That is why unannotated nixpkgs code type-checks out of the box: functions such
+as `lib.mkOption` or `fetchFromGitHub` are polymorphic or overloaded in
+practice, and pinning them to their first use would produce false errors. Add
+annotations where you want real checking.
+
+The rest of the Nix language works as you would expect: `inherit (lib)
+licenses;`, `meta.license = ...;`, `import <nixpkgs> { }`, `x.a or default`,
+`|>` pipes and the other operators all parse and type-check.
 
 ## A flake
 
 A flake's `outputs` is a function from the resolved inputs to an attribute set.
-Annotate the function parameter and every `inputs.nixpkgs...` lookup is
-checked:
+Annotate the inputs you use and every lookup through them is checked:
 
 ```tnix [flake.tnix]
-type FlakeInputs = {
-  self :: dynamic;
-  nixpkgs :: NixpkgsInput;
-};
-
 {
   description = "hello, typed with tnix";
 
-  inputs = {
-    nixpkgs = { url = "github:NixOS/nixpkgs/nixos-unstable"; };
-  };
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = (inputs :: FlakeInputs):
+  outputs = { self, nixpkgs :: NixpkgsInput, ... }:
     let
-      pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
     in {
-      packages = {
-        x86_64-linux = {
-          default = pkgs.hello;
-        };
-      };
-      devShells = {
-        x86_64-linux = {
-          default = pkgs.mkShell { packages = [ pkgs.hello ]; };
-        };
-      };
+      packages.x86_64-linux.default = pkgs.hello;
+      devShells.x86_64-linux.default = pkgs.mkShell { packages = [ pkgs.hello ]; };
     };
 }
 ```
@@ -180,19 +183,20 @@ tnix check flake.tnix
 tnix compile flake.tnix -o flake.nix
 ```
 
-`outputs = inputs: ...` is a valid flake: Nix passes the inputs as one attribute
-set, whether or not you destructure it. Mistakes that would otherwise surface
-only during `nix flake check` on a specific system are now immediate. Ask for a
-system that `NixpkgsInput` does not list:
+Mistakes that would otherwise surface only during `nix flake check` on a
+specific system are now immediate. Ask for a system that `NixpkgsInput` does
+not list:
 
 ```text
-[TC0009] missing field `riscv64-linux` on {
-  aarch64-darwin :: {
-  ...
+8:14: [TC0009] missing field `riscv64-linux` on { aarch64-darwin :: { ...
 ```
 
 Put something that is not a derivation into `mkShell`'s `packages`, such as the
-string `"git"`, and the list no longer matches `List Derivation`.
+string `"git"`, and the error names the field:
+
+```text
+11:53: [TC0013] type mismatch in field `packages`: Vec 1 "git" vs List { name :: String; outPath :: String; }
+```
 
 > [!TIP]
 > Commit both `flake.tnix` and the generated `flake.nix`. Nix reads only
@@ -229,8 +233,9 @@ The declaration's target path is relative to the `.d.tnix` file, hence
 
 - Describe only the nixpkgs surface you use; structural records make narrow
   types fit.
-- Keep `callPackage` patterns and type pattern-bound names with `as`.
-- Annotate `outputs`' parameter to check every input lookup.
+- Keep `callPackage` patterns and annotate their fields
+  (`{ stdenv :: Stdenv, ... }:`); unannotated dependencies stay gradual.
+- Annotate the flake inputs you use to check every lookup through them.
 - Generate `flake.nix` from `flake.tnix`, or keep `flake.nix` and declare it.
 
 <div class="tx-pager">

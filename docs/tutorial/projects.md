@@ -37,6 +37,17 @@ to overwrite an existing `tnix.config.tnix`.
 | `src/main.tnix` | a starter source file |
 | `types/builtins.d.tnix` | a starter `declare "builtins"` block |
 
+> [!WARNING]
+> A workspace `declare "builtins"` block *replaces* the built-in prelude that
+> types every Nix builtin (step 6). The scaffolded starter only lists a few
+> members, so delete `types/builtins.d.tnix` unless you deliberately want to
+> restrict `builtins`. Set `builtins = false;` in the config to stop
+> `tnix scaffold` from recreating it.
+
+`tnix init` can also set up an editor in the same step:
+`tnix init hello-tnix --editor vscode` runs `tnix ide install vscode` for the
+new project (step 10).
+
 ## `tnix.config.tnix`
 
 The configuration is itself a tnix attribute set:
@@ -67,6 +78,7 @@ The fields you will touch most:
 - `generatedDeclarationDir`: where generated `.d.tnix` files go.
 - `declarationPacks`: extra `.d.tnix` files or directories to load, for example
   a vendored copy of the tnix registry.
+- `builtins`: whether `tnix scaffold` creates `types/builtins.d.tnix`.
 
 All paths are relative to the config file. The
 [configuration reference](../reference/config.md) documents every field and
@@ -146,8 +158,8 @@ cp ../tnix-tour/types/nixpkgs.d.tnix types/
 tnix check-project
 ```
 
-`types/builtins.d.tnix` from `tnix init` and your `types/nixpkgs.d.tnix` are
-both picked up because they live under the project root.
+`types/nixpkgs.d.tnix` is picked up because it lives under the project root, as
+is every other `.d.tnix` file there.
 
 > [!TIP]
 > Should `flake.tnix` compile to the repository root instead of `dist/`? Keep it

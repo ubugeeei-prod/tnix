@@ -21,7 +21,7 @@ let
   double = (x :: Int): x * 2;
 
   label :: String -> Int -> String;
-  label = prefix: n: "${prefix}-${builtins.toString n}";
+  label = prefix: n: "${prefix}-${toString n}";
 
   id :: forall a. a -> a;
   id = x: x;
@@ -60,9 +60,10 @@ port :: Int
 3. **Casts** (`expr as Type`) assert a type at an expression. They are the
    subject of [step 5](./gradual.md).
 
-`builtins` is untyped (`dynamic`) unless you declare it, so
-`builtins.toString n` is accepted without complaint. Step 6 shows how to give
-`builtins` real types.
+`toString` is one of the builtins that Nix puts in scope without the
+`builtins.` prefix. tnix ships typed declarations for all of them, and for
+every `builtins.*` member, so `toString n` is checked like any other call
+(`toString :: unknown -> String`). Step 6 explains where those types come from.
 
 ## Literal types and widening
 
@@ -82,7 +83,7 @@ in level
 ```
 
 ```text
-[TC0013] type mismatch: "trace" vs "debug" | "info"
+6:11: [TC0013] type mismatch: "trace" vs "debug" | "info"
 ```
 
 A signature widens: `port :: Int` makes `port` an `Int` even though its value is
@@ -92,7 +93,8 @@ general one.
 ## Numbers
 
 Numbers form a small tower: `Nat <: Int <: Number` and `Float <: Number`.
-Arithmetic picks the narrowest family that is still correct:
+Arithmetic (`+`, `-`, `*`, `/`) picks the narrowest family that is still
+correct:
 
 ```tnix [numbers.tnix]
 let
@@ -101,20 +103,23 @@ let
 
   offset = count - 5;
   scaled = count * 2;
+  half = count / 2;
   ratio = 1.5 * 2;
   add = a: b: a + b;
-in { inherit offset scaled ratio add; }
+in { inherit offset scaled half ratio add; }
 ```
 
 ```text
 root: {
   add :: Number %1 -> Number %1 -> Number;
+  half :: Int;
   offset :: Int;
   ratio :: Number;
   scaled :: Int;
 }
 add :: Number %1 -> Number %1 -> Number
 count :: Nat
+half :: Int
 offset :: Int
 ratio :: Number
 scaled :: Int
@@ -122,12 +127,9 @@ scaled :: Int
 
 Subtracting from a `Nat` can go negative, so `offset` widens to `Int`. Mixing a
 float with an integer gives `Number`. An unannotated `a + b` has nothing to go
-on, so it defaults to `Number`. A negative literal is rejected where a `Nat` is
-expected: `count = -1;` reports `[TC0013] type mismatch: -1 vs Nat`.
-
-> [!NOTE]
-> **Upcoming syntax.** Division (`a / b`) is being added to the parser. Until it
-> lands, use `builtins.div a b`.
+on, so it defaults to `Number`. Integer division stays an integer, as in Nix.
+A negative literal is rejected where a `Nat` is expected: `count = -1;` reports
+`[TC0013] type mismatch: -1 vs Nat`.
 
 ## Functions and the `%1` arrow
 
@@ -144,64 +146,92 @@ where the signature promises an `Int`:
 ```tnix [bad-fn.tnix]
 let
   bad :: Int -> Int;
-  bad = x: "${builtins.toString x}";
+  bad = x: "${toString x}";
 in bad
 ```
 
 ```text
-[TC0013] type mismatch: String vs Int
+3:9: [TC0013] type mismatch: String vs Int
 ```
 
-Calling something that is not a function is caught too: `let a = 1; in a 2`
-reports `[TC0018] cannot call an integer as a function`.
+The `3:9:` prefix is the line and column of the offending expression, here the
+body of `bad`. Editors underline exactly that span. Calling something that is
+not a function is caught too: `let a = 1; in a 2` reports
+`1:15: [TC0018] cannot call an integer as a function`.
 
 ## Polymorphism
 
 `id :: forall a. a -> a` is polymorphic: each use picks its own `a`, which is
-why `id true` returned `true`. tnix also generalizes unannotated bindings, but
-only *after* the `let` group that defines them, because the bindings of one
-`let` may refer to each other recursively. So this fails:
+why `id true` returned `true`. You rarely need to write the `forall` yourself,
+though. tnix infers **principal polymorphic types** for unannotated `let`
+bindings, the way Haskell and OCaml do (Hindley-Milner let-polymorphism):
 
 ```tnix [poly.tnix]
 let
   id = x: x;
+  compose = f: g: x: f (g x);
+
   n = id 1;
   s = id "one";
-in { inherit n s; }
-```
-
-```text
-[TC0013] type mismatch: "one" vs 1
-```
-
-Inside the group, `id` is still being inferred, and its first use fixes the
-parameter to `1`. There are two fixes:
-
-- give it a polymorphic signature, `id :: forall a. a -> a;` (as in
-  `annotations.tnix`), or
-- define it in an outer `let`, so it is generalized before the inner group uses
-  it:
-
-```tnix [poly-nested.tnix]
-let
-  id = x: x;
-in
-let
-  n = id 1;
-  s = id "one";
-in { inherit n s; }
+  inc = compose (x: x + 1) (x: x * 2);
+in { inherit n s inc; }
 ```
 
 ```text
 root: {
+  inc :: Int %1 -> Int;
   n :: 1;
   s :: "one";
 }
+compose :: forall t0 t1 t2. (t1 -> t2) %1 -> (t0 -> t1) %1 -> t0 %1 -> t2
 id :: forall t0. t0 %1 -> t0
+inc :: Int %1 -> Int
+n :: 1
+s :: "one"
 ```
 
-Inferred type variables are named `t0`, `t1`, ... in output. Variables you
-write yourself keep their names.
+`id` is used at `1` and at `"one"` in the same `let`, and each use gets a fresh
+instance. Inferred type variables are named `t0`, `t1`, ... in output; variables
+you write yourself keep their names.
+
+The bindings of one `let` may refer to each other in any order. tnix sorts them
+by their dependencies, infers each group of mutually recursive bindings
+together, and generalizes a group as soon as it is solved. Mutual recursion
+works without annotations:
+
+```tnix [even-odd.tnix]
+let
+  isEven = n: if n == 0 then true else isOdd (n - 1);
+  isOdd = n: if n == 0 then false else isEven (n - 1);
+in isEven 10
+```
+
+```text
+root: Bool
+isEven :: Int -> Bool
+isOdd :: Int -> Bool
+```
+
+### Signatures are promises
+
+A `forall` signature is **rigid**: the body must work for *every* choice of the
+type variables, not just for one. A body that only works for some `a` is
+rejected:
+
+```tnix [rigid.tnix]
+let
+  id :: forall a. a -> a;
+  id = x: 1;
+in id
+```
+
+```text
+3:8: [TC0013] type mismatch: 1 vs a
+```
+
+Inside the body, `a` is an opaque type that only equals itself, so `1` does not
+fit. This is what makes a signature trustworthy: callers may rely on `id`
+returning exactly what they passed in.
 
 ## Recap
 
@@ -210,9 +240,9 @@ write yourself keep their names.
 - Literals keep literal types until a signature or a join widens them.
 - `%1 ->` marks a function that uses its argument once; it is accepted wherever
   `->` is expected.
-- Unannotated bindings are generalized after their `let` group. Use
-  `forall` signatures for helpers that are used at several types in the same
-  group.
+- Unannotated `let` bindings get principal polymorphic types, so one helper
+  can be used at several types. `forall` signatures are rigid: the body must
+  work for every instantiation.
 
 <div class="tx-pager">
 

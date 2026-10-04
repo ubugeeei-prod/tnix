@@ -57,7 +57,7 @@ in raw.port
 ```
 
 ```text
-[TC0008] cannot select field `port` from unknown
+4:4: [TC0008] cannot select field `port` from unknown
 ```
 
 Assigning `raw` to a `String` binding fails the same way, with `[TC0013] type
@@ -92,7 +92,7 @@ do is relate two unrelated concrete types:
 
 ```text
 $ tnix check bad-cast.tnix     # contains: 1 as String
-[TC0015] invalid cast: 1 as String
+1:1: [TC0015] invalid cast: 1 as String
 ```
 
 Like every other piece of type syntax, `as` is erased: `raw as { port :: Int; }`

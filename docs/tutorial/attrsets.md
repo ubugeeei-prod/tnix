@@ -75,7 +75,8 @@ A few things happened here:
 
 ## Missing fields
 
-Leave out a required field and the call is rejected:
+Leave out a required field and the call is rejected. The diagnostic points at
+the argument and names the field that is missing:
 
 ```tnix [package-missing.tnix]
 type Package = { pname :: String; version :: String; };
@@ -86,15 +87,11 @@ in describe { pname = "hello"; }
 ```
 
 ```text
-[TC0013] type mismatch: {
-  pname :: "hello";
-} vs {
-  pname :: String;
-  version :: String;
-}
+5:13: [TC0009] missing field `version`: expected { pname :: String; version :: String; } but got { pname :: "hello"; }
 ```
 
-Selecting a field that is not there is its own diagnostic:
+Selecting a field that is not there is the same diagnostic, pointing at the
+selection:
 
 ```tnix [typo.tnix]
 let
@@ -103,90 +100,145 @@ in hello.license
 ```
 
 ```text
-[TC0009] missing field `license` on {
-  pname :: "hello";
-  version :: "2.12.1";
+3:4: [TC0009] missing field `license` on { pname :: "hello"; version :: "2.12.1"; }
+```
+
+## Inferred record parameters
+
+You do not have to annotate a parameter before selecting from it. When a
+function selects fields from a value whose type is not known yet, tnix infers an
+**open record**: "at least these fields, plus possibly others". This is *row
+polymorphism*:
+
+```tnix [rows.tnix]
+let
+  describe = pkg: "${pkg.pname}-${pkg.version}";
+  withSuffix = pkg: pkg // { suffix = "-dev"; };
+in {
+  name = describe { pname = "hello"; version = "2.12.1"; extra = true; };
+  dev = withSuffix { pname = "hello"; };
 }
 ```
 
-## Annotate parameters you select from
-
-Notice that `describe` annotates its parameter, `(pkg :: Package):`. The checker
-infers a function body before it compares the function against its signature,
-so inside an unannotated `pkg: ...` the parameter's type is still an unknown
-inference variable and `pkg.pname` has nothing to look up:
-
 ```text
-[TC0009] missing field `pname` on ?0
+root: {
+  dev :: {
+    pname :: "hello";
+    suffix :: "-dev";
+  };
+  name :: String;
+}
+describe :: forall t0 t1. {
+  pname :: t0;
+  version :: t1;
+  ...
+} -> String
+withSuffix :: forall t0. {
+  ...t0
+} %1 -> {
+  suffix :: "-dev";
+  ...t0
+}
 ```
 
-Whenever a function selects fields from a parameter, annotate that parameter.
-A `let` signature on the function alone is not enough today.
+- `{ pname :: t0; version :: t1; ... }` is an open record type. The `...` stands
+  for the fields the function does not care about, so `describe` accepts the
+  extra `extra = true` field.
+- `...t0` names those remaining fields. `withSuffix` returns *the same* other
+  fields it received, plus `suffix`: `//` is row-aware.
+- You can write open records in annotations too: `{ pname :: String; ... }`.
+
+A call that does not provide a selected field is still an error:
+`describe { pname = "hello"; }` reports
+`` 3:13: [TC0009] missing field `version` required by { pname :: ?6; version :: ?7; } ``,
+where `?6` and `?7` are field types that were not solved yet.
+
+`x.a or default` selects with a fallback. It never makes `a` a required
+field, so it is the way to read an attribute that may be absent.
 
 ## Attribute-set patterns
 
-Nix's destructuring lambdas work, and the checker infers a record type for the
-argument:
+Nix's destructuring lambdas work in full, including default values and the `@`
+binder, and the checker infers a record type for the argument:
 
 ```tnix [pattern.tnix]
 let
-  mk = { pname, version, ... }: "${pname}-${version}";
-in mk { pname = "hello"; version = "2.12.1"; extra = true; }
+  mk = { pname, version ? "0.1.0", doCheck ? null, ... }@args:
+    "${pname}-${version}";
+in {
+  a = mk { pname = "hello"; };
+  b = mk { pname = "hello"; version = "2.12.1"; extra = true; };
+}
 ```
 
 ```text
-root: String
+root: {
+  a :: String;
+  b :: String;
+}
 mk :: forall t0 t1. {
+  doCheck? :: t1;
   pname :: t0;
-  version :: t1;
+  version? :: String;
+  ...
 } -> String
 ```
 
-The pattern's fields are not annotated, so each gets a type variable. Interpolating
-them is fine; selecting fields *from* them is not, for the reason above. Step 9
-shows how to give pattern-bound names a type with `as`.
+- A field with a default becomes an **optional field**, written `name? :: T`.
+  Callers may leave it out. The type comes from the default, widened to its
+  base type: `version ? "0.1.0"` accepts any `String`, not just `"0.1.0"`.
+- `doCheck ? null` is Nix's idiom for "optional, no default", so the default
+  says nothing about the type of a value a caller passes.
+- `...` makes the argument record open, and `@args` binds the whole argument.
+  `args@{ ... }:` works too.
+- Leaving out a field that has no default is an error:
+  `mk { version = "1.0"; }` reports
+  `` 3:7: [TC0009] missing field `pname` required by { pname :: ?4; version? :: String; } ``.
 
-> [!NOTE]
-> **Upcoming syntax.** Default values and an `@` binder, as in
-> `{ pname, version ? "0.1.0", ... }@args:`, are being added to the parser.
-> Today a pattern lists bare names and an optional `...`.
+Pattern fields can carry an annotation, which is erased like every other type:
+`{ pname :: String, version ? "0.1.0" }:`. Step 9 uses this to type a
+`callPackage`-style package.
 
 ## `rec`, `inherit` and `with`
 
 ```tnix [rec.tnix]
 let
-  base = { a = 1; };
+  base = { a = 1; b = "two"; };
 in rec {
-  inherit base;
+  inherit (base) a b;
   greeting = "hi";
   loud = "${greeting}!";
+  meta.license = "MIT";
+  meta.homepage = "https://example.org";
   fromWith = with base; a + 1;
 }
 ```
 
 ```text
 root: {
-  base :: {
-    a :: 1;
-  };
+  a :: 1;
+  b :: "two";
   fromWith :: Int;
   greeting :: "hi";
   loud :: String;
+  meta :: {
+    homepage :: "https://example.org";
+    license :: "MIT";
+  };
 }
 base :: {
   a :: 1;
+  b :: "two";
 }
 ```
 
-Inside `rec { ... }` the fields can see each other. `with base;` brings the
-fields of a *known* record into scope. If the scope's type is not a known record
-(for example an untyped import), names in the body that tnix cannot resolve are
-treated as `dynamic` instead of being reported as unbound.
-
-> [!NOTE]
-> **Upcoming syntax.** `inherit (base) a;` and nested attribute paths such as
-> `meta.license = "MIT";` are being added. Today, write
-> `a = base.a;` and `meta = { license = "MIT"; };`.
+Inside `rec { ... }` the fields can see each other. `inherit (base) a b;`
+copies fields out of another attribute set, and nested attribute paths such as
+`meta.license = "MIT";` are merged into one `meta` record, exactly as Nix does.
+`with base;` brings the fields of a *known* record into scope. If the scope's
+type is not a known record (for example an untyped import), names in the body
+that tnix cannot resolve are treated as `dynamic` instead of being reported as
+unbound.
 
 ## Unions of records
 
@@ -249,13 +301,49 @@ Remove `aarch64-darwin` from `shells` and you get
 A key of plain type `String` is allowed too, but then the result is `dynamic`,
 since the checker cannot know which field you meant.
 
+Computed keys also work when *building* an attribute set. Because the names are
+not known statically, a set built only from computed keys is a dictionary,
+`AttrsOf T`:
+
+```tnix [computed.tnix]
+let
+  forSystem = system: { ${system} = "bash"; };
+  cfg = { port = 80; };
+in {
+  one = forSystem "x86_64-linux";
+  port = cfg.port or 8080;
+  host = cfg.host or "localhost";
+}
+```
+
+```text
+root: {
+  host :: "localhost";
+  one :: AttrsOf "bash";
+  port :: 80 | 8080;
+}
+cfg :: {
+  port :: 80;
+}
+forSystem :: String %1 -> AttrsOf "bash"
+```
+
+A record whose fields all fit `T` is a subtype of `AttrsOf T`, which is how
+builtins such as `builtins.mapAttrs` and `builtins.attrValues` accept ordinary
+records. A set mixing static and computed keys keeps its static fields and is
+open for the rest: `{ a = 1; ${k} = 2; }` is `{ a :: 1; ... }`.
+
 ## Recap
 
 - Record types are structural; extra fields are fine (width subtyping).
-- `//`, `?`, `rec`, `inherit` and `with` are all typed.
-- Annotate a parameter before selecting fields from it.
+- Selecting from an unannotated parameter infers an open record
+  (`{ a :: T; ... }`); `//` keeps the other fields.
+- Pattern defaults produce optional fields (`name? :: T`).
+- `//`, `?`, `or`, `rec`, `inherit (src)`, nested paths and `with` are all
+  typed.
 - Unions of records allow only the fields every member shares.
-- Literal-typed keys make `attrs.${key}` checkable.
+- Literal-typed keys make `attrs.${key}` checkable; computed keys build
+  `AttrsOf T` dictionaries.
 
 <div class="tx-pager">
 

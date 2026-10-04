@@ -4,11 +4,13 @@
 editor configuration in one step. `tnix doctor` then checks that the toolchain
 and the editors are wired up.
 
-Install `tnix` and `tnix-lsp` first:
+Install `tnix` and `tnix-lsp` first, with the installer script or the flake
+(its default package contains both binaries):
 
 ```bash
-nix profile install github:ubugeeei/tnix#tnix
-nix profile install github:ubugeeei/tnix#tnix-lsp
+curl -fsSL https://tnix.dev/install.sh | sh
+# or
+nix profile install github:ubugeeei-prod/tnix
 ```
 
 ## Quick start

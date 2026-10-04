@@ -6,30 +6,34 @@ description: Connect VS Code, Zed or Neovim to the tnix language server, and dia
 # 10. Editor setup
 
 Everything `tnix check` tells you, the language server tells you while you
-type: diagnostics with their codes, hover types, inlay hints for inferred
-bindings, completion after `.`, go to definition, find references, rename,
-document symbols, folding and semantic highlighting.
+type: diagnostics with their codes, underlined at the exact span the checker
+reports, hover types, inlay hints for inferred bindings, scope- and type-aware
+completion, go to definition, find references, rename, document symbols,
+folding and semantic highlighting. It also adds two lints of its own: unused
+bindings (`TL0001`, shown faded) and uses of declarations documented as
+`@deprecated` (`TL0002`, shown struck through). See
+[diagnostics](../diagnostics.md#language-server-lints-tlxxxx).
 
 The server is the `tnix-lsp` binary from step 1. Every editor integration
 starts it over stdio; the integrations differ only in how they are installed.
 
 ## The quick way: `tnix ide install`
 
-> [!NOTE]
-> **Upcoming.** `tnix ide install` and `tnix doctor` are being added to the CLI
-> for the next release. This section describes their intended behavior; until
-> they ship, use the manual setup below.
-
 `tnix ide install <editor>` sets up an editor in one command:
 
 ```bash
-tnix ide install vscode
+tnix ide install vscode     # or: cursor, vscodium, zed, neovim, helix
 ```
 
-For VS Code it installs the tnix extension and points it at the `tnix-lsp` that
-belongs to the same installation as the `tnix` you ran, so the CLI and the
-editor always agree on the language version. The same command accepts the other
-supported editors (`zed`, `neovim`); run `tnix ide --help` for the current list.
+For VS Code it installs the tnix extension, writes `.vscode/settings.json` with
+the path of the `tnix-lsp` it found, and recommends the extension in
+`.vscode/extensions.json`. Every editor gets the equivalent: Zed's
+`auto_install_extensions`, a generated Lua file for Neovim, `languages.toml`
+entries for Helix. Settings are merged into existing files, never clobbered,
+and running the command again is a no-op. Add `--dry-run` to preview the
+changes and `--global` to write user-level settings instead of project
+settings. `tnix ide list` shows which supported editors are detected on your
+machine. [Editor setup](../editors.md) documents every flag.
 
 ## Check the setup: `tnix doctor`
 
@@ -39,12 +43,13 @@ When something does not light up, run:
 tnix doctor
 ```
 
-`tnix doctor` inspects your environment and reports, check by check, whether
-`tnix` and `tnix-lsp` are on `PATH`, whether their versions match, whether the
-current directory has a workspace root and a readable `tnix.config.tnix`, and
-whether the editor integrations it knows about are installed. Each failing
-check comes with the command that fixes it. Include its output when you file a
-bug.
+`tnix doctor` reports, check by check, whether `tnix` and `tnix-lsp` are on
+`PATH` and report the same version, whether the current project's
+`tnix.config.tnix` loads, whether each detected editor has the tnix
+integration, and whether `nix` is available. Each problem comes with the
+command that fixes it, for example `run tnix ide install vscode`. It exits with
+status `1` only when a check fails; warnings do not change the exit status.
+Include its output (or `tnix doctor --format json`) when you file a bug.
 
 ## Manual setup
 
@@ -103,7 +108,8 @@ server log that is useful when debugging a client.
 Open `package.tnix` from step 9 and:
 
 1. hover `mkDerivation` to see `MkDerivationArgs -> Derivation`;
-2. delete the `version` line and watch the `TC0013` diagnostic appear;
+2. delete the `version` line and watch the `TC0009` diagnostic appear on the
+   `mkDerivation` argument;
 3. type `pkgs.` inside `flake.tnix` to complete the attributes of `Pkgs`.
 
 <div class="tx-pager">

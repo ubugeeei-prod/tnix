@@ -49,6 +49,11 @@ paths are resolved against the directory that contains `tnix.config.tnix`.
 | `exclude` | list of paths | `[]` | source discovery |
 | `builtins` | `Bool` | `true` | `scaffold` (whether to create `builtins.d.tnix`) |
 
+`builtins` only controls scaffolding. Every analysis already types
+`builtins` with the prelude built into tnix, and a scaffolded
+`builtins.d.tnix` *replaces* that prelude with its short starter list. Set
+`builtins = false;` and delete the file to keep the full prelude.
+
 A field with the wrong kind of value fails the command, for example
 `expected list of path-like values for include`. Errors from decoding
 `declarationPacks` use the `TD0004` to `TD0006` codes, because that field is

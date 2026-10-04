@@ -67,7 +67,7 @@ against the *reduced* type:
 Change `result = 42;` to a string and the reduced type shows its teeth:
 
 ```text
-[TC0013] type mismatch: "forty-two" vs ReturnOf (String -> Int)
+15:12: [TC0013] type mismatch: "forty-two" vs ReturnOf (String -> Int)
 ```
 
 ## How matching works
@@ -115,7 +115,7 @@ in port
 
 `PortOf Config` reduces to `Range 1 65535 Int`, a numeric refinement: integers
 from 1 to 65535. `port = 70000;` is rejected with
-`[TC0013] type mismatch: 70000 vs PortOf Config`. The
+`6:10: [TC0013] type mismatch: 70000 vs PortOf Config`. The
 [language reference](../language-reference.md#numeric-validators) covers `Range`,
 `Unit`, and the `Vec` / `Matrix` / `Tensor` shape types.
 

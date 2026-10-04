@@ -12,9 +12,11 @@ checker's behavior, write declaration packs, or contribute to the core. For
 the user-facing rules alone, see the [type system overview](../type-system.md)
 and the [language reference](../language-reference.md).
 
-The short version: tnix is a **local, constraint-based inference engine** over a
-single structural type tree, with **subtyping** for records, numbers and
-shapes, a **consistency** relation for the gradual `dynamic` boundary,
+The short version: tnix runs **Hindley-Milner inference** (let-polymorphism,
+generalization per dependency group, rigid signatures) over a single structural
+type tree, extended with **row-polymorphic records**, **subtyping** for records,
+numbers and shapes, a **consistency** relation for the gradual `dynamic`
+boundary, *soft* inference variables that keep injected dependencies gradual,
 **kind inference** for higher-kinded aliases, and **structural reduction** for
 aliases and conditional types. Types never reach runtime: compilation is pure
 erasure.
@@ -61,7 +63,8 @@ erasure.
 server and the tests:
 
 1. **Load the declaration world** for the file's workspace (cached per
-   workspace root for the length of one CLI command or LSP request).
+   workspace root for the length of one CLI command or LSP request), on top
+   of the built-in `builtins` prelude.
 2. **Parse** the file (`Parser`, `ParserExpr`, `ParserType`, `ParserLexer`).
    Directive comments are scanned first, line by line, and attached to the next
    line of code.
@@ -71,9 +74,9 @@ server and the tests:
 5. **Collect local `declare` blocks** and merge them with the world.
 6. **Check** the root expression (`Check.checkProgram`).
 
-Each phase returns `Either String`, so the first error stops the pipeline. A
-file therefore reports **one diagnostic at a time**; `check-project` reports one
-per file.
+The first error stops the pipeline. A file therefore reports **one diagnostic
+at a time**; `check-project` reports one per file. Parser and checker errors
+carry the source span they were raised at (see [diagnostics](#diagnostics)).
 
 ## Type representation
 
@@ -89,6 +92,8 @@ look at the same tree.
 | `TLit l` | `"web"`, `8080`, `1.5`, `true` | singleton literal types |
 | `TFun m a b` | `a -> b`, `a %1 -> b` | `m` is the multiplicity, `One` or `Many` |
 | `TRecord fs` | `{ name :: String; }` | field map; closed for lookup, open for subtyping |
+| `TOpenRecord fs r` | `{ name :: String; ... }`, `{ ...r }` | open record (row): known fields plus a tail. The tail is a meta during inference, a row variable after generalization, or `dynamic` for "unknown further fields" |
+| `TOptional t` | `name? :: T` | marks an optional field; only meaningful as a field type |
 | `TUnion ts` | `A \| B` | flattened and de-duplicated |
 | `TApp f x` | `List Int`, `f a` | left-nested application, first-class for HKT |
 | `TTypeList ts` | `[2 3 4]` | type-level list, used by `Tensor` shapes and `Tuple` |
@@ -105,7 +110,8 @@ appearance.
 
 Several "types" are encodings over `TCon` and `TApp` rather than constructors:
 
-- `List a` is `TApp (TCon "List") a`.
+- `List a` is `TApp (TCon "List") a`, and the dictionary type `AttrsOf a` is
+  `TApp (TCon "AttrsOf") a`.
 - `Vec n a`, `Matrix r c a` and `Tensor [d1 d2 ...] a` are normalized by
   `Indexed.normalizeIndexedType` into one canonical tensor form, so all three
   spellings compare equal when they describe the same shape.
@@ -117,54 +123,99 @@ Several "types" are encodings over `TCon` and `TApp` rather than constructors:
 
 Inference lives in
 [`Check.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Check.hs).
-It runs in a state monad holding a counter for fresh metas and a substitution
-map from metas to types. `zonk` applies the substitution, and `bindMeta` extends
-it after an **occurs check** (failure is `TC0016`).
+It runs in a state monad holding a counter for fresh metas, a substitution
+map from metas to types, and the set of **soft** metas (see below). `zonk`
+applies the substitution, and `bindMeta` extends it after an **occurs check**
+(failure is `TC0016`).
 
 The algorithm is syntax-directed. The interesting rules:
 
 | Expression | Rule |
 | --- | --- |
-| literal | its singleton type: `"web"`, `8080`, `true`; `null` is `Null`, a path is `Path` |
-| variable | instantiate its scheme with fresh metas; unbound is `TC0001` unless inside an open `with` scope |
+| literal | its singleton type: `"web"`, `8080`, `true`; `null` is `Null`; a path, `<nixpkgs>` or interpolated path is `Path` |
+| variable | instantiate its scheme with fresh metas; unbound is `TC0001` unless inside an open `with` scope. Global builtins share their type with the matching `builtins` member |
 | `x: body` | fresh meta for `x` (or its annotation), infer `body`; multiplicity is `One` if `x` occurs exactly once syntactically, else `Many` |
-| `{ a, b, ... }: body` | a record of fresh metas, one per name |
-| `f x` | infer `f`; if it resolves to `dynamic` or `any`, so does the call; if it is a function, `constrain` the argument against the domain; if it is definitely not callable, `TC0018`; otherwise unify `f` with `arg -> ?r` |
+| `{ a, b ? d, ... }@args: body` | a record with one **soft** meta per field (or its annotation); a field with a default is optional (`b? :: T`) and the widened type of `d` constrains it, except for `? null`; `...` makes the record open; `@args` binds the whole record |
+| `f x` | infer `f`; `dynamic`/`any` callees give `dynamic`/`any`; a function constrains the argument against its domain; a soft meta becomes `dynamic -> dynamic` and the call is `dynamic`; another unknown callee is unified with `widen(arg) -> ?r`; a definitely non-callable type is `TC0018` |
 | `import ./p` | the declared scheme for the resolved path, or `dynamic` |
 | `e.a` | look the field up in the resolved type (see below) |
-| `e.${k}` | literal or literal-union keys select (and join) fields; a `String` key gives `dynamic` |
-| `if c then a else b` | `c` must be `Bool`; result is `join a b` |
+| `e.a.b or d` | the selection joined with `d`; if the path runs into a value of unknown shape, just `d` joined with a fresh meta, so no field becomes required |
+| `e.${k}` | literal or literal-union keys select (and join) fields; `AttrsOf v` gives `v`; a `String` key gives `dynamic` |
+| `e ? path` | `Bool`; dynamic keys must be strings |
+| `{ ... }` | nested paths (`a.b = 1;`) are merged into records, `inherit (s) a` selects from `s`; only computed keys give `AttrsOf (join values)`, static plus computed keys give `{ fields...; ... }` |
+| `if c then a else b` | `c` must be `Bool`; with unsolved metas the literal-widened branches are unified, otherwise the result is `join a b` |
 | `[ ... ]` | shape inference, see [indexed types](#indexed-types) |
-| `a // b` | record merge, right side wins; `TC0021` for non-records |
+| `a // b` | record merge, right side wins; an unknown operand becomes an open row, so `x: x // { y = 1; }` is `{ ...t0 } -> { y :: 1; ...t0 }`; `TC0021` for non-records |
 | `a ++ b` | `List (join elemA elemB)`; `TC0020` for non-lists |
-| `+ - *` | numeric family arithmetic (`Nat`, `Int`, `Float`, `Number`); `Nat - x` widens to `Int` |
+| `+` | strings and paths concatenate (`Path + String` is a `Path`); otherwise numeric |
+| `- * /`, prefix `-` | numeric family arithmetic (`Nat`, `Int`, `Float`, `Number`); `Nat - x` widens to `Int` |
 | `< <= > >=` | both sides numeric or string; `TC0019` otherwise |
 | `== !=` | always `Bool` |
+| `&& \|\| -> !` | `Bool` operands, `Bool` result |
+| `x \|> f`, `f <\| x` | application |
 | `e as T` | `checkCast`, see [casts](#constrain-unify-and-cast) |
 | `with s; body` | a known record scope adds its fields (lexical bindings win); any other scope makes unresolved names `dynamic` |
 
 Field selection resolves the base type first. `any` and `dynamic` absorb the
-selection; `unknown` refuses it (`TC0008`); records look the field up; a union
-succeeds only if **every** member has the field, and joins the results. An
-unsolved meta has no fields, which is why selecting from an unannotated
-parameter reports `missing field ... on ?0`.
+selection; `unknown` refuses it (`TC0008`); records look the field up; an open
+record with a `dynamic` tail gives `dynamic` for fields it does not list; a
+union succeeds only if **every** member has the field, and joins the results.
+Selecting from an **unsolved meta** binds it to an open record
+`{ a :: ?f; ...?r }`, and selecting a new field from such a row extends the
+tail. This is row polymorphism: `x: x.a + x.b` is
+`{ a :: Number; b :: Number; ... } -> Number`. The field metas created this way
+are soft.
+
+### Soft metas
+
+Some unknowns stand for values tnix cannot know but that are usually
+polymorphic or overloaded in practice: arguments injected through an
+attribute-set pattern (`callPackage`-style `{ lib, fetchFromGitHub, ... }:`)
+and fields selected from values of unknown shape (`lib.mkOption`). Their metas
+are marked **soft**. Calling a soft meta binds it to `dynamic -> dynamic`
+instead of fixing it to the argument types of the first call site, so the next
+call with different arguments does not fail. Plain lambda binders are not
+soft and keep full principal types:
+`compose = f: g: x: f (g x)` is
+`forall t0 t1 t2. (t1 -> t2) %1 -> (t0 -> t1) %1 -> t0 %1 -> t2`.
+
+### Literal widening
+
+Singleton literal types are kept where they are useful and widened where they
+would only cause spurious errors: the default of a pattern field (`b ? 2`
+accepts any `Int`), the argument of a callee whose type is still unknown, and
+`if` branches that are unified because the other side is unknown (so `true`
+and `false` meet at `Bool`).
 
 ### `let` groups and generalization
 
-A `let` block is one mutually recursive group, inferred in three phases:
+A `let` block is checked in these phases:
 
 1. Collect signatures. Duplicate signatures (`TC0003`), duplicate bindings
-   (`TC0004`) and signatures without bindings (`TC0005`) are rejected.
-2. Give every binding a placeholder: its signature's scheme if it has one,
-   otherwise a fresh meta. This is what makes recursion work.
-3. Infer each body, `constrain` it against the placeholder, and record the
-   result. A signature always wins over the inferred type.
+   (`TC0004`) and signatures without bindings (`TC0005`) are rejected. Nested
+   paths are merged and `inherit (s) a` becomes a binding `a = s.a`. Dynamic
+   names are rejected (`TC0022`).
+2. Put every signed binding in scope with its signature's scheme. This is what
+   allows polymorphic recursion through a signature.
+3. Order the unsigned bindings by their free names and split them into
+   **strongly connected components**. Each component is a group of mutually
+   recursive bindings, processed in dependency order.
+4. For each group, give its unsigned members fresh placeholder metas, infer
+   each body, and `constrain` it against the placeholder.
+5. **Generalize** each member over the metas that do not occur free in the
+   environment *outside* the group. Metas shared with an enclosing lambda
+   parameter stay monomorphic, as in Hindley-Milner.
 
-Generalization happens when a binding's final type is recorded: remaining metas
-are closed into a scheme (`closeMetas`). Because the placeholders inside the
-group are monomorphic metas, an unannotated binding is polymorphic only for
-code **after** its group. A `forall` signature makes it polymorphic inside the
-group as well.
+Because every group is generalized before later groups see it, a helper is
+polymorphic for the rest of the `let`:
+`let id = x: x; in { a = id 1; b = id "s"; }` checks, and mutually recursive
+`even` / `odd` solve without annotations.
+
+**Signatures are rigid.** A signed binding's body is checked against the
+signature with its quantified variables held abstract (skolemized): inside the
+body, `a` is a type that only equals itself. `id :: forall a. a -> a;
+id = x: 1;` is therefore rejected with `type mismatch: 1 vs a`. Other bindings
+instantiate the signature freshly at every use.
 
 ### Directives
 
@@ -184,15 +235,24 @@ function arguments and recursive placeholders. In order:
 
 1. A fixed-shape sequence (vector, tuple) meeting a plain `List` is compared
    through its list view.
-2. Metas are bound.
+2. Metas are bound. A meta passed where `unknown` or `AttrsOf unknown` is
+   expected is not pinned to that top type (an unknown attribute set only
+   becomes an open row).
 3. Functions compare argument types contravariantly and results covariantly,
    and the actual multiplicity must be a sub-multiplicity of the expected one
    (`%1 ->` may stand in for `->`, not the reverse).
-4. Equal types, or `isSubtype actual expected`, succeed.
-5. **Gradual consistency is used only when `dynamic` occurs somewhere in either
+4. Records that still contain metas are compared field by field: every
+   required expected field must be present, optional ones may be missing, and
+   a missing field extends the actual record's row when its tail is still
+   open. A record against `AttrsOf v` constrains the join of its field types
+   against `v`.
+5. Equal types, or `isSubtype actual expected`, succeed.
+6. **Gradual consistency is used only when `dynamic` occurs somewhere in either
    type.** Two unrelated concrete types never pass by consistency.
-6. If unsolved metas remain, fall back to `unify`.
-7. Otherwise `TC0013 type mismatch`.
+7. If unsolved metas remain, fall back to `unify`.
+8. Otherwise, for two records, the error names the first missing field
+   (`TC0009`) or the first field whose type does not fit (`TC0013 type
+   mismatch in field ...`); anything else is `TC0013 type mismatch`.
 
 **`unify a b`** is symmetric and is used when both sides are partially unknown.
 It binds metas, recurses through functions (same multiplicity), applications
@@ -272,7 +332,9 @@ The rules, in the order the implementation tries them:
 | units | same label only: `Unit "ms" Nat` is not `<: Unit "s" Nat`; a bare literal may enter a unit |
 | tuples and tensors | positional and axis-wise; any tensor is a subtype of its `List` view; an empty tensor accepts any element type |
 | functions | contravariant argument, covariant result, `%1 ->` below `->` |
-| records | **width subtyping**: every expected field must exist and be a subtype |
+| records | **width subtyping**: every required expected field must exist and be a subtype; an expected optional field may be absent; a field that is optional in the actual type does not satisfy a required one |
+| open records | an actual record with a `dynamic` tail may lack required fields (they are unknown, not absent) |
+| dictionaries | a record is below `AttrsOf v` when every field is below `v` and it has no unknown further fields |
 | applications | `F a <: G b` iff `F <: G` and `a <: b` (covariant) |
 
 **Consistency** (`isConsistent`) is the gradual relation: two types are
@@ -437,13 +499,23 @@ labels that are not string literals.
 <figcaption>Local <code>declare</code> blocks in the file being checked are added to the merged world.</figcaption>
 </figure>
 
+- The **built-in prelude** is the base of every world. It is
+  [`registry/workspace/builtins.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/builtins.d.tnix),
+  embedded into every binary (as the generated `BuiltinPrelude.hs`), and it
+  declares `builtins` plus aliases such as `Derivation`, `DerivationArgs`,
+  `FetchedSource`, `PathLike`, `FileType`, `TypeName` and `NameValuePair`.
+  Project aliases with the same name win, and a workspace `declare "builtins"`
+  replaces the prelude's.
 - The **workspace root** is the nearest ancestor of the source file that
   contains `flake.nix`, `cabal.project`, `pnpm-workspace.yaml`,
   `tnix.config.tnix` or a `.git` directory. Without one, the file's own
-  directory is used.
-- Every `.d.tnix` under the root is loaded, except inside nested directories
-  that are themselves workspaces. A declaration file never contributes to its
-  own analysis, and it must not contain an expression (`TD0007`).
+  directory is used, and only the `.d.tnix` files directly in it are loaded.
+- In a real workspace, every `.d.tnix` under the root is loaded, except inside
+  nested directories that are themselves workspaces. Hidden directories,
+  `node_modules`, `dist-newstyle`, `dist`, `target`, `result` and `result-*`
+  build links, and symlinked directories are skipped. A declaration file never
+  contributes to its own analysis, and it must not contain an expression
+  (`TD0007`).
 - `declarationPacks` in `tnix.config.tnix` add files or directories. Packs that
   live under a `registry/workspace/` directory are **rebased** onto your project
   root, so their relative targets (`../../flake.nix`) point at your files.
@@ -459,8 +531,11 @@ labels that are not string literals.
 
 `import` is typed only when its argument is a path literal or a string literal;
 the resolved absolute path is looked up in the world. Any other import, and any
-path without a declaration, is `dynamic`. `builtins` defaults to `dynamic` and
-becomes the declared record once a `declare "builtins"` block is visible.
+path without a declaration, is `dynamic`. `builtins` is the record declared by
+the prelude (or by the workspace's own `declare "builtins"`), and the global
+builtins such as `toString`, `map`, `throw`, `import`, `derivation`,
+`baseNameOf`, `dirOf`, `fetchTarball`, `isNull`, `removeAttrs` and
+`placeholder` take the type of the matching member.
 
 ## Erasure and compilation
 
@@ -469,12 +544,15 @@ does not translate anything; it deletes:
 
 - `type` aliases and `declare` blocks,
 - `let` signatures (`name :: Type;`),
-- lambda annotations (`(x :: Int):` becomes `x:`),
+- lambda annotations (`(x :: Int):` becomes `x:`) and pattern-field
+  annotations (`{ name :: String }:` becomes `{ name }:`),
 - casts (`e as T` becomes `e`).
 
 The remaining tree is pretty-printed as Nix. Names, structure, string forms
-(double-quoted or indented) and operators are preserved; whitespace is
-normalized and comments are not carried over. Because the compiler only
+(double-quoted or indented, including their escapes), nested attribute paths
+and operators are preserved; whitespace is normalized and comments are not
+carried over. Over a sample of 4000 nixpkgs files, the output parses to the
+same AST as the input under `nix-instantiate --parse`. Because the compiler only
 deletes, the generated `.nix` evaluates exactly like the `.tnix` would if Nix
 ignored the type syntax. `tnix compile` runs the full analysis first and
 refuses to emit output for a file that does not check.
@@ -491,13 +569,19 @@ becomes an entry. Otherwise the whole root becomes `default`, quantified with
 [`Diagnostics.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Diagnostics.hs)
 assigns every message a stable code, prefixed by phase: `TP` parser, `TK` kind
 checker, `TC` type checker, `TD` driver. The message format is
-`[CODE] text`, and codes are never reused. The full catalogue with fixes is in
+`[CODE] text`, prefixed with `line:col: ` when the error has a source span, and
+codes are never reused. The full catalogue with fixes is in
 [diagnostics](../diagnostics.md).
 
 - **Parse errors** carry a line and column (`3:12: [TP0004] ...`) and the
   Megaparsec excerpt.
-- **Semantic errors** are plain messages. The language server maps them back to
-  a source range heuristically, from the names and literals they mention.
+- **Checker errors** carry the span of the innermost expression whose
+  inference failed: every parsed expression is wrapped in a located node, and
+  a failure is attributed to the nearest enclosing one. The CLI prints the
+  start as `line:col: [CODE] message`; the language server underlines the
+  whole span. A call whose argument does not fit points at the argument, and
+  a signature mismatch at the binding's body. A few errors raised before any
+  expression is inferred, such as `TC0022`, have no span.
 - The CLI prints text diagnostics to standard error and exits `1`. With
   `--format json`, a structured report goes to standard output instead,
   versioned by `schemaVersion`; see the [CLI reference](./cli.md#json-output).
@@ -507,10 +591,13 @@ checker, `TC` type checker, `TD` driver. The message format is
 These follow directly from the design above and are good to keep in mind:
 
 - One diagnostic per file per run; fix and re-run to see the next.
-- Field selection on an unannotated lambda parameter or pattern field fails;
-  annotate the binder or cast it.
 - Implementing records whose fields have their own `forall` is not accepted
   yet; declare such values instead.
-- Unions are not narrowed by `if` conditions.
-- Records have no optional fields; model optionality with `T | Null` and
-  provide the field.
+- Unions are not narrowed by `if` conditions: `isAttrs x`, `x ? a` and `_tag`
+  checks do not refine `x` in the branches.
+- Constraint contexts (`Functor f =>`) are parsed but not enforced; there are
+  no type classes.
+- Soft metas trade precision for adoption: calls through unannotated injected
+  dependencies are not checked. Annotate the pattern field to check them.
+- NixOS modules are typed as ordinary functions; the `config` / `options`
+  fixpoint is not modelled.

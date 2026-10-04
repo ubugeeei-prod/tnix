@@ -35,7 +35,7 @@ root_expression = expression
 ### Type alias declarations
 
 ```ebnf
-alias_decl = "type" identifier identifier* "=" type ";"
+alias_decl = "type" type_identifier type_identifier* "=" type ";"
 ```
 
 ### Ambient declarations
@@ -43,15 +43,17 @@ alias_decl = "type" identifier identifier* "=" type ";"
 `declare` blocks describe externally-defined Nix surfaces.
 
 ```ebnf
-ambient_decl  = "declare" ( path_literal | string_literal ) "{" ambient_entry* "}" ";"
+ambient_decl  = "declare" ( path | string_literal ) "{" ambient_entry* "}" ";"
 ambient_entry = attr_name "::" type ";"
 ```
 
 ## Expressions
 
-The expression grammar is layered from loosest binding to tightest:
-`expression < or < and < equality < relational < update < not < addition <
-multiplication < concat < has_attr < cast < application < postfix < atom`.
+The expression grammar follows Nix. It is layered from loosest binding to
+tightest:
+`expression < pipe < implication < or < and < equality < relational < update <
+not < addition < multiplication < concat < has_attr < negation < cast <
+application < select < atom`.
 
 ```ebnf
 expression       = if_expr
@@ -59,7 +61,7 @@ expression       = if_expr
                  | assert_expr
                  | with_expr
                  | lambda_expr
-                 | or_expr
+                 | pipe_expr
 ```
 
 ### Control flow
@@ -72,62 +74,66 @@ assert_expr = "assert" expression ";" expression
 with_expr   = "with" expression ";" expression
 
 let_expr = "let" let_item* "in" expression
-let_item = let_signature | let_binding
-let_signature = identifier "::" type ";"
-let_binding   = identifier "=" expression ";"
+let_item = let_signature | let_binding | inherit_clause
+let_signature = binding_identifier "::" type ";"
+let_binding   = let_key ("." attr_key)* "=" expression ";"
+let_key       = binding_identifier | "${" expression "}" | string_literal
 ```
 
-`let_item` is parsed as `try let_signature <|> let_binding`, so signatures
-take precedence over bindings when the same identifier could match both.
+The first key of a `let` item is parsed once; if it is a plain name followed
+by `::`, the item is a signature, otherwise a binding. A binding may use a
+nested path (`a.b.c = 1;`). A dynamic first key (`${k} = v;`) parses but is
+rejected by the checker with `TC0022`, as Nix rejects it.
 
 ### Lambdas and patterns
 
 ```ebnf
-lambda_expr  = pattern ":" expression
-pattern      = typed_pattern
-             | attr_set_pattern
-             | identifier
+lambda_expr  = pattern ":" expression        -- the ":" must not start "::"
+pattern      = "(" binding_identifier "::" type ")"
+             | binding_identifier "@" attr_set_pattern
+             | attr_set_pattern ("@" binding_identifier)?
+             | binding_identifier
 
-typed_pattern = "(" identifier "::" type ")"
-attr_set_pattern = "{" attr_set_pattern_items "}"
-attr_set_pattern_items = ( identifier ("," identifier)* ("," "...")? | "..." )?
+attr_set_pattern = "{" (pattern_item ("," pattern_item)* ","?)? "}"
+pattern_item     = "..."
+                 | binding_identifier ("::" type)? ("?" expression)?
 ```
 
-Open attribute-set patterns (`{ self, nixpkgs, ... }`) and typed binders
-(`(x :: Int)`) compose with ordinary identifier binders.
+Only the `pattern :` prefix is speculative: once it is recognized, the parser
+commits to the lambda, so an error inside the body is reported where it occurs.
+A pattern field may carry an erased annotation and a default:
+`{ name :: String, version ? "1", ... }@args:`.
 
 ### Operators
 
-Operators bind looser than application/selection and casts, but tighter than
-control flow.
-
 ```ebnf
+pipe_expr        = impl_expr ("|>" impl_expr)*          -- left-associative
+                 | impl_expr ("<|" impl_expr)*          -- right-associative
+impl_expr        = or_expr ("->" impl_expr)?
 or_expr          = and_expr ("||" and_expr)*
 and_expr         = equality_expr ("&&" equality_expr)*
 equality_expr    = relational_expr (("==" | "!=") relational_expr)*
 relational_expr  = update_expr (("<=" | ">=" | "<" | ">") update_expr)*
-update_expr         = not_expr ("//" update_expr)?
-not_expr            = "!" not_expr | addition_expr
-addition_expr       = multiplication_expr (("+" | "-") multiplication_expr)*
-multiplication_expr = concat_expr ("*" concat_expr)*
-concat_expr         = has_attr_expr ("++" concat_expr)?
-has_attr_expr       = cast_expr ("?" attr_path)?
-attr_path           = attr_name ("." attr_name)*
-
+update_expr      = not_expr ("//" update_expr)?
+not_expr         = "!" not_expr | addition_expr
+addition_expr    = multiplication_expr (("+" | "-") multiplication_expr)*
+multiplication_expr = concat_expr (("*" | "/") concat_expr)*
+concat_expr      = has_attr_expr ("++" concat_expr)?
+has_attr_expr    = negation_expr ("?" attr_key ("." attr_key)*)?
+negation_expr    = "-" negation_expr | cast_expr
 cast_expr        = application_expr ("as" type)*
-application_expr = postfix_expr+
-postfix_expr     = atom select_step*
-select_step      = "." (attr_name | "${" expression "}")
+application_expr = select_expr+
+select_expr      = atom ("." attr_key)* ("or" select_expr)?
+attr_key         = field_name | string_literal | "${" expression "}"
 ```
 
-All binary operators are left-associative except list concatenation `++` and
-attribute-set update `//`, which are right-associative. Precedence runs
-(loosest to tightest) `||` < `&&` < `==`/`!=` < relational < `//` <
-prefix `!` < `+`/`-` < `*` < `++` < `?`, so
-`a + 1 < limit && ok || done` parses as
-`(((a + 1) < limit) && ok) || done`. `cast_expr` is left-associative:
-`expr as A as B` desugars to `(expr as A) as B`. `application_expr` is also
-left-associative.
+`|>` and `<|` cannot be mixed in one chain without parentheses, as in Nix. A
+negated numeric literal folds into a negative literal (`-1` keeps the
+singleton type `-1`). `or` is only meaningful after a selection:
+`x.a.b or default`.
+
+Single-character operators never swallow a longer one: `-` is not followed by
+`>`, `/` not by `/`, `<` not by `|`, and `+` not by `+`.
 
 ### Atoms
 
@@ -136,49 +142,55 @@ atom = "(" expression ")"
      | rec_attr_set
      | attr_set
      | list
-     | string_literal
+     | string
+     | path
+     | search_path
      | float_literal
      | int_literal
      | "true" | "false" | "null"
-     | path_literal
+     | uri_literal
      | identifier
+     | "as"                     -- the variable `as`, when no type follows
 
 attr_set        = "{" attr_item* "}"
 rec_attr_set    = "rec" "{" attr_item* "}"
 attr_item       = inherit_clause | attr_field
-inherit_clause  = "inherit" identifier+ ";"
-attr_field      = attr_name "=" expression ";"
+inherit_clause  = "inherit" ("(" expression ")")? attr_name* ";"
+attr_field      = attr_key ("." attr_key)* "=" expression ";"
 
 list            = "[" list_item* "]"
-list_item       = if_expr | let_expr | lambda_expr | list_addition
-list_addition   = list_cast ("+" list_cast)*
-list_cast       = postfix_expr ("as" type)*
+list_item       = if_expr | let_expr | lambda_expr | list_cast
+list_cast       = select_expr ("as" type)*
 ```
 
-The list-internal `list_addition` / `list_cast` productions exist because
-the outer `expression` cannot be used directly inside `[ ... ]` without
-breaking Nix-style space-separated list elements.
+List elements are selection-level expressions, as in Nix, so `[ f x ]` is a
+two-element list. tnix additionally accepts casts and a few compound forms
+inside lists that would otherwise need parentheses.
 
 ## Types
 
 ```ebnf
 type             = forall_type
-                 | conditional_type
-                 | function_type
+                 | context? conditional_type
 
-forall_type      = "forall" identifier+ "." type
-function_type    = union_type ( ("->" | "%1" "->") type )?
+forall_type      = "forall" type_identifier+ "." type
+context          = "(" application_type ("," application_type)* ")" "=>"
+                 | application_type "=>"
+function_type    = union_type ( ("->" | "%1" "->") function_type )?
 union_type       = application_type ("|" application_type)*
 application_type = atom_type+
 ```
+
+A constraint context (`Functor f =>`, `(Eq a, Show a) =>`) may open a type or
+follow a `forall`. It is parsed and then dropped: tnix has no type classes yet,
+so contexts are documentation only.
 
 Function arrows are right-associative: `A -> B -> C` parses as `A -> (B -> C)`.
 
 ### Conditional types
 
 ```ebnf
-conditional_type = application_type "extends" application_type
-                   "?" type ":" type
+conditional_type = function_type ("extends" function_type "?" type ":" type)?
 ```
 
 ### Atomic types
@@ -195,12 +207,16 @@ atom_type = "(" type ")"
           | "infer" identifier
           | type_ref
 
-record_type = "{" record_field* "}"
-record_field = attr_name "::" type ";"
+record_type  = "{" record_field* row_tail? "}"
+record_field = attr_name "?"? "::" type ";"
+row_tail     = "..." type_identifier? ";"?
 
 type_list = "[" shape_item* "]"
 shape_item = atom_type
 ```
+
+`name? :: T;` is an optional field. A trailing `...` makes the record open,
+and `...r` names its row variable.
 
 A bare identifier in a type position becomes `TVar` if it starts with a
 lowercase letter, otherwise `TCon`. This is how `List a` and `Vec n a` parse
@@ -209,41 +225,40 @@ as `TApp (TCon "List") (TVar "a")` and so on without dedicated keywords.
 ## Lexical Structure
 
 ```ebnf
-identifier      = ascii_letter (ascii_alphanum | "_" | "'" | "-")*
-                  -- minus the reserved words below
+identifier      = ident_start ident_char*
+                  -- minus the term keywords below
+binding_identifier = identifier | "as"
+type_identifier = ident_start ident_char*
+                  -- minus the type keywords below
+field_name      = ident_start ident_char*      -- keywords allowed
+ident_start     = letter | "_"
+ident_char      = letter | digit | "_" | "'" | "-"
 
-attr_name       = identifier | string_literal
+attr_name       = field_name | string_literal
 
-reserved        = "true" | "false" | "null" | "let" | "in"
-                | "if" | "then" | "else" | "inherit"
-                | "type" | "declare" | "import" | "rec" | "with"
-                | "as" | "assert" | "forall" | "extends" | "infer"
-                | "any" | "dynamic" | "unknown"
-                | "Tuple"
+int_literal     = digit+                      -- types also accept a leading "-"
+float_literal   = digit* "." digit+ ( ("e"|"E") ["+"|"-"] digit+ )?
 
-int_literal     = ["-"] digit+
-float_literal   = ["-"] digit+ "." digit+ ( ("e"|"E") ["+"|"-"] digit+ )?
-
-string_literal  = double_quoted | indented
-double_quoted   = '"' ( interpolation | double_quoted_char )* '"'
-indented        = "''" ( interpolation | indented_char )* "''"
-double_quoted_char = escape_seq | "\$" | any character except '"' and '\'
-indented_char   = "''${" | "'''" | any character except "''" and "${"
-escape_seq      = "\\" ( '"' | '\\' | 'n' | 't' | '$' | '/' | other_char )
-
+string          = double_quoted | indented
+double_quoted   = '"' ( interpolation | "$$" | escape_seq | double_quoted_char )* '"'
+indented        = "''" ( interpolation | indented_escape | indented_char )* "''"
+escape_seq      = "\\" any_char      -- \n \r \t decode; any other char is literal
+indented_escape = "''$" | "''${" | "'''" | "''\\" any_char
 interpolation   = "${" expression "}"
 
-path_literal    = relative_path | absolute_path | parent_path
-relative_path   = "./" path_body
-parent_path     = "../" path_body
-absolute_path   = "/" path_body
-path_body       = path_segment ("/" path_segment)*
-path_segment    = (ascii_alphanum | "_" | "-" | ".")+ -- minus ".." alone
+path            = path_prefix path_part+
+path_prefix     = "./" | "../" | "~/" | "/"
+path_part       = path_chars | interpolation    -- e.g. ./${name}.nix
+path_chars      = (letter | digit | "." | "_" | "-" | "+")+ ("/" path_chars)*
+search_path     = "<" search_segment ("/" search_segment)* ">"   -- <nixpkgs/lib>
+uri_literal     = letter (letter | digit | "+" | "-" | ".")+ ":" uri_char+
 ```
 
-`attr_name` accepts string literals to support quoted keys such as
-`"aarch64-darwin"`. Dynamic keys (`packages.${system}`) are part of the
-expression grammar (`select_step`), not the lexer.
+`attr_name` and `attr_key` accept string literals to support quoted keys such
+as `"aarch64-darwin"`. A path needs at least one segment after its prefix, so
+`//` and a lone `/` remain operators. Unquoted URIs are only reachable in
+argument position, because a bare `scheme:` at the start of an expression is
+read as a lambda; quote URIs elsewhere.
 
 ## Comments
 
@@ -261,30 +276,36 @@ expression or `let` item as a `DiagnosticDirective`. See
 
 ## Operator Precedence and Associativity
 
-From loosest to tightest binding:
+From loosest to tightest binding, matching Nix:
 
 | Level | Form | Associativity |
 | --- | --- | --- |
-| 1 | `if`, `let`, lambda `pattern :` | (non-applicable) |
-| 2 | `\|\|` (boolean or) | left |
-| 3 | `&&` (boolean and) | left |
-| 4 | `==`, `!=` (equality) | left |
-| 5 | `<`, `>`, `<=`, `>=` (relational) | left |
-| 6 | `//` (attribute-set update) | right |
-| 7 | `!` (boolean not) | prefix |
-| 8 | `+`, `-` (additive) | left |
-| 9 | `*` (multiplicative) | left |
-| 10 | `++` (list concatenation) | right |
-| 11 | `e ? attrpath` (has-attr) | (non-associative) |
-| 12 | `expr as Type` (cast) | left |
-| 13 | function application `f x` | left |
-| 14 | `.field` and `.${expr}` (postfix select) | left |
+| 1 | `if`, `let`, `with`, `assert`, lambda `pattern :` | (non-applicable) |
+| 2 | `\|>` and `<\|` (pipes) | left and right |
+| 3 | `->` (logical implication) | right |
+| 4 | `\|\|` (boolean or) | left |
+| 5 | `&&` (boolean and) | left |
+| 6 | `==`, `!=` (equality) | left |
+| 7 | `<`, `>`, `<=`, `>=` (relational) | left |
+| 8 | `//` (attribute-set update) | right |
+| 9 | `!` (boolean not) | prefix |
+| 10 | `+`, `-` (additive) | left |
+| 11 | `*`, `/` (multiplicative) | left |
+| 12 | `++` (list concatenation) | right |
+| 13 | `e ? attrpath` (has-attr) | (non-associative) |
+| 14 | `-e` (arithmetic negation) | prefix |
+| 15 | `expr as Type` (cast) | left |
+| 16 | function application `f x` | left |
+| 17 | `.field`, `.${expr}`, `or` default (select) | left |
+
+So `a + 1 < limit && ok || done` parses as `(((a + 1) < limit) && ok) || done`,
+and `xs |> map f |> length` as `(xs |> map f) |> length`.
 
 Type-level precedence, from loosest to tightest:
 
 | Level | Form | Associativity |
 | --- | --- | --- |
-| 1 | `forall vars. T` | (binds tightest body) |
+| 1 | `forall vars. T`, `C =>` context | (binds tightest body) |
 | 1 | `T extends P ? A : B` | right |
 | 2 | `A -> B`, `A %1 -> B` | right |
 | 3 | `` A \| B `` (union) | left |
@@ -293,14 +314,20 @@ Type-level precedence, from loosest to tightest:
 
 ## Reserved Words
 
-`true`, `false`, `null`, `let`, `in`, `if`, `then`, `else`, `inherit`,
-`type`, `declare`, `import`, `as`, `forall`, `extends`, `infer`, `any`,
-`dynamic`, `unknown`, `Tuple`.
+In expressions, only the Nix keywords are reserved: `if`, `then`, `else`,
+`let`, `in`, `rec`, `with`, `assert`, `inherit`, `or`, and the constants
+`true`, `false` and `null`. `as` is reserved as a variable reference only where
+a type can follow it; it is an ordinary name in binding positions (lambda
+binders, pattern fields, `let` keys), so `as: as.x` parses as in Nix.
 
-Identifiers in the lexer match `identifier` above but are rejected when
-they equal one of these. The same set is reserved inside `let`-bindings,
-attribute names (where keywords are allowed only when quoted), and
-declarations.
+In types, tnix's own keywords are reserved as well: `type`, `declare`,
+`import`, `forall`, `extends`, `infer`, `any`, `dynamic`, `unknown`, `Tuple`
+and `as`. This is why `type`, `any`, `import` and `declare` can be bound and
+used as ordinary names in expressions.
+
+Attribute names (field names, selections, record fields, `declare` entries)
+accept every identifier, keywords included, so declaration packs can mirror
+real APIs such as `lib.or` or `lib.any`.
 
 ## Whitespace and Newlines
 
@@ -312,8 +339,10 @@ expressions, declarations, and lists can all span multiple lines freely.
 
 - The grammar is implemented with [Megaparsec](https://hackage.haskell.org/package/megaparsec)
   and uses `try` for productions that share a common prefix (`alias_decl`
-  vs `ambient_decl`, `let_signature` vs `let_binding`, the typed-pattern
-  vs attrset-pattern split).
+  vs `ambient_decl`, the lambda `pattern :` prefix, the typed-pattern vs
+  attrset-pattern split).
+- Every expression node records its source span, which is how diagnostics
+  report `line:col` positions and editors underline the exact range.
 - `programParser` requires the input to end with `eof`, so unterminated
   expressions are rejected with a structured `ParseError` (see
   [`Parser.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Parser.hs)).
@@ -322,10 +351,13 @@ expressions, declarations, and lists can all span multiple lines freely.
   executable examples for every production in this document; if you change
   the grammar, mirror the change there first.
 
-## Not Yet Supported
+## Nix Parity
 
-The parser intentionally accepts a production-ready Nix-shaped subset instead
-of the full Nix language. These forms are still outside the supported surface:
+The parser accepts every expression form of the Nix language. Erasing a file
+without type syntax gives back the same program: over a sample of 4000
+nixpkgs files, `tnix compile` output parses to the same AST as the source
+under `nix-instantiate --parse`, up to how equal strings are split into
+segments. The known differences from Nix's lexer are:
 
-- nested attribute-path declarations such as `a.b.c = value;`
-- Nix's full indented-string indentation stripping and escape rules
+- unquoted URIs are recognized only in argument position (see above);
+- `x:x` without a space is a lambda, where Nix would read it as a URI.

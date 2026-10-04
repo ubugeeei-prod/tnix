@@ -43,11 +43,12 @@ a tnix project that `tnix check-project` verifies on every pull request.
 - Code blocks titled with a file name, such as `hello.tnix`, are files you
   create. Blocks without a title are terminal sessions or fragments.
 - The output shown under `tnix check` is copied from the real CLI. Bindings are
-  listed alphabetically after the `root:` line.
-- Callouts marked **Upcoming syntax** use language features that are being
-  implemented right now (default arguments, `inherit (x)`, nested attribute
-  paths, `<nixpkgs>`, `->`, `/`, `|>`, and global builtins such as `toString`).
-  They do not parse with tnix 0.5 yet; each one shows a form that works today.
+  listed alphabetically after the `root:` line, and diagnostics start with the
+  `line:column` of the offending expression.
+- Everything is ordinary Nix syntax plus type annotations. Default arguments,
+  `@` binders, `inherit (x)`, nested attribute paths, `<nixpkgs>`, every
+  operator and the global builtins such as `toString` all work, so examples are
+  written the way you would write Nix.
 
 > [!TIP]
 > Already know the basics and want the rules instead of a walkthrough? Jump to

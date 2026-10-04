@@ -122,6 +122,12 @@ To set up an editor, run `tnix ide install vscode` (or `cursor`, `vscodium`,
 - `src/main.tnix`
 - `types/builtins.d.tnix`
 
+`builtins` and the global builtins (`toString`, `map`, `throw`, ...) are typed
+out of the box by a prelude embedded in the binary. A workspace
+`declare "builtins"` block replaces that prelude, so delete the scaffolded
+`types/builtins.d.tnix` unless you want to restrict the builtins, and set
+`builtins = false;` to keep `tnix scaffold` from recreating it.
+
 The generated config is ordinary tnix syntax:
 
 ```tnix
@@ -201,45 +207,63 @@ This is the main bridge for incremental adoption:
 - describe its public API in `.d.tnix` or inline `declare`
 - use that API from typed `.tnix`
 
-## Flake Workflow Today
+## Nix Syntax
 
-For flakes, the most reliable workflow today is to keep the runtime flake logic
-in `.nix` and use `.tnix` as a typed projection over the parts you want to
-check.
-
-Example adapted from [`dogfood/flake-surface.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/dogfood/flake-surface.tnix):
+`.tnix` accepts the whole Nix expression language, so existing code can be
+renamed to `.tnix` and annotated gradually. For example:
 
 ```tnix
+{ lib ? null, name ? "demo", version, ... }@args:
 let
-  flake = import ../flake.nix;
-
-  inputs :: ResolvedFlakeInputs;
-  inputs = {
-    self = builtins;
-    nixpkgs = builtins;
-    flake-utils = builtins;
-  };
-
-  outputs :: FlakeOutputs;
-  outputs = flake.outputs inputs;
-in {
-  description = flake.description;
-  formatter = outputs.formatter.aarch64-darwin;
-  devShell = outputs.devShells.aarch64-darwin.default;
+  base = { meta.license = "MIT"; meta.homepage = "https://example.org"; };
+  inherit (base.meta) license;
+  greeting = "${name}-${version}";
+in base // {
+  inherit greeting license;
+  half = 7 / 2;
+  safe = args.extra.port or 8080;
+  piped = [ 1 2 3 ] |> builtins.length;
+  implied = true -> false;
+  src = ./${name}.nix;
 }
 ```
 
-This pattern lets you keep the checker on the stable surface while leaving the
-full flake implementation in `flake.nix` or a helper such as
-`nix/flake-outputs.nix`.
+Attribute-set patterns with defaults and `@` binders, `inherit (src)`, nested
+(`a.b.c = 1;`) and dynamic (`${k} = v;`) attribute paths, `x.a or default`,
+`x ? ${k}`, every operator (including `/`, `->`, `|>` and `<|`), `<nixpkgs>`,
+`~/` and interpolated paths, and `$$` string escapes all parse and type-check.
+Only Nix keywords are reserved: `type`, `any`, `import` and `declare` are
+ordinary names in expressions, and `as` is an ordinary name except in the
+`expr as Type` cast. See the [language reference](./language-reference.md#nix-compatibility).
 
-Recent parser/compiler work now also supports the flake-oriented Nix forms that
-show up quickly in real projects:
+## Flake Workflow
 
-- quoted attribute names such as `"dotnet-sdk_9"` or `"aarch64-darwin"`
-- dynamic attribute access such as `self.packages.${system}`
-- attrset lambda arguments such as `{ self, nixpkgs, tnix }:`
-- indented strings in the `'' ... ''` form for `shellHook` and `installPhase`
+A flake can be written directly as `flake.tnix` and compiled to `flake.nix`;
+the [flake tutorial](./tutorial/flakes-and-packages.md#a-flake) walks through
+it. Annotate the inputs you use, `{ self, nixpkgs :: NixpkgsInput, ... }:`, and
+every lookup through them is checked.
+
+If you would rather keep `flake.nix` hand-written, describe it with a
+declaration and check a typed *projection* of the parts you care about:
+
+```tnix
+declare "./flake.nix" {
+  description :: String;
+  outputs :: dynamic -> {
+    packages :: { x86_64-linux :: { default :: Derivation; }; };
+  };
+};
+
+let
+  flake = import ./flake.nix;
+  outputs = flake.outputs { };
+in {
+  description = flake.description;
+  package = outputs.packages.x86_64-linux.default;
+}
+```
+
+`Derivation` is one of the aliases the built-in prelude provides.
 
 ## Bundled Ecosystem Declarations
 
@@ -292,14 +316,19 @@ their ambient declarations still target your local `flake.nix` and
 Plain Nix list syntax can infer more precise indexed shapes.
 
 ```tnix
-[1 2]
-# => Vec 2 (1 | 2)
+{
+  pair = [1 2];
+  grid = [[1 2] [3 4]];
+  ragged = [[1] [2 3]];
+}
+```
 
-[[1 2] [3 4]]
-# => Matrix 2 2 (1 | 2 | 3 | 4)
-
-[[1] [2 3]]
-# => List (Vec (1 | 2) (1 | 2 | 3))
+```text
+root: {
+  grid :: Matrix 2 2 (1 | 2 | 3 | 4);
+  pair :: Vec 2 (1 | 2);
+  ragged :: List (Vec (1 | 2) (1 | 2 | 3));
+}
 ```
 
 You can also write shape annotations directly:
@@ -416,7 +445,7 @@ let
 in value
 ```
 
-Today these directives are aimed at root expressions and `let` items.
+These directives apply to the root expression or to one `let` item.
 
 ## Declaration Emit
 
@@ -451,11 +480,14 @@ argument exactly once; see [Annotations and inference](./tutorial/annotations.md
 
 ## Suggested Learning Path
 
-1. Start with plain annotations on `let` bindings and function parameters.
-2. Add ambient declarations for existing `.nix` imports.
-3. Use `emit` to stabilize public APIs between files.
-4. Add `tnix.config.tnix` and `tnix scaffold` once the project layout is settling.
-5. Reach for `Vec` / `Matrix` / `Tensor`, `Range`, and `Unit` when the shape or numeric contract actually matters.
+1. Start by renaming a file to `.tnix` and running `tnix check`; inference and
+   the builtins prelude cover a lot without any annotations.
+2. Add annotations on `let` bindings and function parameters where you want
+   to state intent.
+3. Add ambient declarations for existing `.nix` imports.
+4. Use `emit` to stabilize public APIs between files.
+5. Add `tnix.config.tnix` and `tnix scaffold` once the project layout is settling.
+6. Reach for `Vec` / `Matrix` / `Tensor`, `Range`, and `Unit` when the shape or numeric contract actually matters.
 
 ## Next Docs
 

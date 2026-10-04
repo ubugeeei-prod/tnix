@@ -21,8 +21,8 @@ tnix COMMAND [OPTIONS]
 | [`emit-project`](#tnix-emit-project) | emit declarations for every project source |
 | [`version`](#tnix-version) | print the version |
 | [`lsp`](#tnix-lsp) | start the language server over stdio |
-| [`ide`](#tnix-ide-upcoming) | install editor integrations (upcoming) |
-| [`doctor`](#tnix-doctor-upcoming) | diagnose the installation (upcoming) |
+| [`ide`](#tnix-ide) | install editor integrations, list supported editors |
+| [`doctor`](#tnix-doctor) | check the toolchain, project and editor setup |
 
 Global options: `-h`, `--help` on any command, and `-v`, `--version` at the top
 level.
@@ -31,6 +31,10 @@ level.
 
 - **Exit status** is `0` on success and `1` when any diagnostic is reported or
   any file fails. Commands never write partial output on failure.
+- **Diagnostics** have the shape `line:col: [CODE] message`, where `line:col`
+  is the start of the offending expression (1-based). The few diagnostics
+  without a source position omit the prefix. Codes are listed in
+  [diagnostics](../diagnostics.md).
 - **Output.** Results go to standard output. Text-mode errors go to standard
   error. With `--format json`, the JSON report (success or failure) goes to
   standard output.
@@ -53,18 +57,24 @@ root: String
 greeting :: String
 ```
 
-A declaration-only file (`.d.tnix`) prints nothing when it checks.
+A declaration-only file (`.d.tnix`) prints nothing when it checks. A failing
+check prints the diagnostic to standard error and exits `1`:
+
+```text
+3:14: [TC0013] type mismatch: 42 vs String
+```
 
 ## `tnix compile`
 
 ```text
-tnix compile FILE [-o|--output OUTPUT]
+tnix compile FILE [-o|--output OUTPUT] [--no-check]
 ```
 
 Checks `FILE`, erases all type syntax and prints the resulting Nix, or writes
 it to `OUTPUT` (parent directories are created; the write is atomic). Fails
-without output if the file does not check. A declaration-only file cannot be
-compiled.
+without output if the file does not check. `--no-check` skips type checking
+and only erases, like TypeScript's transpile-only mode: parse errors still
+fail, type errors do not. A declaration-only file cannot be compiled.
 
 ## `tnix emit`
 
@@ -81,12 +91,13 @@ how members are chosen.
 ## `tnix init`
 
 ```text
-tnix init [DIRECTORY]
+tnix init [DIRECTORY] [--editor EDITOR]...
 ```
 
 Creates `DIRECTORY` if needed and writes a default `tnix.config.tnix`, then
 runs [`scaffold`](#tnix-scaffold). Fails if `tnix.config.tnix` already exists.
-The project name defaults to the directory name.
+The project name defaults to the directory name. Each `--editor` (repeatable)
+also runs [`tnix ide install EDITOR`](#tnix-ide) for the new project.
 
 ## `tnix scaffold`
 
@@ -100,6 +111,10 @@ missing, never overwriting existing ones:
 - `tnix.config.d.tnix`: types for the config file,
 - the `entry` file (by default `src/main.tnix`),
 - `declarationDir/builtins.d.tnix` when `builtins = true`.
+
+`builtins` is already typed by the prelude built into the binary. A scaffolded
+`builtins.d.tnix` replaces that prelude with its short starter list, so delete
+it (and set `builtins = false`) unless you want to restrict the builtins.
 
 ## `tnix check-project`
 
@@ -159,37 +174,46 @@ Executes `tnix-lsp --stdio`, which must be on `PATH`. Editors usually start
 `tnix-lsp` directly; this subcommand exists so a single binary name can be
 configured everywhere. `--log-file` is forwarded to the server.
 
-## `tnix ide` (upcoming)
-
-> [!NOTE]
-> Being added for the next release. The interface below is the intended one;
-> run `tnix ide --help` on your version for the authoritative flags.
+## `tnix ide`
 
 ```text
-tnix ide install EDITOR
+tnix ide install vscode|cursor|vscodium|zed|neovim|helix
+                 [--project DIR | -g|--global] [-n|--dry-run]
+                 [--no-extension] [--force] [--lsp-path PATH]
+tnix ide list
 ```
 
-Installs and configures the tnix integration for `EDITOR` (`vscode`, and other
-supported editors), wired to the `tnix-lsp` that belongs to the same
-installation as the running `tnix`.
+`tnix ide install EDITOR` installs the tnix extension (where the editor has
+one) and merges the editor configuration that starts `tnix-lsp`: project
+settings under the current directory (or `--project DIR`) by default, user
+settings with `--global`. Settings are merged, never clobbered, and re-running
+the command is a no-op. `--dry-run` prints the planned commands and a diff
+without changing anything, `--no-extension` only writes configuration,
+`--force` rewrites files that cannot be merged safely after saving a `.bak`
+copy, and `--lsp-path` pins a `tnix-lsp` path (`""` pins nothing).
 
-## `tnix doctor` (upcoming)
+`tnix ide list` prints the supported editors and whether each one is detected.
 
-> [!NOTE]
-> Being added for the next release.
+[Editor setup](../editors.md) documents what each editor gets.
+
+## `tnix doctor`
 
 ```text
-tnix doctor
+tnix doctor [-f|--format text|json]
 ```
 
-Checks the environment (binaries on `PATH`, matching `tnix` and `tnix-lsp`
-versions, workspace root and config, editor integrations) and prints a
-pass/fail line per check with a suggested fix for each failure.
+Checks that `tnix` and `tnix-lsp` are on `PATH` and report the same version,
+that the current project's `tnix.config.tnix` loads, that each detected editor
+has the tnix integration, and that `nix` is available. Each check prints one
+line, with a suggested fix for each problem. Exits `1` if any check fails;
+warnings do not change the exit status. See
+[editor setup](../editors.md#tnix-doctor) for the list of checks and the JSON
+report.
 
 ## JSON output
 
 `--format json` is accepted by `check`, `check-project`, `build`,
-`emit-project` and `version`. Every report is one JSON object on one line with
+`emit-project`, `version` and `doctor`. Every report is one JSON object on one line with
 `schemaVersion` (currently `1`), `action`, and `success` or a `summary`.
 Rendered types are strings in tnix syntax and may contain newlines.
 
@@ -209,7 +233,7 @@ Rendered types are strings in tnix syntax and may contain newlines.
 
 On failure, `success` is `false`, `root` is `null`, `bindings` is empty and
 `error` holds the diagnostic, for example
-`"[TC0013] type mismatch: 42 vs String"`.
+`"3:14: [TC0013] type mismatch: 42 vs String"`.
 
 `check-project`:
 

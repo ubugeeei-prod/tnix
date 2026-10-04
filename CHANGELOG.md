@@ -2,6 +2,58 @@
 
 ## Unreleased
 
+### Added
+
+#### Language: full Nix syntax
+
+- `.tnix` accepts the whole Nix expression language: attrset lambda patterns with defaults and binders (`{ a, b ? 1, ... }@args:`, `args@{ ... }:`), optional erased field annotations (`{ name :: String, version ? "1" }:`), `inherit (src) a b;` in attribute sets and `let`, nested and dynamic attribute paths (`a.b.c = 1;`, `${k} = v;`), `x.a.b or default`, `x ? ${k}`, the operators `/`, `->` (implication), `|>` and `<|` (pipes) and prefix `-`, `<nixpkgs>` search paths, `~/` and interpolated paths (`./${name}.nix`), unquoted URIs, and `$$` string escapes.
+- Only Nix keywords are reserved in expressions, so `type`, `any`, `import`, and `declare` are ordinary names. `as` is contextual: `as: as.x` works, and `e as T` is still a cast.
+- Parity is verified against nixpkgs: 4000 sampled files parse, and their compiled output parses to the same AST as the source under `nix-instantiate --parse` (up to how equal strings are split). `scripts/check-nix-parity.sh` runs this check in CI.
+- Haskell-style constraint contexts (`Functor f =>`, `(Eq a, Show a) =>`) parse. They are documentation only until tnix has type classes.
+
+#### Type system
+
+- Hindley-Milner let-polymorphism: unannotated `let` bindings are inferred per dependency group (strongly connected component) and generalized over the inference variables that are not free in the enclosing environment. `let id = x: x; in { a = id 1; b = id "s"; }` checks, and mutually recursive bindings such as `even` / `odd` solve without annotations.
+- Row polymorphism: selecting from a value of unknown shape infers an open record, so `x: x.a + x.b` is `{ a :: Number; b :: Number; ... } -> Number`. Open records are written `{ a :: T; ... }` or with a named row `{ a :: T; ...r }`, and `//` is row-aware (`x: x // { y = 1; }` is `{ ...t0 } -> { y :: 1; ...t0 }`).
+- Optional fields `name? :: T;`. Pattern fields with defaults produce them: `{ a, b ? 2, ... }: a + b` is `{ a :: Int; b? :: Int; ... } -> Int`, and omitting `a` at a call site is `TC0009`. `x ? null` defaults do not constrain the argument type.
+- `AttrsOf a` dictionaries: `{ ${k} = 1; }` is `AttrsOf 1`, records are subtypes of `AttrsOf t` when every field fits `t`, and builtins such as `mapAttrs`, `listToAttrs`, and `readDir` use it. Mixing static and computed keys gives `{ a :: T; ... }`.
+- `x.a or d` never makes `a` a required field.
+- Gradual inference for unannotated Nix: arguments injected through attrset patterns (`{ lib, fetchFromGitHub, ... }:`) and fields selected from unknown records are "soft", so calling one is `dynamic -> dynamic` instead of pinning it to its first call site. Plain lambda binders keep full principal types (`compose = f: g: x: f (g x)` is `forall t0 t1 t2. (t1 -> t2) %1 -> (t0 -> t1) %1 -> t0 %1 -> t2`). About 98% of a sample of 800 unannotated nixpkgs files type-check.
+- Literals are widened where precision would only cause false errors: pattern defaults, arguments to unknown callees, and `if` branches whose other side is unknown. `+` concatenates strings and paths (`path + string` is a `Path`).
+- A richly typed `builtins` prelude (`registry/workspace/builtins.d.tnix`) is embedded into every binary, so `builtins.*` and the global builtins (`toString`, `map`, `throw`, `import`, `derivation`, `abort`, `baseNameOf`, `dirOf`, `fetchTarball`, `isNull`, `removeAttrs`, `placeholder`, ...) are typed with no project setup. It also provides aliases such as `Derivation`, `DerivationArgs`, `FetchedSource`, `PathLike`, `FileType`, `TypeName`, and `NameValuePair`. A workspace that declares `builtins` overrides it. `vp run generate:prelude` regenerates the embedded copy and `vp run check:prelude` checks it in CI.
+- Diagnostics carry precise source spans. The CLI prints `line:col: [CODE] message`, call mismatches point at the argument, and record mismatches name the missing (`TC0009`) or ill-typed (`TC0013`) field. New code `TC0022`: dynamic attribute in `let`.
+
+#### Language server
+
+- Editors underline the exact span the checker reports; field and name errors narrow to the named token.
+- Scope- and type-aware completion (member fields with types, names in scope, keywords, snippets, type positions, expected-record keys, path literals), hover cards with documentation, signature help with parameter names, scope-aware definition, references and rename, hierarchical symbols, selection ranges, and richer semantic tokens.
+- Diagnostics with code links, related information, "did you mean" suggestions, debounced publishing, and pull diagnostics. New lints `TL0001` (unused binding, rendered as unnecessary) and `TL0002` (use of a declaration documented `@deprecated`).
+- Code actions: did-you-mean, add a missing field, remove or `_`-prefix an unused binding, insert the inferred signature.
+- Requests run on a worker queue with `$/cancelRequest` support.
+
+#### Editors
+
+- `tree-sitter-tnix` grammar (full Nix plus tnix) with highlight, injection, locals, indent, and fold queries, used by Zed and Neovim.
+- VS Code: a generated TextMate grammar for full Nix plus tnix syntax (including optional fields and open rows) with a Markdown code-block injection, snippets, a walkthrough, file icons, doctor and toolchain commands, and `tnix-lsp` detection.
+- Neovim: ftdetect/ftplugin, `vim.lsp.config` on 0.11+ with a fallback, nvim-treesitter registration, and `:checkhealth tnix`.
+
+#### CLI
+
+- `tnix ide install <vscode|cursor|vscodium|zed|neovim|helix>` installs the editor extension and merges editor configuration (`--project`/`--global`, `--dry-run`, `--no-extension`, `--force`, `--lsp-path`); `tnix ide list` shows supported editors and detection status.
+- `tnix doctor [--format json]` checks `tnix` / `tnix-lsp` on `PATH` and their versions, the project config, each detected editor's integration, and `nix`.
+- `tnix init --editor EDITOR` chains into `tnix ide install`.
+- `tnix compile --no-check` erases types without type-checking.
+
+#### Distribution
+
+- `curl -fsSL https://tnix.dev/install.sh | sh` installs prebuilt, self-contained `tnix` and `tnix-lsp` binaries for Linux x64/arm64 and macOS arm64/x64 after verifying their SHA-256 checksums (`TNIX_VERSION`, `TNIX_INSTALL_DIR`, `--uninstall`).
+- `nix profile install github:ubugeeei-prod/tnix` installs both binaries: the flake's default package is now `tnix-toolchain`. The flake also exports `overlays.default` and NixOS / nix-darwin / Home Manager modules (`programs.tnix.enable = true;`).
+
+#### Documentation
+
+- Documentation site with a brand system (logo, palette, typography, code theme), a landing page, a 12-step tutorial, and a reference section ("How Checking Works", CLI, configuration, builtins and registry), deployed to Cloudflare Pages.
+- The tutorial, README, getting-started guide, and language reference are rewritten for the full Nix syntax, with every example checked against the CLI. The grammar, type-system, internals, CLI, roadmap, troubleshooting, and diagnostics pages describe HM inference, rows, optional fields, `AttrsOf`, soft dependencies, the builtins prelude, span diagnostics, and the `TLxxxx` lints.
+
 ### Fixed
 
 - Compiled `.nix` output no longer breaks on strings that contain a quote, a backslash, or an antiquotation marker. `Pretty` renders string literals verbatim, so a source such as `message = "he said \"hi\""` compiled to `"he said "hi""`, which Nix rejects outright. Double-quoted text now escapes `"`, `\`, newline/CR/tab, and a `$` that would open an antiquotation; indented text escapes `${` and the single quotes that would pair with a delimiter. The same escaping applies inside interpolation segments, attribute names, type-level string literals, and `declare` paths.
@@ -23,6 +75,11 @@
 
 ### Changed
 
+- `forall` signatures are rigid: the body is checked with the quantified variables held abstract, so `id :: forall a. a -> a; id = x: 1;` is now rejected (`type mismatch: 1 vs a`). Code that relied on the old, unsound behavior needs a narrower signature.
+- `builtins` is no longer `dynamic` without a declaration; it is typed by the embedded prelude. Code that used builtins in ways their real types do not allow may now report errors. A workspace `declare "builtins"` still replaces the prelude.
+- Checker diagnostics are prefixed with `line:col:`, also in the `error` field of `--format json` reports.
+- Declaration discovery only recurses inside real workspaces (a directory with `tnix.config.tnix`, `flake.nix`, `.git`, `cabal.project`, or `pnpm-workspace.yaml`) and skips hidden directories, `node_modules`, `dist-newstyle`, `result*` links, and symlinked directories. Outside a workspace, only declaration files next to the checked file are loaded.
+- Indented-string escapes `''\n`, `''\r`, and `''\t` are kept verbatim in compiled output, preserving Nix's indentation stripping.
 - `Driver` exports `SupportCache`, `newSupportCache`, and the `...With` analysis entry points. The existing functions are unchanged and create a private cache per call.
 - `Check` exports `resolvePath` and `collapseParentSegments`; the driver kept a second copy that had to stay in sync with the checker's for ambient declarations to keep matching the imports they describe.
 - `Diagnostics` exports `allDiagnosticCodes`, so tooling and tests enumerate the catalogue instead of restating it.

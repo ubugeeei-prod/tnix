@@ -90,27 +90,102 @@ root when loaded through `declarationPacks`.
 
 ### `registry/ecosystem/`
 
-Alias-only packs for common upstream APIs. They declare **types**, not files,
-so you connect them to your imports with your own `declare` blocks:
+Alias-only packs for nixpkgs, NixOS modules and the flake ecosystem. They
+declare **types**, not files, so you connect them to your code with an
+annotation or your own `declare` block. Load the whole directory:
+`nixpkgs-lib` is self-contained, and the other packs build on it (`nixpkgs-pkgs`
+on `nixpkgs-lib`, `nixos-modules` on both, the flake packs on all three).
+
+```tnix [tnix.config.tnix]
+{
+  declarationPacks = [ ./vendor/tnix/registry/ecosystem ];
+}
+```
 
 ```tnix
+# Annotate the arguments nixpkgs passes in:
+{ lib :: NixpkgsLib, stdenv :: NixpkgsStdenv, fetchFromGitHub :: NixpkgsFetchFromGitHub, ... }:
+stdenv.mkDerivation {
+  pname = "hello";
+  version = "1.0";
+  src = fetchFromGitHub { owner = "me"; repo = "hello"; rev = "v1.0"; hash = "sha256-..."; };
+  meta.license = lib.licenses.mit;
+}
+```
+
+```tnix
+# Or type a file you import:
 declare "./nix/flake-utils.nix" { default :: NixFlakeUtilsFlake; };
 ```
 
 | File | Main aliases |
 | --- | --- |
-| [`nixpkgs-lib.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/nixpkgs-lib.d.tnix) | `NixpkgsLib` with `lists`, `strings`, `attrsets`, `trivial`, `modules`, `systems`; `NixpkgsMeta`, `NixpkgsLicense`, `NixpkgsSystem` |
-| [`nixpkgs-pkgs.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/nixpkgs-pkgs.d.tnix) | `NixpkgsPkgs`, `NixpkgsStdenv`, `NixpkgsDerivation`, `NixpkgsMkDerivationArgs`, `NixpkgsMkShellArgs`, fetcher arguments, `NixpkgsImport` |
-| [`flake-ecosystem.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/flake-ecosystem.d.tnix) | `NixFlakeInputSpec`, `NixFlakeSystemOutputs a`, `NixpkgsFlake`, `NixFlakeUtilsFlake`, `HomeManagerFlake`, `NixDarwinFlake`, `FlakePartsLib` |
-| [`community-flakes.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/community-flakes.d.tnix) | `DevenvFlake`, `TreefmtNixFlake`, `PreCommitHooksFlake`, `CraneFlake`, `FenixFlake`, `DeployRsFlake`, `NixvimFlake`, `SopsNixFlake`, `AgenixFlake`, `DiskoFlake`, `ColmenaFlake` |
+| [`nixpkgs-lib.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/nixpkgs-lib.d.tnix) | `NixpkgsLib` and one alias per sub-library; `NixpkgsDerivation`, `NixpkgsDerivationCore`, `NixpkgsMeta`, `NixpkgsLicense`, `NixpkgsMaintainer`, `NixpkgsPlatform`, `NixpkgsSystem`, `NixpkgsSourceLike`, `NixpkgsFileset`; module-system values `NixpkgsOptionType a`, `NixpkgsMkOptionArgs a`, `NixpkgsOption a`, `NixpkgsModuleIf a`, `NixpkgsModuleOverride a`, ...; `NixosSystemArgs` / `NixosConfiguration` for `lib.nixosSystem` |
+| [`nixpkgs-pkgs.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/nixpkgs-pkgs.d.tnix) | `NixpkgsPkgs`, `NixpkgsStdenv`, `NixpkgsImport`, `NixpkgsImportArgs`, `NixpkgsConfig`; builder arguments `NixpkgsMkDerivationArgs`, `NixpkgsMkShellArgs`, `NixpkgsBuildGoModuleArgs`, `NixpkgsBuildRustPackageArgs`, `NixpkgsBuildNpmPackageArgs`, `NixpkgsBuildPythonPackageArgs`, `NixpkgsWriteShellApplicationArgs`, `NixpkgsSymlinkJoinArgs`, `NixpkgsBuildEnvArgs`; fetchers `NixpkgsFetchFromGitHub`, `NixpkgsFetchUrl`, `NixpkgsFetchZip`, `NixpkgsFetchGit`, `NixpkgsFetchFromGitLab`, `NixpkgsFetchPatch`; `NixpkgsRustPlatform`, `NixpkgsPythonPackages`, `NixpkgsPython`, `NixpkgsHaskellPackageSet`, `NixpkgsDockerTools`, `NixpkgsFormats`, `NixpkgsWriters` |
+| [`nixos-modules.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/nixos-modules.d.tnix) | `NixosModule`, `NixosModuleArgs`, `NixosModuleAttrs`, `NixosModuleFunction`, `NixosSystemdService`, `NixosUser` |
+| [`flake-ecosystem.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/flake-ecosystem.d.tnix) | `NixFlake`, `NixFlakeOutputs`, `NixFlakeInputSpec`, `NixFlakeApp`, `NixFlakeTemplate`, `NixFlakePerSystem a`, `NixFlakeSystemOutputs a`, `NixFlakeSourceInfo`; `NixpkgsFlake`, `NixFlakeUtilsFlake`, `FlakePartsFlake` / `FlakePartsLib` / `FlakePartsModule` / `FlakePartsPerSystemArgs`, `HomeManagerFlake` / `HomeManagerConfigurationArgs` / `HomeManagerDag`, `NixDarwinFlake` |
+| [`community-flakes.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/community-flakes.d.tnix) | `DevenvFlake`, `TreefmtNixFlake`, `PreCommitHooksFlake`, `CraneFlake` / `CraneLib` / `CraneBuildArgs`, `FenixFlake`, `DeployRsFlake`, `NixvimFlake`, `SopsNixFlake`, `AgenixFlake`, `DiskoFlake`, `ColmenaFlake` |
 
-> [!WARNING]
-> tnix records have no optional fields, so a registry argument type such as
-> `NixpkgsMkDerivationArgs` requires *every* field it lists (fields like
-> `buildInputs :: List dynamic | Null` must be present, possibly as `null`).
-> When that is too strict for your call sites, define a narrower alias with
-> only the fields you pass, as the
-> [flake tutorial](../tutorial/flakes-and-packages.md) does.
+#### What `NixpkgsLib` covers
+
+Every sub-library is reachable both nested and at the top level, exactly as
+nixpkgs re-exports it (`lib.attrsets.mapAttrs` and `lib.mapAttrs`; about 460
+top-level names). Signatures follow nixpkgs 26.11.
+
+| Sub-library | Alias | Highlights |
+| --- | --- | --- |
+| `lib.attrsets` | `NixpkgsAttrsetsLib` | `mapAttrs :: forall a b. (String -> a -> b) -> AttrsOf a -> AttrsOf b`, `mapAttrs'`, `mapAttrsToList`, `filterAttrs`, `foldlAttrs`, `genAttrs`, `listToAttrs`, `nameValuePair`, `optionalAttrs`, `recursiveUpdate`, `attrByPath`, `zipAttrsWith`, `cartesianProduct`, `getExe`-style output selectors |
+| `lib.lists` | `NixpkgsListsLib` | `map`, `filter`, `foldl'`, `foldr`, `imap0`, `concatMap`, `optional`, `optionals`, `findFirst`, `partition`, `groupBy`, `sort`, `sortOn`, `unique`, `range`, `take`, `drop`, `zipListsWith`, `toposort` |
+| `lib.strings` | `NixpkgsStringsLib` | `concatStringsSep`, `concatMapStringsSep`, `optionalString`, `hasPrefix`, `removePrefix`, `splitString`, `trim`, `toUpper`, `escapeShellArg`, `makeBinPath`, `versionAtLeast`, `cmakeFeature`, `mesonBool`, `enableFeature`, `toInt` |
+| `lib.trivial` | `NixpkgsTrivialLib` | `id`, `const`, `flip`, `pipe`, `warn`, `warnIf`, `throwIf`, `defaultTo`, `mapNullable`, `importJSON`, `importTOML`, `version`, `boolToString` |
+| `lib.options` | `NixpkgsOptionsLib` | `mkOption :: forall a. NixpkgsMkOptionArgs a -> NixpkgsOption a`, `mkEnableOption`, `mkPackageOption`, `literalExpression`, `literalMD`, `showOption`, `getValues` |
+| `lib.types` | `NixpkgsTypesLib` | `str`, `int`, `bool`, `port`, `path`, `package`, `lines`, `ints.*`, `numbers.*`, `listOf`, `attrsOf`, `lazyAttrsOf`, `attrsWith`, `nullOr`, `enum`, `either`, `oneOf`, `coercedTo`, `addCheck`, `functionTo`, `submodule`, `submoduleWith`, `deferredModule`, `mkOptionType` |
+| `lib.modules` | `NixpkgsModulesLib` | `mkIf`, `mkMerge`, `mkDefault`, `mkForce`, `mkOverride`, `mkOptionDefault`, `mkBefore`, `mkAfter`, `mkOrder`, `mkDefinition`, `evalModules`, `mkRenamedOptionModule`, `mkRemovedOptionModule`, `mkAliasOptionModule`, `importApply` |
+| `lib.fixedPoints` | `NixpkgsFixedPointsLib` | `fix`, `fix'`, `extends`, `composeExtensions`, `composeManyExtensions`, `makeExtensible`, `toExtension` |
+| `lib.customisation` | `NixpkgsCustomisationLib` | `callPackageWith`, `callPackagesWith`, `makeOverridable`, `makeScope`, `overrideDerivation`, `extendDerivation`, `extendMkDerivation`, `hydraJob` |
+| `lib.meta` | `NixpkgsMetaLib` | `getExe`, `getExe'`, `lowPrio`, `hiPrio`, `setPrio`, `addMetaAttrs`, `availableOn`, `getLicenseFromSpdxId` |
+| `lib.versions` | `NixpkgsVersionsLib` | `major`, `minor`, `patch`, `majorMinor`, `splitVersion`, `pad` |
+| `lib.fileset` | `NixpkgsFilesetLib` | `toSource`, `unions`, `union`, `intersection`, `difference`, `fileFilter`, `gitTracked`, `maybeMissing`, `fromSource` |
+| `lib.filesystem`, `lib.path`, `lib.sources` | `NixpkgsFilesystemLib`, `NixpkgsPathLib`, `NixpkgsSourcesLib` | `listFilesRecursive`, `packagesFromDirectoryRecursive`, `pathType`; `path.append`, `path.subpath.*`; `cleanSource`, `cleanSourceWith`, `sourceByRegex` |
+| `lib.generators`, `lib.cli` | `NixpkgsGeneratorsLib`, `NixpkgsCliLib` | `toINI`, `toKeyValue`, `toJSON`, `toYAML`, `toLua`, `toPretty`, `mkLuaInline`; `toGNUCommandLine`, `toCommandLineShellGNU` |
+| `lib.debug`, `lib.asserts` | `NixpkgsDebugLib`, `NixpkgsAssertsLib` | `traceVal`, `traceSeq`, `runTests`; `assertMsg`, `assertOneOf` |
+| `lib.systems` | `NixpkgsSystemsLib` | `flakeExposed`, `elaborate :: String \| NixpkgsAttrs -> NixpkgsPlatform`, `doubles` |
+| `lib.licenses`, `lib.maintainers`, `lib.teams`, `lib.platforms` | | `AttrsOf NixpkgsLicense`, `AttrsOf NixpkgsMaintainer`, `AttrsOf NixpkgsTeam`, `NixpkgsSystemDoubles` |
+| also | | `lib.gvariant`, `lib.stringsWithDeps`, `lib.derivations`, `lib.flakes`, `lib.nixosSystem`, `lib.extend`; `lib.misc` (deprecated helpers) is reachable but `dynamic` |
+
+#### How the packs model nixpkgs
+
+- **Open library records.** `NixpkgsLib`, its sub-libraries, `NixpkgsPkgs`,
+  derivations and platforms end in `...`: a member the pack does not list is
+  `dynamic`, not an error, so new nixpkgs functions and packages keep working.
+- **Closed argument records with optional fields.** Builder arguments
+  (`NixpkgsMkDerivationArgs`, fetcher arguments, `NixpkgsMkOptionArgs`, ...)
+  list every documented attribute as optional (`doCheck? :: Bool`) and mark the
+  genuinely required ones (`fetchFromGitHub` needs `owner` and `repo`;
+  `writeShellApplication` needs `name` and `text`). A wrongly typed attribute
+  or a missing required one is an error; extra attributes such as custom
+  environment variables are still accepted by width subtyping.
+- **`finalAttrs`.** `stdenv.mkDerivation`, `buildGoModule`,
+  `rustPlatform.buildRustPackage`, `buildNpmPackage` and
+  `buildPythonPackage` accept `NixpkgsArgsOrFinalAttrs Args`, which is
+  `Args | (dynamic -> Args)`.
+- **Option types carry their value type.** `lib.types.int` is
+  `NixpkgsOptionType Int`, `listOf`/`attrsOf`/`nullOr`/`either`/`enum` combine
+  them, and `mkOption` relates `type` and `default`:
+  `mkOption { type = types.port; default = "80"; }` is rejected,
+  `mkOption { type = types.enum [ "a" "b" ]; default = "c"; }` too.
+- **Module properties are values.** `mkIf c x` is `NixpkgsModuleIf a`,
+  `mkDefault x` is `NixpkgsModuleOverride a`, `mkBefore x` is
+  `NixpkgsModuleOrder a`, so you can annotate helpers that build config.
+- **Module `config` and `options` are `dynamic`.** Their shape depends on every
+  module in the evaluation; `NixosModuleArgs` types `lib`, `pkgs` and
+  `modulesPath` instead.
+- **Accepting vs producing systems.** Results such as
+  `lib.systems.flakeExposed` use the literal union `NixpkgsSystem`; parameters
+  take `String`, so `builtins.currentSystem` is accepted.
+- **No branching alias cycles.** Package-set variants (`pkgsStatic`,
+  `pkgsCross.*`, `extend`) are `dynamic`, and `override`/`overrideAttrs` return
+  `NixpkgsDerivationCore`, which keeps the alias graph acyclic.
 
 ## Writing your own pack
 

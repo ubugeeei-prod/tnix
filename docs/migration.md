@@ -58,19 +58,22 @@ This is the core bridge:
 
 ## 4. Type the flake surface
 
-For flakes, keep the full implementation in `flake.nix` and write a typed
-*projection* over the parts you want checked. The pattern (adapted from
-[`dogfood/flake-surface.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/dogfood/flake-surface.tnix)):
+A flake can be converted to `flake.tnix` directly; see the
+[flake tutorial](./tutorial/flakes-and-packages.md#a-flake). If you would
+rather keep the full implementation in `flake.nix`, declare its surface and
+write a typed *projection* over the parts you want checked:
 
 ```tnix
+declare "./flake.nix" {
+  description :: String;
+  outputs :: dynamic -> {
+    devShells :: { aarch64-darwin :: { default :: Derivation; }; };
+  };
+};
+
 let
-  flake = import ../flake.nix;
-
-  inputs :: ResolvedFlakeInputs;
-  inputs = { self = builtins; nixpkgs = builtins; };
-
-  outputs :: FlakeOutputs;
-  outputs = flake.outputs inputs;
+  flake = import ./flake.nix;
+  outputs = flake.outputs { };
 in {
   description = flake.description;
   devShell = outputs.devShells.aarch64-darwin.default;
@@ -121,8 +124,10 @@ the JSON output contract.
 
 ## What not to migrate (yet)
 
-Executable `.tnix` targets a Nix-like subset, not full parser parity. For
-modules that use constructs outside that subset, prefer ambient typing
-(steps 3–4) over rewriting them as `.tnix`. The supported subset and its current
-exclusions are documented in [grammar.md](./grammar.md) and the
-[README](https://github.com/ubugeeei-prod/tnix/blob/main/README.md).
+Any Nix file can be renamed to `.tnix`: the parser accepts the whole Nix
+expression language, and unannotated code is checked gradually (injected
+dependencies stay `dynamic`). Whether converting is worth it is a separate
+question. Modules whose value comes from the `config` fixpoint, such as NixOS
+modules, are typed as ordinary functions today, so ambient typing (steps 3–4)
+is often the better trade for them until `config`-aware typing lands (see the
+[roadmap](./roadmap.md)).

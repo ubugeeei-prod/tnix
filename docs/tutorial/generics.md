@@ -10,8 +10,8 @@ Nix code is full of helpers that work for any element type: `map`, `filter`,
 level further with **higher-kinded types**, where the thing you abstract over
 is itself a type constructor such as `List`.
 
-This step continues in the `tnix-tour` workspace and relies on the
-`types/builtins.d.tnix` file from step 6.
+This step continues in the `tnix-tour` workspace. `builtins.head` below is
+typed by the built-in prelude from step 6 (`forall a. List a -> a`).
 
 ## Generic functions and aliases
 
@@ -41,10 +41,7 @@ in {
 ```text
 root: {
   head :: "x" | "y";
-  pair :: {
-    fst :: "one";
-    snd :: 1;
-  };
+  pair :: Pair "one" 1;
   port :: Maybe Int;
 }
 first :: forall a. List a -> a
@@ -73,7 +70,7 @@ in n
 ```
 
 ```text
-[TC0013] type mismatch: "x" | "y" vs Int
+6:7: [TC0013] type mismatch: "x" | "y" vs Int
 ```
 
 ## Abstracting over type constructors
@@ -123,9 +120,7 @@ in {
 
 ```text
 root: {
-  boxed :: {
-    value :: Int;
-  };
+  boxed :: Box Int;
   xs :: List Int;
 }
 functors :: {

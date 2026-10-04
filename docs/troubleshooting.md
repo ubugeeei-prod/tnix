@@ -7,9 +7,10 @@ with a minimal reproduction (see [CONTRIBUTING.md](https://github.com/ubugeeei-p
 
 ### `tnix: command not found`
 
-The binary is not on your `PATH`. Either install it from the flake
-(`nix profile install github:ubugeeei-prod/tnix#tnix`) or, when working from a
-checkout, run it through Cabal inside the dev shell:
+The binary is not on your `PATH`. The installer script puts it in
+`~/.tnix/bin` and prints the line to add to your shell profile. Otherwise
+install it from the flake (`nix profile install github:ubugeeei-prod/tnix`) or,
+when working from a checkout, run it through Cabal inside the dev shell:
 
 ```bash
 nix develop --accept-flake-config --command cabal run tnix -- --version
@@ -34,30 +35,59 @@ isn't filtering everything out.
 
 ### A `.nix` file won't compile with `tnix compile`
 
-Executable `.tnix` targets a reliable Nix-like subset, not full parser parity.
-Constructs outside that subset are reported as parse errors. See the
-"not yet supported" notes in [grammar.md](./grammar.md) and the parity statement
-in the [README](https://github.com/ubugeeei-prod/tnix/blob/main/README.md). For existing `.nix` modules you usually want
-*ambient typing* with a `.d.tnix` file rather than compiling them — see
-[migration.md](./migration.md).
+The parser accepts the whole Nix expression language, so a parse error usually
+points at a real syntax error. The known exception is unquoted URIs
+(`https://...`), which are only recognized in argument position; quote them.
+
+More often, `tnix compile` refuses a file because it does not type-check:
+compile checks first and never writes output for an ill-typed file. Fix the
+reported diagnostic, suppress it with `# @tnix-ignore`, or annotate the
+offending boundary with `dynamic`. For existing `.nix` modules that you do not
+want to convert, *ambient typing* with a `.d.tnix` file is usually the better
+route; see [migration.md](./migration.md).
+
+### `missing field` on `builtins`
+
+`builtins` and the global builtins are typed by a prelude built into `tnix`.
+If a builtin that exists in Nix is reported as a missing field, the workspace
+probably contains its own `declare "builtins"` block, which replaces the
+prelude. `tnix init` scaffolds one at `types/builtins.d.tnix` when
+`builtins = true`. Delete that file (and set `builtins = false;` in
+`tnix.config.tnix`) to use the full prelude again.
+
+### Declarations are not picked up
+
+`.d.tnix` files are discovered under the *workspace root*, the nearest
+directory containing `.git`, `flake.nix`, `tnix.config.tnix`, `cabal.project`
+or `pnpm-workspace.yaml`. Without such a marker, only declaration files next to
+the checked file are loaded. Nested workspaces, hidden directories,
+`node_modules`, `dist-newstyle`, `result*` links and symlinked directories are
+skipped. Move the file under the root, or list it in `declarationPacks`.
 
 ## Diagnostics
 
-Every diagnostic has a stable code such as `[TC0013]`. Look the code up in
+Every diagnostic has a stable code such as `[TC0013]`, usually preceded by the
+`line:col` of the offending expression. Look the code up in
 [diagnostics.md](./diagnostics.md) for an explanation and a suggested fix. The
 prefix tells you the phase: `TP` parser, `TK` kind checker, `TC` type checker,
-`TD` driver/project/IO.
+`TD` driver/project/IO, and `TL` for lints that only the language server
+reports.
 
 ### Silencing a known diagnostic
 
 Use the directive comments documented in
 [getting-started.md](./getting-started.md#diagnostic-directives):
-`# @tnix-ignore` to suppress the next root expression's error, and
-`# @tnix-expected` to assert that a specific error must occur.
+`# @tnix-ignore` to suppress the error of the next `let` item or root
+expression, and `# @tnix-expected` to assert that an error must occur there.
 
 ## The language server (`tnix-lsp`)
 
 ### The server doesn't start in my editor
+
+Run `tnix doctor` first: it checks that `tnix` and `tnix-lsp` are on `PATH`
+with matching versions and that each detected editor is set up, and prints the
+command that fixes each problem (usually `tnix ide install <editor>`). If it
+reports no problem:
 
 1. Confirm the binary runs on its own: `tnix-lsp --version`.
 2. Confirm your editor points at the right executable. VS Code uses the

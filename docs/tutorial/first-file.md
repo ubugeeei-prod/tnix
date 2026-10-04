@@ -85,11 +85,12 @@ tnix check hello.tnix
 ```
 
 ```text
-[TC0013] type mismatch: 42 vs String
+3:14: [TC0013] type mismatch: 42 vs String
 ```
 
-The command exits with status `1`. Every diagnostic starts with a stable code in
-brackets. The first letters tell you which phase found the problem:
+The command exits with status `1`. A diagnostic starts with the line and column
+of the offending expression (`3:14` is the `42`), followed by a stable code in
+brackets. The first letters of the code tell you which phase found the problem:
 
 | Prefix | Phase |
 | --- | --- |
@@ -103,8 +104,8 @@ that the checker reports `42`, not `Int`: integer and string literals keep their
 exact *literal type* until something forces them to widen. You will use that in
 the next step.
 
-A syntax error looks different because it comes from the parser and carries a
-position:
+A syntax error comes from the parser, which also prints an excerpt of the line
+and what it expected to find:
 
 ```tnix [broken.tnix]
 let
@@ -151,7 +152,8 @@ in depth.
 - `.tnix` = Nix + type syntax. Signatures look like `name :: Type;`.
 - `tnix check` analyzes, `tnix compile` erases types and emits `.nix`, and
   `tnix emit` writes a `.d.tnix` declaration.
-- Diagnostics carry stable codes such as `TC0013`.
+- Diagnostics carry a `line:column` position and a stable code such as
+  `TC0013`.
 
 <div class="tx-pager">
 

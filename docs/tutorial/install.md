@@ -14,9 +14,10 @@ Pick one of the installation methods below.
 
 ## Option A: the installer script
 
-On Linux x64 and macOS arm64, the quickest route is the installer script. It
-downloads the prebuilt release archive for your platform from GitHub Releases
-and installs `tnix` and `tnix-lsp`:
+On Linux (x64, arm64) and macOS (arm64, x64), the quickest route is the
+installer script. It downloads the prebuilt release archive for your platform,
+verifies its SHA-256 checksum, and installs `tnix` and `tnix-lsp` into
+`~/.tnix/bin`:
 
 ```bash
 curl -fsSL https://tnix.dev/install.sh | sh
@@ -36,14 +37,13 @@ On any host with flakes enabled, install straight from the flake:
 nix profile install github:ubugeeei-prod/tnix
 ```
 
-The default package is the `tnix` CLI. Add the language server as well (you
-need it in step 10), or install both at once through the `tnix-toolchain`
-package:
+The default package is `tnix-toolchain`, which contains both the `tnix` CLI
+and the `tnix-lsp` language server (you need the server in step 10). The
+binaries are also available on their own:
 
 ```bash
+nix profile install github:ubugeeei-prod/tnix#tnix
 nix profile install github:ubugeeei-prod/tnix#tnix-lsp
-# or, both binaries in one package:
-nix profile install github:ubugeeei-prod/tnix#tnix-toolchain
 ```
 
 To pin a release, add a tag to the flake reference, for example
@@ -71,9 +71,9 @@ tnix 0.5.0.0
 the [CLI reference](../reference/cli.md) documents all of them.
 
 > [!TIP]
-> Platform support differs per tier. Linux x64 and macOS arm64 have prebuilt
-> archives; Linux arm64 and macOS x64 build through the flake. See the
-> [support matrix](../support-matrix.md) for details.
+> Platform support differs per tier. Prebuilt archives exist for Linux x64 and
+> arm64 and for macOS arm64 and x64; other platforms build through the flake.
+> See the [support matrix](../support-matrix.md) for details.
 
 ## Set up a playground
 
