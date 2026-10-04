@@ -1,0 +1,333 @@
+================================================================================
+integer
+================================================================================
+
+42
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (integer_expression))
+
+================================================================================
+float
+================================================================================
+
+1.5e3
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (float_expression))
+
+================================================================================
+float with leading zero
+================================================================================
+
+0.25
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (float_expression))
+
+================================================================================
+variable
+================================================================================
+
+builtins
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (variable_expression
+    (identifier)))
+
+================================================================================
+attrset
+================================================================================
+
+{ a = 1; b.c = 2; "quoted key" = 3; ${dyn} = 4; }
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (attrset_expression
+    (binding_set
+      (binding
+        (attrpath
+          (identifier))
+        (integer_expression))
+      (binding
+        (attrpath
+          (identifier)
+          (identifier))
+        (integer_expression))
+      (binding
+        (attrpath
+          (string_expression
+            (string_fragment)))
+        (integer_expression))
+      (binding
+        (attrpath
+          (interpolation
+            (variable_expression
+              (identifier))))
+        (integer_expression)))))
+
+================================================================================
+attrset with type as attribute name
+================================================================================
+
+{ type = "app"; program = x.type; }
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (attrset_expression
+    (binding_set
+      (binding
+        (attrpath
+          (identifier))
+        (string_expression
+          (string_fragment)))
+      (binding
+        (attrpath
+          (identifier))
+        (select_expression
+          (variable_expression
+            (identifier))
+          (attrpath
+            (identifier)))))))
+
+================================================================================
+rec attrset
+================================================================================
+
+rec { a = 1; b = a; }
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (rec_attrset_expression
+    (binding_set
+      (binding
+        (attrpath
+          (identifier))
+        (integer_expression))
+      (binding
+        (attrpath
+          (identifier))
+        (variable_expression
+          (identifier))))))
+
+================================================================================
+legacy let attrset
+================================================================================
+
+let { body = 1; }
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (let_attrset_expression
+    (binding_set
+      (binding
+        (attrpath
+          (identifier))
+        (integer_expression)))))
+
+================================================================================
+inherit
+================================================================================
+
+{ inherit a b; inherit (pkgs) stdenv lib; }
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (attrset_expression
+    (binding_set
+      (inherit
+        (inherited_attrs
+          (identifier)
+          (identifier)))
+      (inherit_from
+        (variable_expression
+          (identifier))
+        (inherited_attrs
+          (identifier)
+          (identifier))))))
+
+================================================================================
+list
+================================================================================
+
+[ 1 "two" ./three (f x) ]
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (list_expression
+    (integer_expression)
+    (string_expression
+      (string_fragment))
+    (path_expression
+      (path_fragment))
+    (parenthesized_expression
+      (apply_expression
+        (variable_expression
+          (identifier))
+        (variable_expression
+          (identifier))))))
+
+================================================================================
+let expression
+================================================================================
+
+let x = 1; y = x; in y
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (let_expression
+    (binding_set
+      (binding
+        (attrpath
+          (identifier))
+        (integer_expression))
+      (binding
+        (attrpath
+          (identifier))
+        (variable_expression
+          (identifier))))
+    (variable_expression
+      (identifier))))
+
+================================================================================
+let with type keyword as binding name
+================================================================================
+
+let type = 1; in type
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (let_expression
+    (binding_set
+      (binding
+        (attrpath
+          (identifier))
+        (integer_expression)))
+    (variable_expression
+      (identifier))))
+
+================================================================================
+with and assert
+================================================================================
+
+assert x != null; with lib; mkIf cfg.enable { }
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (assert_expression
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))
+    (with_expression
+      (variable_expression
+        (identifier))
+      (apply_expression
+        (apply_expression
+          (variable_expression
+            (identifier))
+          (select_expression
+            (variable_expression
+              (identifier))
+            (attrpath
+              (identifier))))
+        (attrset_expression)))))
+
+================================================================================
+if expression
+================================================================================
+
+if a then b else if c then d else e
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (if_expression
+    (variable_expression
+      (identifier))
+    (variable_expression
+      (identifier))
+    (if_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))))
+
+================================================================================
+select with or default
+================================================================================
+
+a.b.${c}."d" or null
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (select_expression
+    (variable_expression
+      (identifier))
+    (attrpath
+      (identifier)
+      (interpolation
+        (variable_expression
+          (identifier)))
+      (string_expression
+        (string_fragment)))
+    (variable_expression
+      (identifier))))
+
+================================================================================
+has attr
+================================================================================
+
+a ? b.c
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (has_attr_expression
+    (variable_expression
+      (identifier))
+    (attrpath
+      (identifier)
+      (identifier))))
+
+================================================================================
+application
+================================================================================
+
+import ./default.nix { inherit pkgs; }
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (apply_expression
+    (apply_expression
+      (variable_expression
+        (identifier))
+      (path_expression
+        (path_fragment)))
+    (attrset_expression
+      (binding_set
+        (inherit
+          (inherited_attrs
+            (identifier)))))))

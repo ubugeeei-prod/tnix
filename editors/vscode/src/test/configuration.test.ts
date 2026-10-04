@@ -30,6 +30,11 @@ suite("configuration", () => {
       "tnix.server.args",
       "tnix.server.cwd",
       "tnix.trace.server",
+      "tnix.cli.path",
+      "tnix.server.promptInstall",
+      "tnix.inlayHints.enabled",
+      "tnix.diagnostics.enabled",
+      "tnix.diagnostics.severityOverrides",
     ]) {
       assert.ok(key in props, `${key} should be contributed`);
     }

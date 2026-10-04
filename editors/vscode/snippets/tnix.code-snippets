@@ -1,0 +1,144 @@
+{
+  "Type alias": {
+    "prefix": "type",
+    "body": [
+      "type ${1:Name}${2: a} = ${3:{ ${4:field} :: ${5:a}; \\}};"
+    ],
+    "description": "Declare a type alias"
+  },
+  "Record type alias": {
+    "prefix": "typerec",
+    "body": [
+      "type ${1:Name} = {",
+      "  ${2:name} :: ${3:String};",
+      "  $0",
+      "};"
+    ],
+    "description": "Declare a structural record type"
+  },
+  "Union type alias": {
+    "prefix": "typeunion",
+    "body": [
+      "type ${1:Option} ${2:a} =",
+      "  { _tag :: \"${3:some}\"; value :: ${2:a}; }",
+      "  | { _tag :: \"${4:none}\"; };"
+    ],
+    "description": "Declare a tagged union type"
+  },
+  "Conditional type": {
+    "prefix": "typecond",
+    "body": [
+      "type ${1:Element} ${2:t} = ${2:t} extends ${3:List} (infer ${4:a}) ? ${4:a} : ${5:dynamic};"
+    ],
+    "description": "Declare a conditional type with infer"
+  },
+  "Ambient declaration": {
+    "prefix": "declare",
+    "body": [
+      "declare \"${1:./default.nix}\" {",
+      "  ${2:default} :: ${3:{ ${4:value} :: ${5:Int}; \\}};",
+      "};"
+    ],
+    "description": "Describe the shape of an existing .nix file"
+  },
+  "Signature": {
+    "prefix": "sig",
+    "body": [
+      "${1:name} :: ${2:Type};",
+      "${1:name} = ${0};"
+    ],
+    "description": "A typed binding (signature + definition)"
+  },
+  "Polymorphic signature": {
+    "prefix": "forall",
+    "body": [
+      "${1:name} :: forall ${2:a}. ${3:${2:a} -> ${2:a}};"
+    ],
+    "description": "A polymorphic signature"
+  },
+  "Let with signature": {
+    "prefix": "let",
+    "body": [
+      "let",
+      "  ${1:name} :: ${2:Int};",
+      "  ${1:name} = ${3:1};",
+      "in",
+      "${0:${1:name}}"
+    ],
+    "description": "let block with a typed binding"
+  },
+  "Typed lambda": {
+    "prefix": "lam",
+    "body": [
+      "(${1:x} :: ${2:Int}): ${0:${1:x}}"
+    ],
+    "description": "Lambda with an annotated binder"
+  },
+  "Lambda with formals": {
+    "prefix": "fn",
+    "body": [
+      "{ ${1:lib}, ${2:pkgs}, ... }:",
+      "$0"
+    ],
+    "description": "Lambda taking an attribute set"
+  },
+  "Cast": {
+    "prefix": "as",
+    "body": [
+      "${1:expr} as ${0:Type}"
+    ],
+    "description": "Narrow or widen an expression with `as`"
+  },
+  "If expression": {
+    "prefix": "if",
+    "body": [
+      "if ${1:cond} then ${2:yes} else ${0:no}"
+    ],
+    "description": "Conditional expression"
+  },
+  "Inherit": {
+    "prefix": "inherit",
+    "body": [
+      "inherit ${1:(${2:source}) }${0:name};"
+    ],
+    "description": "inherit attributes"
+  },
+  "Indented string": {
+    "prefix": "''",
+    "body": [
+      "''",
+      "  $0",
+      "''"
+    ],
+    "description": "Multi-line indented string"
+  },
+  "Ignore next error": {
+    "prefix": "@tnix-ignore",
+    "body": [
+      "# @tnix-ignore"
+    ],
+    "description": "Suppress the next checker failure"
+  },
+  "Expect next error": {
+    "prefix": "@tnix-expected",
+    "body": [
+      "# @tnix-expected"
+    ],
+    "description": "Suppress the next failure and require that it fails"
+  },
+  "Flake": {
+    "prefix": "flake",
+    "body": [
+      "{",
+      "  description = \"${1:A tnix project}\";",
+      "",
+      "  inputs.nixpkgs.url = \"github:NixOS/nixpkgs/nixos-unstable\";",
+      "",
+      "  outputs = { self, nixpkgs, ... }: {",
+      "    $0",
+      "  };",
+      "}"
+    ],
+    "description": "Flake skeleton"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "grammars": [
+    {
+      "name": "tnix",
+      "camelcase": "Tnix",
+      "scope": "source.tnix",
+      "path": ".",
+      "file-types": ["tnix"],
+      "highlights": "queries/highlights.scm",
+      "injections": "queries/injections.scm",
+      "locals": "queries/locals.scm",
+      "injection-regex": "^tnix$"
+    }
+  ],
+  "metadata": {
+    "version": "0.5.0",
+    "license": "MIT",
+    "description": "tree-sitter grammar for tnix (Nix with a gradual type layer)",
+    "authors": [{ "name": "tnix contributors" }],
+    "links": { "repository": "https://github.com/ubugeeei/tnix" }
+  },
+  "bindings": {
+    "c": false,
+    "go": false,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "swift": false
+  }
+}

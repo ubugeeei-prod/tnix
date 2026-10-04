@@ -12,16 +12,40 @@ suite("activation", () => {
   test("registers the restart command", async () => {
     await activateExtension();
     const commands = await vscode.commands.getCommands(true);
-    assert.ok(
-      commands.includes("tnix.restartServer"),
-      "tnix.restartServer should be registered",
-    );
+    for (const command of [
+      "tnix.restartServer",
+      "tnix.showOutput",
+      "tnix.showVersion",
+      "tnix.runDoctor",
+      "tnix.installServer",
+      "tnix.showMenu",
+    ]) {
+      assert.ok(commands.includes(command), `${command} should be registered`);
+    }
   });
 
   test("contributes the tnix language", async () => {
     await activateExtension();
     const languages = await vscode.languages.getLanguages();
     assert.ok(languages.includes("tnix"), "tnix language should be registered");
+  });
+
+  test("contributes the tnix grammars and snippets", async () => {
+    const ext = await activateExtension();
+    const contributes = (
+      ext.packageJSON as { contributes: Record<string, unknown> }
+    ).contributes as {
+      grammars: { scopeName: string }[];
+      snippets: { language: string }[];
+      walkthroughs: { id: string }[];
+    };
+    const scopes = contributes.grammars.map((g) => g.scopeName);
+    assert.ok(scopes.includes("source.tnix"));
+    assert.ok(scopes.includes("markdown.tnix.codeblock"));
+    assert.ok(contributes.snippets.some((s) => s.language === "tnix"));
+    assert.ok(
+      contributes.walkthroughs.some((w) => w.id === "tnix.gettingStarted"),
+    );
   });
 
   test("opens .tnix files as the tnix language", async () => {

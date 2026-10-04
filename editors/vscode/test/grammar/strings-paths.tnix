@@ -1,0 +1,20 @@
+let
+  simple = "hello \"world\" \n \${not} ${name}!";
+  nested = "outer ${ "inner ${toString 1}" } end";
+  indented = ''
+    echo ${pkgs.hello}/bin/hello
+    literal: ''${notInterpolated} and ''' quotes ''\n escaped
+    $HOME stays; semicolons too
+  '';
+  relative = ./foo/bar.nix;
+  parent = ../lib;
+  absolute = /etc/hosts;
+  home = ~/.config/nixpkgs;
+  search = <nixpkgs>;
+  searchSub = <nixpkgs/lib>;
+  dynamicPath = ./pkgs/${name}/default.nix;
+  url = https://example.com/archive.tar.gz;
+  flakeRef = github:NixOS/nixpkgs;
+  update = a // b;
+  division = a / b;
+in simple

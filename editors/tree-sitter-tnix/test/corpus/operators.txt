@@ -1,0 +1,138 @@
+================================================================================
+arithmetic precedence
+================================================================================
+
+1 + 2 * 3 - 4 / 5
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (binary_expression
+    (binary_expression
+      (integer_expression)
+      (binary_expression
+        (integer_expression)
+        (integer_expression)))
+    (binary_expression
+      (integer_expression)
+      (integer_expression))))
+
+================================================================================
+division versus path
+================================================================================
+
+a / b
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (variable_expression
+      (identifier))))
+
+================================================================================
+update and concat
+================================================================================
+
+a // b ++ c
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))))
+
+================================================================================
+logic and implication
+================================================================================
+
+!a && b || c -> d
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (binary_expression
+    (binary_expression
+      (binary_expression
+        (unary_expression
+          (variable_expression
+            (identifier)))
+        (variable_expression
+          (identifier)))
+      (variable_expression
+        (identifier)))
+    (variable_expression
+      (identifier))))
+
+================================================================================
+comparison
+================================================================================
+
+a == b != (c < d) && e >= f
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (binary_expression
+    (binary_expression
+      (binary_expression
+        (variable_expression
+          (identifier))
+        (variable_expression
+          (identifier)))
+      (parenthesized_expression
+        (binary_expression
+          (variable_expression
+            (identifier))
+          (variable_expression
+            (identifier)))))
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))))
+
+================================================================================
+negation
+================================================================================
+
+-x - -1
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (binary_expression
+    (unary_expression
+      (variable_expression
+        (identifier)))
+    (unary_expression
+      (integer_expression))))
+
+================================================================================
+pipe operators
+================================================================================
+
+xs |> map f <| ys
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (binary_expression
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (apply_expression
+        (variable_expression
+          (identifier))
+        (variable_expression
+          (identifier))))
+    (variable_expression
+      (identifier))))
