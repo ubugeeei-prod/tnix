@@ -256,8 +256,12 @@ inferExpr ctx env = \case
               | definitelyNotCallable resolvedFunTy ->
                   throwCheck (withCode TC0018NotCallable ("cannot call " <> describeNonCallable resolvedFunTy <> " as a function"))
               | otherwise -> do
+                  -- The callee is still unknown: its parameter type is
+                  -- inferred from this argument, widened so one call site's
+                  -- literal does not pin the parameter to a singleton.
                   outTy <- freshMeta
-                  _ <- unify ctx funTy (TFun Many argTy outTy)
+                  argTy' <- widenLiterals <$> zonk argTy
+                  _ <- unify ctx funTy (TFun Many argTy' outTy)
                   zonk outTy
   EBinaryOp op left right -> inferBinaryOp ctx env op left right
   EUnaryOp OpNot operand -> do
@@ -312,7 +316,15 @@ inferExpr ctx env = \case
   ERec items -> inferRecAttrSet ctx env items
   ESelectOr base fields fallback -> do
     fallbackTy <- inferExpr ctx env fallback
-    attempt <- catchInfer (inferExpr ctx env (ESelect base fields))
+    baseTy <- inferExpr ctx env base >>= zonk
+    -- `x.a or d` must not *require* `a`: when the path runs into a value whose
+    -- shape is still unknown, the result is just the fallback's type joined
+    -- with a fresh unknown, and no row requirement is recorded.
+    known <- pathIsKnown ctx env baseTy fields
+    attempt <-
+      if known
+        then catchInfer (inferExpr ctx env (ESelect base fields))
+        else Right <$> freshMeta
     case attempt of
       Right selectedTy -> do
         selected <- zonk selectedTy
@@ -338,15 +350,65 @@ inferExpr ctx env = \case
   EIf cond yesExpr noExpr -> do
     condTy <- inferExpr ctx env cond
     _ <- constrain ctx condTy tBool
-    yesTy <- inferExpr ctx env yesExpr
-    noTy <- inferExpr ctx env noExpr
-    pure (joinTypes (checkAliases ctx) yesTy noTy)
+    yesTy <- inferExpr ctx env yesExpr >>= zonk
+    noTy <- inferExpr ctx env noExpr >>= zonk
+    joinBranches ctx yesTy noTy
   EList members ->
     traverse (inferExpr ctx env) members
       <&> inferListType (joinTypes (checkAliases ctx))
   ECast expr assertedTy -> do
     actualTy <- inferExpr ctx env expr
     checkCast ctx actualTy assertedTy
+
+-- | Whether every step of a selection path can be resolved without guessing:
+-- the base (and each intermediate value) has a known shape.
+pathIsKnown :: CheckContext -> TypeEnv -> Type -> [SelectStep] -> InferM Bool
+pathIsKnown _ _ _ [] = pure True
+pathIsKnown ctx env ty (step : rest) = do
+  ty' <- zonk ty
+  case resolveType (checkAliases ctx) ty' of
+    TMeta _ -> pure False
+    TOpenRecord fields (TMeta _)
+      | SelectName name <- step,
+        not (Map.member name fields) ->
+          pure False
+    resolved
+      | SelectName name <- step,
+        Just fieldTy <- lookupRecordField (checkAliases ctx) resolved name ->
+          pathIsKnown ctx env fieldTy rest
+      | otherwise -> pure True
+
+-- | Join the two branches of a conditional. While metas are involved the
+-- branches are unified (after widening literals, so `true`/`false` meet at
+-- `Bool`), which is what lets recursive definitions such as mutually
+-- recursive `even`/`odd` solve; fully known branches keep their precise join.
+joinBranches :: CheckContext -> Type -> Type -> InferM Type
+joinBranches ctx yesTy noTy
+  | hasUnresolvedMetas yesTy noTy = do
+      attempt <- catchInfer (unify ctx (widenLiterals yesTy) (widenLiterals noTy))
+      case attempt of
+        Right ty -> zonk ty
+        Left _ -> pure (joinTypes (checkAliases ctx) yesTy noTy)
+  | otherwise = pure (joinTypes (checkAliases ctx) yesTy noTy)
+
+-- | Replace singleton literal types by their primitive base.
+widenLiterals :: Type -> Type
+widenLiterals = \case
+  TLit (LInt _) -> tInt
+  TLit (LFloat _) -> tFloat
+  TLit (LString _) -> tString
+  TLit (LBool _) -> tBool
+  TRecord fields -> TRecord (fmap widenLiterals fields)
+  TOpenRecord fields tail' -> TOpenRecord (fmap widenLiterals fields) tail'
+  TOptional inner -> TOptional (widenLiterals inner)
+  TFun mult a b -> TFun mult (widenLiterals a) (widenLiterals b)
+  TApp f x -> TApp f (widenLiterals x)
+  TUnion members -> case nubOrdTypes (map widenLiterals members) of
+    [single] -> single
+    many' -> TUnion many'
+  other -> other
+  where
+    nubOrdTypes = Set.toList . Set.fromList
 
 -- | Recognize `import <path>` targets that can be resolved statically.
 importTarget :: Expr -> Maybe FilePath
@@ -604,7 +666,10 @@ inferPatternBindings ctx env = \case
     forM_ (zip patternFields fieldTys) $ \(field, fieldTy) ->
       forM_ (patternFieldDefault field) $ \fallback -> do
         fallbackTy <- inferExpr ctx (patternEnv <> env) fallback
-        constrain ctx fallbackTy fieldTy
+        -- An unannotated defaulted argument takes the default's *widened*
+        -- type: `b ? 2` accepts any Int, not just the literal 2.
+        let target = if isJust (patternFieldType field) then fallbackTy else widenLiterals fallbackTy
+        constrain ctx target fieldTy
     pure (argTy, patternEnv)
   where
     binderName = \case
@@ -893,12 +958,52 @@ constrain ctx actual expected = do
       | hasUnresolvedMetas actual' expected',
         Just (actualFields, _) <- recordView (resolveType (checkAliases ctx) actual'),
         Just valueTy <- attrsOfView (resolveType (checkAliases ctx) expected') ->
-          forM_ (Map.elems actualFields) (\fieldTy -> constrain ctx (unOptional fieldTy) valueTy) $> expected'
+          -- A record used as a dictionary: its values must fit together, so
+          -- their join (not the first field) determines the value type.
+          case map unOptional (Map.elems actualFields) of
+            [] -> pure expected'
+            x : xs -> do
+              zonked <- traverse zonk (x : xs)
+              let joined = foldRight1 (joinTypes (checkAliases ctx)) (head zonked) (tail zonked)
+              constrain ctx (widenLiterals joined) valueTy $> expected'
     _ | actual' == expected' -> pure expected'
     _ | isSubtype (checkAliases ctx) actual' expected' -> pure expected'
     _ | allowsGradualConsistency actual' expected' && isConsistent (checkAliases ctx) actual' expected' -> pure expected'
     _ | hasUnresolvedMetas actual' expected' -> unify ctx actual' expected'
+    _
+      | Just detail <- recordMismatchDetail (checkAliases ctx) actual' expected' -> throwCheck detail
     _ -> throwCheck (withCode TC0013TypeMismatch ("type mismatch: " <> showType actual' <> " vs " <> showType expected'))
+
+-- | Explain why one record does not satisfy another: the first missing
+-- required field, or the first field whose type does not fit.
+recordMismatchDetail :: AliasEnv -> Type -> Type -> Maybe String
+recordMismatchDetail aliases actual expected = do
+  (actualFields, actualTail) <- recordView (resolveType aliases actual)
+  (expectedFields, _) <- recordView (resolveType aliases expected)
+  let open = actualTail == Just tDynamic || actualTail == Just tAny
+      missing =
+        [ name
+          | (name, ty) <- Map.toList expectedFields,
+            not (isOptionalField ty),
+            not (Map.member name actualFields),
+            not open
+        ]
+      wrong =
+        [ (name, unOptional a, unOptional e)
+          | (name, e) <- Map.toList expectedFields,
+            Just a <- [Map.lookup name actualFields],
+            not (isSubtype aliases (unOptional a) (unOptional e))
+        ]
+  case (missing, wrong) of
+    (name : _, _) ->
+      Just (withCode TC0009MissingField ("missing field " <> quoteName name <> ": expected " <> showType expected <> " but got " <> showType actual))
+    ([], (name, a, e) : _) ->
+      Just (withCode TC0013TypeMismatch ("type mismatch in field " <> quoteName name <> ": " <> showType a <> " vs " <> showType e))
+    _ -> Nothing
+  where
+    isOptionalField = \case
+      TOptional _ -> True
+      _ -> False
 
 -- | Width-subtyping obligation between record shapes that still contain
 -- metas: every expected field must be provided (unless optional). A missing
@@ -1079,11 +1184,33 @@ inferArithmetic ctx env op left right = do
     else
       if leftResolved == tDynamic || rightResolved == tDynamic
         then pure tDynamic
-        else do
-          let expected = arithmeticTarget op leftResolved rightResolved
-          _ <- constrain ctx leftTy expected
-          _ <- constrain ctx rightTy expected
-          zonk expected
+        else case textConcatTarget aliases op leftResolved rightResolved of
+          -- `+` also concatenates strings and paths, as in Nix.
+          Just (leftExpected, rightExpected, result) -> do
+            _ <- constrain ctx leftTy leftExpected
+            _ <- constrain ctx rightTy rightExpected
+            pure result
+          Nothing -> do
+            let expected = arithmeticTarget op leftResolved rightResolved
+            _ <- constrain ctx leftTy expected
+            _ <- constrain ctx rightTy expected
+            zonk expected
+
+-- | Decide whether `+` is string/path concatenation. The result follows the
+-- left operand: `path + string` is a path, `string + path` a string.
+textConcatTarget :: AliasEnv -> BinOp -> Type -> Type -> Maybe (Type, Type, Type)
+textConcatTarget aliases op left right
+  | op /= OpAdd = Nothing
+  | isPathLike left, isTextLike right || isMeta right = Just (tPath, tString `orPath` right, tPath)
+  | isStringLike left, isTextLike right || isMeta right = Just (tString, tString `orPath` right, tString)
+  | isMeta left, isStringLike right = Just (tString, tString, tString)
+  | isMeta left, isPathLike right = Just (tPath, tPath, tPath)
+  | otherwise = Nothing
+  where
+    isStringLike ty = isSubtype aliases ty tString
+    isPathLike ty = isSubtype aliases ty tPath
+    isTextLike ty = isStringLike ty || isPathLike ty
+    orPath base ty = if isPathLike ty then tPath else base
 
 -- | Pick the numeric result family for an arithmetic operator. Subtraction can
 -- yield negative results, so a `Nat`-only operand pair widens to `Int`.
