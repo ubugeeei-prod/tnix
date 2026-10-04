@@ -14,16 +14,21 @@ synopsis:           CLI for tnix
 library
   exposed-modules:
       Cli
+    , Doctor
+    , Ide
+    , Jsonc
     , Project
   hs-source-dirs: src
   build-depends:
       aeson
+    , array
     , base >=4.19 && <5
     , bytestring
     , containers
     , directory
     , filepath
     , optparse-applicative
+    , process
     , text
     , tnix-core
   default-language: GHC2021
@@ -51,9 +56,14 @@ test-suite tnix-cli-spec
   hs-source-dirs: src
   other-modules:
       Cli
+    , Doctor
+    , Ide
+    , IdeSpec
+    , Jsonc
     , Project
   build-depends:
       aeson
+    , array
     , base >=4.19 && <5
     , bytestring
     , containers
@@ -61,6 +71,7 @@ test-suite tnix-cli-spec
     , filepath
     , hspec
     , optparse-applicative
+    , process
     , text
     , tnix-cli
     , tnix-core
