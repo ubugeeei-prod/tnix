@@ -41,7 +41,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
-import Driver (Analysis (..), SupportCache, analyzeTextWith, newSupportCache)
+import Driver (Analysis (..), SupportCache, analyzeTextForEditorWith, newSupportCache)
 import Paths_tnix_lsp qualified as PackageInfo
 import Server (asText, clearDiagnostics, field, pathUri, respond, respondError, serverCapabilities)
 import ServerProtocol (ReadOutcome (..), notify, readMessageOutcome)
@@ -237,7 +237,9 @@ cachedAnalyzeText cacheRef supportCache file content = do
       writeIORef cacheRef touchedCache
       pure result
     (Nothing, _) -> do
-      result <- analyzeTextWith supportCache file content
+      -- Checker failures carry a full source range; encode it as
+      -- `line:col:endLine:endCol:` so diagnostics underline the exact span.
+      result <- analyzeTextForEditorWith supportCache file content
       modifyIORef' cacheRef (insertAnalysisCache (file, content) result)
       pure result
 
@@ -395,3 +397,4 @@ readFileSafe file = do
     case result of
       Left err -> Left ("failed to read " <> file <> ": " <> show err)
       Right content -> Right content
+

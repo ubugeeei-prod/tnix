@@ -1542,7 +1542,7 @@ quoteNames = intercalate ", " . map quoteName
 
 -- | Render a type using the surface syntax produced by 'Pretty'.
 showType :: Type -> String
-showType = T.unpack . renderType
+showType = T.unpack . T.unwords . map T.strip . T.lines . renderType
 
 -- | Render a record's field map as the equivalent record type.
 showRecord :: Map Name Type -> String

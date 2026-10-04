@@ -15,7 +15,7 @@ import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
-import Driver (Analysis, analyzeText)
+import Driver (Analysis, analyzeText, analyzeTextForEditor)
 import Session
 import SessionScan (scanDocument)
 import SessionSemanticTokens (semanticTokensFor)
@@ -136,7 +136,8 @@ spec = do
     it "localises location-less type errors to the offending binding value" $
       withDiagnostics (Text.unlines ["let", "  greet :: String -> String;", "  greet = who: who;", "in {", "  ok = greet \"x\";", "  bad = greet 1;", "}"]) $ \diags -> do
         let errors = filter ((== Just (Number 1)) . field' "severity") diags
-        map rangeOf errors `shouldBe` [Just (5, 8, 5, 15)]
+        -- The checker points call mismatches at the offending argument.
+        map rangeOf errors `shouldBe` [Just (5, 14, 5, 15)]
 
     it "adds unused-binding hints tagged as unnecessary" $
       withDiagnostics (Text.unlines ["let", "  used = 1;", "  spare = 2;", "in { f = { a, b }: a; v = used; }"]) $ \diags -> do
@@ -256,8 +257,8 @@ withDiagnostics content body =
   withTree [("main.tnix", content)] $ \root -> do
     let file = root </> "main.tnix"
         docs = documentsFromList [(file, content)]
-    result <- analyzeText file content
-    diags <- documentDiagnostics readFileStub analyzeText docs file content result
+    result <- analyzeTextForEditor file content
+    diags <- documentDiagnostics readFileStub analyzeTextForEditor docs file content result
     body diags
 
 data RequestShape

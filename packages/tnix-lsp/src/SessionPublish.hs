@@ -40,7 +40,7 @@ import Data.Aeson (Value, object, (.=))
 import Data.Char (isAlphaNum, isDigit, toLower)
 import Data.List (sortOn)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust, listToMaybe, mapMaybe)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -112,11 +112,14 @@ errorCode msg = do
 stripErrorPrefixes :: Text -> Text
 stripErrorPrefixes msg =
   let firstLine = Text.strip (dropExcerpt msg)
-      noLoc = case Text.splitOn ":" firstLine of
-        a : b : _ : _
-          | Text.all isDigit a && not (Text.null a) && Text.all isDigit (Text.strip b) && not (Text.null (Text.strip b)) ->
-              Text.stripStart (Text.drop (Text.length a + Text.length b + 2) firstLine)
-        _ -> firstLine
+      -- Drop a leading `line:col:` or `line:col:endLine:endCol:` location.
+      segments = Text.splitOn ":" firstLine
+      numeric t = not (Text.null (Text.strip t)) && Text.all isDigit (Text.strip t)
+      locationParts = length (takeWhile numeric (take 4 segments))
+      noLoc
+        | locationParts >= 2 && length segments > locationParts =
+            Text.stripStart (Text.intercalate ":" (drop locationParts segments))
+        | otherwise = firstLine
       noCode = case Text.stripPrefix "[" noLoc of
         Just rest | Text.length (Text.takeWhile (/= ']') rest) == 6 -> Text.stripStart (Text.drop 7 rest)
         _ -> noLoc
@@ -148,14 +151,27 @@ quotedName text =
 -- | Offset range of a checker error: an explicit @line:col@ prefix wins,
 -- then the token named by the message.
 errorRange :: Scan -> Text -> Maybe (Int, Int)
-errorRange scan msg = located <|> named
+errorRange scan msg = narrowed <|> located <|> named
   where
+    -- A field or name error inside a reported span is best underlined at the
+    -- named token itself (`box.alpah` -> `alpah`).
+    narrowed = do
+      (start, end) <- located
+      (nameStart, nameEnd) <- named
+      if code `elem` ["TC0001", "TC0009"] && nameStart >= start && nameEnd <= end
+        then Just (nameStart, nameEnd)
+        else Nothing
     idx = scanLineIndex scan
     code = fromMaybe "" (errorCode msg)
     located = do
       firstLine <- listToMaybe (Text.lines msg)
-      case mapMaybe readInt (take 2 (Text.splitOn ":" firstLine)) of
-        [l, c] -> do
+      case mapMaybe readInt (takeWhile (isJust . readInt) (take 4 (Text.splitOn ":" firstLine))) of
+        [l, c, el, ec] -> do
+          -- A full `line:col:endLine:endCol:` range from the checker.
+          let start = positionToOffset idx (max 0 (l - 1), max 0 (c - 1))
+              end = positionToOffset idx (max 0 (el - 1), max 0 (ec - 1))
+          pure (start, max (start + 1) end)
+        l : c : _ -> do
           let off = positionToOffset idx (max 0 (l - 1), max 0 (c - 1))
           pure $ case codeTokenIndexAt scan off >>= codeToken scan of
             Just t | tokStart t == off -> (tokStart t, tokEnd t)

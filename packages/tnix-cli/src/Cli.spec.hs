@@ -79,6 +79,7 @@ spec = do
       let analysis =
             Analysis
               { analysisProgram = error "unused in cli tests",
+                analysisLocatedProgram = error "unused in cli tests",
                 analysisRoot = Just (Scheme [] tInt),
                 analysisBindings = Map.fromList [("box", Scheme [] tString), ("id", Scheme ["a"] (TFun Many (TVar "a") (TVar "a")))],
                 analysisAliases = mempty,

@@ -30,6 +30,9 @@ module Driver
     AnalysisError (..),
     analyzeTextDetailedWith,
     renderAnalysisError,
+    renderAnalysisErrorWithRange,
+    analyzeTextForEditor,
+    analyzeTextForEditorWith,
     spanToRange,
   )
 where
@@ -100,6 +103,23 @@ renderAnalysisError err =
   case analysisErrorRange err of
     Just (line, column, _, _) -> show line <> ":" <> show column <> ": " <> analysisErrorMessage err
     Nothing -> analysisErrorMessage err
+
+-- | Render an analysis error with its full 1-based range as a
+-- `line:col:endLine:endCol:` prefix, for editors that underline the span.
+renderAnalysisErrorWithRange :: AnalysisError -> String
+renderAnalysisErrorWithRange err =
+  case analysisErrorRange err of
+    Just (line, column, endLine, endColumn) ->
+      show line <> ":" <> show column <> ":" <> show endLine <> ":" <> show endColumn <> ": " <> analysisErrorMessage err
+    Nothing -> analysisErrorMessage err
+
+-- | 'analyzeText' with errors rendered by 'renderAnalysisErrorWithRange'.
+analyzeTextForEditor :: FilePath -> Text -> IO (Either String Analysis)
+analyzeTextForEditor path input = newSupportCache >>= \cache -> analyzeTextForEditorWith cache path input
+
+analyzeTextForEditorWith :: SupportCache -> FilePath -> Text -> IO (Either String Analysis)
+analyzeTextForEditorWith cache path input =
+  either (Left . renderAnalysisErrorWithRange) Right <$> analyzeTextDetailedWith cache path input
 
 -- | Convert a span of character offsets into a 1-based line/column range.
 -- Trailing whitespace absorbed by the lexer is trimmed from the end.
