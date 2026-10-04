@@ -7,7 +7,7 @@ export default defineConfig({
         command: "vp run build:haskell && pnpm --filter tnix build && vp run build:zed && vp run docs:build",
       },
       "workspace:check": {
-        command: "vp run check:versions && vp run check:haskell && vp run test:haskell && vp run check:dogfood && vp run check:examples && pnpm --filter tnix check && pnpm --filter tnix test && vp run check:zed && vp run test:zed && vp run check:neovim",
+        command: "vp run check:versions && vp run check:prelude && vp run check:haskell && vp run test:haskell && vp run check:dogfood && vp run check:examples && pnpm --filter tnix check && pnpm --filter tnix test && vp run check:zed && vp run test:zed && vp run check:neovim",
       },
       "workspace:fmt": {
         command: "vp run fmt:haskell && pnpm --filter tnix fmt",
@@ -41,6 +41,14 @@ export default defineConfig({
       "fmt:haskell": {
         command:
           "if rg --files -g '*.hs' >/dev/null 2>&1; then fourmolu -m inplace $(rg --files -g '*.hs'); else echo 'no haskell sources'; fi",
+        cache: false,
+      },
+      "check:prelude": {
+        command: "node --experimental-strip-types ./scripts/generate-prelude.ts --check",
+        cache: false,
+      },
+      "generate:prelude": {
+        command: "node --experimental-strip-types ./scripts/generate-prelude.ts",
         cache: false,
       },
       "check:versions": {

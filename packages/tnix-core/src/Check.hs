@@ -90,6 +90,12 @@ withSpan region action =
       Left err@CheckError{checkErrorSpan = Nothing} -> Left err{checkErrorSpan = Just region}
       other -> other
 
+-- | Attribute failures of @action@ to @expr@'s source span, if it has one.
+atSpanOf :: Expr -> InferM a -> InferM a
+atSpanOf = \case
+  ELoc region _ -> withSpan region
+  _ -> id
+
 -- | Strip the outermost location wrappers to inspect an expression's shape.
 unloc :: Expr -> Expr
 unloc = \case
@@ -251,7 +257,7 @@ inferExpr ctx env = \case
         if resolvedFunTy == tAny
           then pure tAny
           else case resolvedFunTy of
-            TFun _ domTy outTy -> constrain ctx argTy domTy *> zonk outTy
+            TFun _ domTy outTy -> atSpanOf arg (constrain ctx argTy domTy) *> zonk outTy
             _
               | definitelyNotCallable resolvedFunTy ->
                   throwCheck (withCode TC0018NotCallable ("cannot call " <> describeNonCallable resolvedFunTy <> " as a function"))
@@ -577,7 +583,7 @@ inferLet ctx env items = do
         attempt <-
           catchInfer $ do
             actual <- inferExpr ctx groupEnv expr
-            _ <- constrain ctx actual expected
+            _ <- atSpanOf expr (constrain ctx actual expected)
             zonk expected
         resolved <-
           case (directive, attempt) of
@@ -963,8 +969,9 @@ constrain ctx actual expected = do
           case map unOptional (Map.elems actualFields) of
             [] -> pure expected'
             x : xs -> do
-              zonked <- traverse zonk (x : xs)
-              let joined = foldRight1 (joinTypes (checkAliases ctx)) (head zonked) (tail zonked)
+              first <- zonk x
+              rest <- traverse zonk xs
+              let joined = foldRight1 (joinTypes (checkAliases ctx)) first rest
               constrain ctx (widenLiterals joined) valueTy $> expected'
     _ | actual' == expected' -> pure expected'
     _ | isSubtype (checkAliases ctx) actual' expected' -> pure expected'

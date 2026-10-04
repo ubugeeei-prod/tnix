@@ -35,6 +35,7 @@ module Driver
 where
 
 import Alias
+import BuiltinPrelude (builtinPreludePath, builtinPreludeSource)
 import Check hiding (resolvePath)
 import Check qualified
 import Compile
@@ -279,7 +280,30 @@ loadSupportWith (SupportCache ref) path = do
       loaded <- loadSupportBundle root
       modifyIORef' ref (Map.insert root loaded)
       pure loaded
-  pure (bundle >>= supportWorldFor path)
+  pure (withBuiltinPrelude <$> (bundle >>= supportWorldFor path))
+
+-- | The `builtins` declarations embedded in every tnix binary.
+--
+-- They are parsed once (lazily) and form the base of every world, so
+-- `builtins.*` and global builtins such as `toString` are typed with no
+-- project setup. A workspace that declares `builtins` itself takes precedence.
+builtinPreludeWorld :: Either String World
+builtinPreludeWorld = do
+  program <- parseText builtinPreludePath builtinPreludeSource
+  ambient <- collectAmbient builtinPreludePath program
+  pure World{worldAliases = programAliases program, worldAmbient = ambient}
+{-# NOINLINE builtinPreludeWorld #-}
+
+withBuiltinPrelude :: World -> World
+withBuiltinPrelude world =
+  case builtinPreludeWorld of
+    Left _ -> world
+    Right prelude ->
+      World
+        { -- Prelude aliases come first so project aliases of the same name win.
+          worldAliases = worldAliases prelude <> worldAliases world,
+          worldAmbient = Map.union (worldAmbient world) (worldAmbient prelude)
+        }
 
 loadSupportBundle :: FilePath -> IO (Either String SupportBundle)
 loadSupportBundle root = do
