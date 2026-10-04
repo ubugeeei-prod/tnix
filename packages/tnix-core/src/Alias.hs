@@ -93,6 +93,8 @@ expandAliases env = go 0
             TTypeList items -> TTypeList (map (go depth) items)
             TFun mult a b -> TFun mult (go depth a) (go depth b)
             TRecord fields -> TRecord (fmap (go depth) fields)
+            TOpenRecord fields tail' -> mkOpenRecord (fmap (go depth) fields) (go depth tail')
+            TOptional inner -> TOptional (go depth inner)
             TUnion members -> flattenUnion (TUnion (map (go depth) members))
             TApp f x -> reduce depth (go depth f) (go depth x)
             TForall vars body -> TForall vars (go depth body)

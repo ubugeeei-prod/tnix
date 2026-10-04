@@ -78,7 +78,7 @@ spec = describe "analysis" $ do
   it "infers attrset lambda binders used in flake outputs" $ do
     analysis <- analyzeText "main.tnix" "{ self, nixpkgs, ... }: self" >>= expectRight
     fmap renderScheme (analysisRoot analysis)
-      `shouldBe` Just "forall t0 t1. {\n  nixpkgs :: t1;\n  self :: t0;\n} -> t0"
+      `shouldBe` Just "forall t0 t1. {\n  nixpkgs :: t1;\n  self :: t0;\n  ...\n} -> t0"
 
   it "counts mutually exclusive if branches once for lambda multiplicity" $ do
     analysis <- analyzeText "main.tnix" "x: if true then x else x" >>= expectRight

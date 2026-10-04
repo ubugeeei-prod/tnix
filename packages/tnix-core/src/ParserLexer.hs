@@ -15,8 +15,15 @@ module ParserLexer
     float,
     fieldName,
     identifier,
+    bindingIdentifier,
+    asVariable,
     indentedStringLiteral,
     integer,
+    naturalLiteral,
+    searchPathLiteral,
+    typeIdentifier,
+    unsignedFloat,
+    uriLiteral,
     lexeme,
     parens,
     pathLiteral,
@@ -73,13 +80,51 @@ symbol = L.symbol sc
 reserved :: Text -> Parser ()
 reserved word = lexeme $ try $ string word *> notFollowedBy (satisfy identCont)
 
--- | Parse a non-keyword identifier.
+-- | Parse a term-level identifier.
+--
+-- Only genuine Nix keywords (plus tnix's `as` cast) are reserved here, so
+-- ordinary Nix code that binds names such as `type`, `any`, or `declare` keeps
+-- parsing. Type-only keywords are reserved by 'typeIdentifier' instead.
 identifier :: Parser Name
-identifier = lexeme $ try $ do
+identifier = identifierExcluding termReservedWords
+
+-- | Parse a name in a binding position (lambda binders, pattern fields, `let`
+-- keys). Here `as` is an ordinary name, as in Nix: `as: as.x` is common.
+bindingIdentifier :: Parser Name
+bindingIdentifier = identifierExcluding (filter (/= "as") termReservedWords)
+
+-- | Parse a reference to a variable literally named `as`.
+--
+-- In expression position `as` usually starts a cast (`e as T`), so it is only
+-- read as a variable when what follows cannot begin a type: a selection, a
+-- delimiter, or an operator.
+asVariable :: Parser Name
+asVariable = lexeme . try $ do
+  _ <- string "as"
+  notFollowedBy (satisfy identCont)
+  sc
+  _ <- lookAhead terminator
+  pure "as"
+  where
+    terminator =
+      choice
+        [ () <$ oneOf (".;,)]}=+*/<>!&|?:" :: String),
+          () <$ string "++",
+          () <$ string "-",
+          eof
+        ]
+        <|> () <$ choice (map (\w -> string w <* notFollowedBy (satisfy identCont)) ["in", "then", "else", "or"])
+
+-- | Parse a type-level identifier, where tnix's type keywords are reserved.
+typeIdentifier :: Parser Name
+identifierExcluding :: [Text] -> Parser Name
+typeIdentifier = identifierExcluding reservedWords
+
+identifierExcluding excluded = lexeme $ try $ do
   first <- satisfy identStart
   rest <- many (satisfy identCont)
   let name = Text.pack (first : rest)
-  when (name `elem` reservedWords) (fail "reserved word")
+  when (name `elem` excluded) (fail ("reserved word " <> show name))
   pure name
 
 -- | Parse an identifier-shaped field or selector name.
@@ -130,6 +175,51 @@ integer = lexeme . try $ do
       Just _ -> negate value
       Nothing -> value
 
+-- | Parse an unsigned decimal integer. Expressions use this so that `n -1`
+-- stays a subtraction; negation is a separate prefix operator.
+naturalLiteral :: Parser Integer
+naturalLiteral = lexeme . try $ L.decimal <* notFollowedBy (satisfy identCont)
+
+-- | Parse an unsigned float literal (`1.5`, `1.5e3`, `.5`).
+unsignedFloat :: Parser Double
+unsignedFloat = lexeme . try $ do
+  whole <- many digitChar
+  _ <- char '.'
+  frac <- some digitChar
+  expo <- optional exponentPart
+  let rendered = (if null whole then "0" else whole) <> "." <> frac <> fromMaybe "" expo
+  maybe (fail ("invalid float literal: " <> rendered)) pure (readMaybe rendered)
+  where
+    exponentPart = do
+      marker <- oneOf ("eE" :: String)
+      sign <- optional (oneOf ("+-" :: String))
+      digits <- some digitChar
+      pure (marker : maybe digits (: digits) sign)
+
+-- | Parse a `<nixpkgs>` / `<nixpkgs/lib>` lookup path, returning the inner text.
+searchPathLiteral :: Parser FilePath
+searchPathLiteral = lexeme $ try $ do
+  _ <- char '<'
+  first <- some (satisfy searchChar)
+  rest <- many ((:) <$> char '/' <*> some (satisfy searchChar))
+  _ <- char '>'
+  pure (first <> concat rest)
+  where
+    searchChar c = isAlphaNum c || c `elem` ("._-+" :: String)
+
+-- | Parse an unquoted URI literal such as `https://example.org/x.tar.gz`.
+-- Nix treats these as strings; the scheme needs at least two characters so
+-- that ordinary `x:x`-style lambdas are not swallowed.
+uriLiteral :: Parser Text
+uriLiteral = lexeme $ try $ do
+  first <- satisfy isLetter
+  schemeRest <- some (satisfy (\c -> isAlphaNum c || c `elem` ("+-." :: String)))
+  _ <- char ':'
+  body <- some (satisfy uriChar)
+  pure (Text.pack (first : schemeRest <> ":" <> body))
+  where
+    uriChar c = isAlphaNum c || c `elem` ("%/?:@&=+$,-_.!~*'" :: String)
+
 -- | Parse a decimal float literal with a required fractional part.
 float :: Parser Double
 float = lexeme . try $ do
@@ -164,6 +254,10 @@ parens, braces, brackets :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 braces = between (symbol "{") (symbol "}")
 brackets = between (symbol "[") (symbol "]")
+
+termReservedWords :: [Text]
+termReservedWords =
+  ["as", "assert", "else", "false", "if", "in", "inherit", "let", "null", "or", "rec", "then", "true", "with"]
 
 reservedWords :: [Text]
 reservedWords =

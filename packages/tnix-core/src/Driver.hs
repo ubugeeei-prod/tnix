@@ -27,6 +27,10 @@ module Driver
     lookupSymbolType,
     newSupportCache,
     parseText,
+    AnalysisError (..),
+    analyzeTextDetailedWith,
+    renderAnalysisError,
+    spanToRange,
   )
 where
 
@@ -60,7 +64,11 @@ import Type
 -- Keeping the parsed program alongside inferred schemes lets downstream tools
 -- answer both syntactic and semantic questions without reparsing.
 data Analysis = Analysis
-  { analysisProgram :: Program,
+  { -- | The parsed program with source locations stripped, so structural
+    -- consumers can pattern-match on it directly.
+    analysisProgram :: Program,
+    -- | The same program with 'ELoc' source spans retained.
+    analysisLocatedProgram :: Program,
     analysisRoot :: Maybe Scheme,
     analysisBindings :: Map Name Scheme,
     analysisAliases :: AliasEnv,
@@ -76,28 +84,73 @@ parseText path = either (Left . Text.unpack) Right . parseProgram path
 analyzeText :: FilePath -> Text -> IO (Either String Analysis)
 analyzeText path input = newSupportCache >>= \cache -> analyzeTextWith cache path input
 
+-- | A failed analysis: the coded message and, when known, the 1-based
+-- @(startLine, startColumn, endLine, endColumn)@ source range it refers to.
+data AnalysisError = AnalysisError
+  { analysisErrorMessage :: String,
+    analysisErrorRange :: Maybe (Int, Int, Int, Int)
+  }
+  deriving (Eq, Show)
+
+-- | Render an analysis error as text, prefixing `line:column:` when the
+-- error carries a location (matching the parser's convention).
+renderAnalysisError :: AnalysisError -> String
+renderAnalysisError err =
+  case analysisErrorRange err of
+    Just (line, column, _, _) -> show line <> ":" <> show column <> ": " <> analysisErrorMessage err
+    Nothing -> analysisErrorMessage err
+
+-- | Convert a span of character offsets into a 1-based line/column range.
+-- Trailing whitespace absorbed by the lexer is trimmed from the end.
+spanToRange :: Text -> SrcSpan -> (Int, Int, Int, Int)
+spanToRange input (SrcSpan start end) =
+  let clampedEnd = max start (min end (Text.length input))
+      trimmedEnd = start + Text.length (Text.stripEnd (Text.take (clampedEnd - start) (Text.drop start input)))
+      (startLine, startColumn) = position start
+      (endLine, endColumn) = position (max start trimmedEnd)
+   in (startLine, startColumn, endLine, endColumn)
+  where
+    position offset =
+      let before = Text.take offset input
+          lineNo = Text.count "\n" before + 1
+          column = Text.length (snd (Text.breakOnEnd "\n" before)) + 1
+       in (lineNo, column)
+
 -- | 'analyzeText' reusing declaration support already loaded into @cache@.
 analyzeTextWith :: SupportCache -> FilePath -> Text -> IO (Either String Analysis)
-analyzeTextWith cache path input = do
+analyzeTextWith cache path input = either (Left . renderAnalysisError) Right <$> analyzeTextDetailedWith cache path input
+
+-- | Analyze a buffer, keeping structured location information on failure.
+analyzeTextDetailedWith :: SupportCache -> FilePath -> Text -> IO (Either AnalysisError Analysis)
+analyzeTextDetailedWith cache path input = do
   support <- loadSupportWith cache path
   pure $ do
-    supportWorld <- support
-    program <- parseText path input
-    _ <- validateProgramKinds (programAliases program <> worldAliases supportWorld) program
-    _ <- validateProgramIndexedTypes program
-    localAmbient <- collectAmbient path program
+    supportWorld <- plain support
+    located <- case parseProgramLocatedDetailed path input of
+      Left err -> Left (AnalysisError (Text.unpack (parseErrorMessage err)) (Just (parseErrorLine err, parseErrorColumn err, parseErrorLine err, parseErrorColumn err)))
+      Right program -> Right program
+    let program = stripProgramLocations located
+    _ <- plain (validateProgramKinds (programAliases program <> worldAliases supportWorld) program)
+    _ <- plain (validateProgramIndexedTypes program)
+    localAmbient <- plain (collectAmbient path program)
     let aliases = mkAliasEnv (programAliases program <> worldAliases supportWorld)
         ambient = localAmbient <> worldAmbient supportWorld
         context = CheckContext{checkAliases = aliases, checkAmbient = ambient, checkFile = path, checkOpenScope = False}
-    result <- checkProgram context program
+    result <- case checkProgramDetailed context located of
+      Left err -> Left (AnalysisError (checkErrorMessage err) (spanToRange input <$> checkErrorSpan err))
+      Right ok -> Right ok
     pure
       Analysis
         { analysisProgram = program,
+          analysisLocatedProgram = located,
           analysisRoot = resultRoot result,
           analysisBindings = resultBindings result,
           analysisAliases = aliases,
           analysisAmbient = ambient
         }
+
+plain :: Either String a -> Either AnalysisError a
+plain = either (\message -> Left (AnalysisError message Nothing)) Right
 
 -- | Read and analyze a file from disk.
 analyzeFile :: FilePath -> IO (Either String Analysis)

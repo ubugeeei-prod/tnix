@@ -30,13 +30,16 @@ eraseExpr expr =
     EAttrSet items -> EAttrSet (map eraseAttrItem items)
     ERec items -> ERec (map eraseAttrItem items)
     ESelect base fields -> ESelect (eraseExpr base) (map eraseSelectStep fields)
-    EHasAttr base path -> EHasAttr (eraseExpr base) path
+    EHasAttr base path -> EHasAttr (eraseExpr base) (map eraseSelectStep path)
     EAssert cond body -> EAssert (eraseExpr cond) (eraseExpr body)
     EWith scope body -> EWith (eraseExpr scope) (eraseExpr body)
     EIf cond yesExpr noExpr -> EIf (eraseExpr cond) (eraseExpr yesExpr) (eraseExpr noExpr)
     EList members -> EList (map eraseExpr members)
     EInterp form parts -> EInterp form (map eraseStringPart parts)
     ECast inner _ -> eraseExpr inner
+    ESelectOr base fields fallback -> ESelectOr (eraseExpr base) (map eraseSelectStep fields) (eraseExpr fallback)
+    EPathInterp parts -> EPathInterp (map eraseStringPart parts)
+    ELoc span' inner -> ELoc span' (eraseExpr inner)
     other -> other
 
 eraseStringPart :: StringPart -> StringPart
@@ -45,24 +48,32 @@ eraseStringPart (StrText text) = StrText text
 
 erasePattern :: Pattern -> Pattern
 erasePattern (PVar name _) = PVar name Nothing
-erasePattern (PAttrSet names open) = PAttrSet names open
+erasePattern (PAttrSet fields open binder) =
+  PAttrSet
+    [field{patternFieldType = Nothing, patternFieldDefault = eraseExpr <$> patternFieldDefault field} | field <- fields]
+    open
+    binder
 
 eraseLetItem :: LetItem -> LetItem
 eraseLetItem (LetBinding name expr) = LetBinding name (eraseExpr expr)
+eraseLetItem (LetInherit source names) = LetInherit (eraseExpr <$> source) names
+eraseLetItem (LetPath steps expr) = LetPath (map eraseSelectStep steps) (eraseExpr expr)
 eraseLetItem item = item
 
 eraseMarkedLetItem :: Marked LetItem -> Marked LetItem
 eraseMarkedLetItem marked = marked{markedValue = eraseLetItem (markedValue marked)}
 
 isLetBinding :: LetItem -> Bool
-isLetBinding LetBinding{} = True
-isLetBinding _ = False
+isLetBinding LetSignature{} = False
+isLetBinding _ = True
 
 eraseAttrItem :: AttrItem -> AttrItem
 eraseAttrItem item =
   case item of
     AttrField name expr -> AttrField name (eraseExpr expr)
     AttrInherit names -> AttrInherit names
+    AttrInheritFrom source names -> AttrInheritFrom (eraseExpr source) names
+    AttrPath steps expr -> AttrPath (map eraseSelectStep steps) (eraseExpr expr)
 
 eraseSelectStep :: SelectStep -> SelectStep
 eraseSelectStep step =

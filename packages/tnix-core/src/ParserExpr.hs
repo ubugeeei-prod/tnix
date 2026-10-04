@@ -3,18 +3,24 @@
 -- | Parser for top-level declarations and executable expressions.
 --
 -- The parser preserves Nix-like surface structure as much as possible so that
--- compilation can be implemented as a mostly mechanical erasure pass.
+-- compilation can be implemented as a mostly mechanical erasure pass. The
+-- executable grammar aims at parity with the Nix language: every construct
+-- the reference implementation accepts should parse here too, with tnix's
+-- type-only syntax layered on top.
+--
+-- Expressions are wrapped in 'ELoc' nodes carrying source offsets so that the
+-- checker can report span-accurate diagnostics.
 module ParserExpr (expressionParser, programParser) where
 
 import Data.Either (lefts, rights)
 import Data.Functor (($>))
+import Data.Maybe (isJust)
 import Data.Text qualified as Text
 import ParserLexer
 import ParserType
 import Syntax
 import Text.Megaparsec
 import Text.Megaparsec.Char (char, string)
-import Text.Megaparsec.Char.Lexer qualified as L
 import Type
 
 -- | Parse a full tnix source file.
@@ -31,14 +37,14 @@ programParser = do
 
 -- | Parse either a type alias or an ambient declaration.
 declarationParser :: Parser (Either TypeAlias AmbientDecl)
-declarationParser = try (Left <$> aliasParser) <|> (Right <$> ambientParser)
+declarationParser = try (Left <$> aliasParser) <|> (Right <$> try ambientParser)
 
 -- | Parse a top-level `type` alias declaration.
 aliasParser :: Parser TypeAlias
 aliasParser = do
   reserved "type"
-  name <- identifier
-  params <- many identifier
+  name <- typeIdentifier
+  params <- many typeIdentifier
   _ <- symbol "="
   body <- typeParser
   _ <- symbol ";"
@@ -62,9 +68,19 @@ ambientEntry = do
   _ <- symbol ";"
   pure AmbientEntry{ambientEntryName = name, ambientEntryType = ty}
 
--- | Parse any expression form supported by the prototype.
+-- | Record the source offsets around a parser's result.
+located :: Parser Expr -> Parser Expr
+located parser = do
+  start <- getOffset
+  expr <- parser
+  end <- getOffset
+  pure $ case expr of
+    ELoc{} -> expr
+    _ -> ELoc (SrcSpan start end) expr
+
+-- | Parse any expression form.
 expressionParser :: Parser Expr
-expressionParser = choice [ifParser, letParser, assertParser, withParser, try lambdaParser, orParser]
+expressionParser = located (choice [ifParser, letParser, assertParser, withParser, lambdaParser, pipeParser])
 
 -- | Parse a Nix-style conditional expression.
 ifParser :: Parser Expr
@@ -100,155 +116,224 @@ letParser = do
   reserved "in"
   ELet items <$> expressionParser
 
--- | Parse either a type signature or a value binding inside a `let`.
+-- | Parse one `let` item: an `inherit` clause, a type signature, or a value
+-- binding whose left-hand side may be a nested attribute path.
 --
--- Both forms open with the same identifier, so it is parsed once and the two
--- tails are tried after it. Committing to the shared prefix keeps `many
--- letItemParser` from re-lexing every binding name, and still stops cleanly at
--- `in`, where `identifier` fails without consuming.
+-- Signatures and bindings both open with an attribute key, so the first key is
+-- parsed once and the two tails are tried after it. The first key of a `let`
+-- binding uses the strict identifier parser so that `in` terminates the block.
 letItemParser :: Parser LetItem
-letItemParser = do
-  name <- identifier
-  signatureFor name <|> bindingFor name
+letItemParser = inheritItem <|> keyed
   where
+    inheritItem = do
+      (source, names) <- inheritClause
+      pure (LetInherit source names)
+    keyed = do
+      firstKey <- (SelectName <$> bindingIdentifier) <|> dynamicKey <|> stringKey
+      case firstKey of
+        SelectName name -> signatureFor name <|> bindingFor [firstKey]
+        _ -> bindingFor [firstKey]
     signatureFor name = do
       _ <- symbol "::"
       ty <- typeParser
       _ <- symbol ";"
       pure (LetSignature name ty)
-    bindingFor name = do
+    bindingFor prefix = do
+      rest <- many (symbol "." *> attrKey)
       _ <- symbol "="
       expr <- expressionParser
       _ <- symbol ";"
-      pure (LetBinding name expr)
+      pure $ case prefix <> rest of
+        [SelectName name] -> LetBinding name expr
+        steps -> LetPath steps expr
 
--- | Parse a lambda using tnix's Haskell-like binder syntax.
+-- | Parse `inherit a b;` or `inherit (source) a b;`.
+inheritClause :: Parser (Maybe Expr, [Name])
+inheritClause = do
+  reserved "inherit"
+  source <- optional (parens expressionParser)
+  names <- many attrName
+  _ <- symbol ";"
+  pure (source, names)
+
+-- | Parse a lambda: a binder pattern followed by `:`.
+--
+-- Only the `pattern :` prefix is speculative. Once it is recognised the parser
+-- commits to the lambda, so an error inside the body is reported where it
+-- occurs instead of re-parsing the input as something else (which would also
+-- make failures exponential in the nesting depth of lambdas).
 lambdaParser :: Parser Expr
 lambdaParser = do
-  pattern' <- patternParser
-  _ <- symbol ":"
+  pattern' <- try (patternParser <* lambdaColon)
   ELambda pattern' <$> expressionParser
+  where
+    lambdaColon = lexeme (char ':' <* notFollowedBy (char ':'))
 
--- | Parse TypeScript-style `expr as Type` chains.
---
--- Casts bind looser than application and field selection, so `f x as Int`
--- means `(f x) as Int`, while casting larger control-flow expressions still
--- requires parentheses.
-castParser :: Parser Expr
-castParser = do
-  base <- applicationParser
-  casts <- many (reserved "as" *> typeParser)
-  pure (foldl ECast base casts)
+-- | Parse the pipe operators (`|>` left-associative, `<|` right-associative),
+-- which bind loosest of all operators. Mixing the two without parentheses is
+-- an error in Nix, so each chain only accepts one direction.
+pipeParser :: Parser Expr
+pipeParser = do
+  first <- implParser
+  pipeRight first <|> pipeLeft first <|> pure first
+  where
+    pipeRight acc = do
+      _ <- try (symbol "|>")
+      next <- implParser
+      let combined = binary OpPipeRight acc next
+      pipeRight combined <|> pure combined
+    pipeLeft acc = do
+      _ <- try (symbol "<|")
+      rest <- implParser
+      more <- optional (pipeLeft rest)
+      pure (binary OpPipeLeft acc (maybe rest id more))
 
--- | Operator precedence ladder, from loosest to tightest binding.
---
--- The layering mirrors Nix: boolean `||` binds loosest, then `&&`, equality,
--- ordered comparisons, prefix `!`, and finally numeric `+`. Each level sits
--- above application/selection and explicit casts so expressions such as
--- `f x + 1 < limit && ok` keep the expected Nix shape.
+-- | Logical implication (`->`), right-associative and looser than `||`.
+implParser :: Parser Expr
+implParser = chainRight1 orParser (binary OpImpl <$ try (symbol "->"))
+
+-- | Operator precedence ladder, from loosest to tightest binding, mirroring
+-- Nix: `||`, `&&`, equality, ordered comparisons, `//`, prefix `!`, `+`/`-`,
+-- `*`/`/`, `++`, `?`, prefix `-`, application, selection.
 orParser :: Parser Expr
-orParser = chainLeft1 andParser (EBinaryOp OpOr <$ symbol "||")
+orParser = chainLeft1 andParser (binary OpOr <$ symbol "||")
 
 andParser :: Parser Expr
-andParser = chainLeft1 equalityParser (EBinaryOp OpAnd <$ symbol "&&")
+andParser = chainLeft1 equalityParser (binary OpAnd <$ symbol "&&")
 
 equalityParser :: Parser Expr
 equalityParser =
   chainLeft1
     relationalParser
-    ((EBinaryOp OpEq <$ symbol "==") <|> (EBinaryOp OpNeq <$ symbol "!="))
+    ((binary OpEq <$ symbol "==") <|> (binary OpNeq <$ symbol "!="))
 
 relationalParser :: Parser Expr
 relationalParser =
   chainLeft1
     updateParser
     ( choice
-        [ EBinaryOp OpLe <$ symbol "<=",
-          EBinaryOp OpGe <$ symbol ">=",
-          EBinaryOp OpLt <$ symbol "<",
-          EBinaryOp OpGt <$ symbol ">"
+        [ binary OpLe <$ symbol "<=",
+          binary OpGe <$ symbol ">=",
+          binary OpLt <$ operator "<" "|",
+          binary OpGt <$ symbol ">"
         ]
     )
 
--- | Parse right-associated attribute-set update (`//`), binding tighter than
--- comparisons but looser than prefix `!`, matching Nix.
+-- | Parse right-associated attribute-set update (`//`).
 updateParser :: Parser Expr
-updateParser = chainRight1 notParser (EBinaryOp OpUpdate <$ symbol "//")
+updateParser = chainRight1 notParser (binary OpUpdate <$ symbol "//")
 
 -- | Parse prefix boolean negation, falling through to numeric addition.
 notParser :: Parser Expr
-notParser = (EUnaryOp OpNot <$> (symbol "!" *> notParser)) <|> additionParser
+notParser = located ((EUnaryOp OpNot <$> (operator "!" "=" *> notParser)) <|> additionParser)
 
 -- | Parse left-associated additive arithmetic (`+`, `-`).
 additionParser :: Parser Expr
 additionParser =
   chainLeft1
     multiplicationParser
-    ((EBinaryOp OpAdd <$ symbol "+") <|> (EBinaryOp OpSub <$ symbol "-"))
+    ((binary OpAdd <$ operator "+" "+") <|> (binary OpSub <$ operator "-" ">"))
 
--- | Parse left-associated multiplicative arithmetic (`*`), binding tighter
--- than additive operators.
+-- | Parse left-associated multiplicative arithmetic (`*`, `/`).
 multiplicationParser :: Parser Expr
-multiplicationParser = chainLeft1 concatParser (EBinaryOp OpMul <$ symbol "*")
+multiplicationParser =
+  chainLeft1
+    concatParser
+    ((binary OpMul <$ symbol "*") <|> (binary OpDiv <$ operator "/" "/"))
 
--- | Parse right-associated list concatenation (`++`), binding tighter than
--- arithmetic so `xs ++ ys ++ zs` groups as `xs ++ (ys ++ zs)`.
+-- | Parse right-associated list concatenation (`++`).
 concatParser :: Parser Expr
-concatParser = chainRight1 hasAttrParser (EBinaryOp OpConcat <$ symbol "++")
+concatParser = chainRight1 hasAttrParser (binary OpConcat <$ symbol "++")
 
--- | Parse the attribute-presence test (`e ? attrpath`), binding tighter than
--- concatenation. The right-hand side is a dotted attribute path, not an
--- arbitrary expression, matching Nix.
+-- | Parse the attribute-presence test (`e ? attrpath`).
 hasAttrParser :: Parser Expr
-hasAttrParser = do
-  base <- castParser
-  option base (EHasAttr base <$> (symbol "?" *> attrPathParser))
+hasAttrParser = located $ do
+  base <- negationParser
+  option base (EHasAttr base <$> (symbol "?" *> sepBy1 attrKey (symbol ".")))
+
+-- | Parse prefix arithmetic negation. Negated numeric literals fold into
+-- negative literals so singleton types such as `-1` survive checking.
+negationParser :: Parser Expr
+negationParser =
+  located $
+    (negateExpr <$> (operator "-" ">" *> negationParser)) <|> castParser
   where
-    attrPathParser = sepBy1 attrName (symbol ".")
+    negateExpr operand =
+      case stripLoc operand of
+        EInt n -> EInt (negate n)
+        EFloat n -> EFloat (negate n)
+        _ -> EUnaryOp OpNeg operand
+    stripLoc (ELoc _ inner) = stripLoc inner
+    stripLoc other = other
+
+-- | Parse TypeScript-style `expr as Type` chains.
+castParser :: Parser Expr
+castParser = located $ do
+  base <- applicationParser
+  casts <- many (reserved "as" *> typeParser)
+  pure (foldl ECast base casts)
 
 -- | Parse left-associated application chains.
 applicationParser :: Parser Expr
-applicationParser = do
+applicationParser = located $ do
   head' <- postfixParser
   rest <- many postfixParser
   pure (foldl EApp head' rest)
 
--- | Parse postfix field selections without stealing path literals.
+-- | Parse an atom followed by field selections and an optional `or` default.
 postfixParser :: Parser Expr
-postfixParser = do
+postfixParser = located $ do
   base <- atomParser
   steps <- many (try selectStepParser)
-  pure $ if null steps then base else ESelect base steps
+  if null steps
+    then pure base
+    else do
+      fallback <- optional (reserved "or" *> postfixParser)
+      pure (maybe (ESelect base steps) (ESelectOr base steps) fallback)
 
 selectStepParser :: Parser SelectStep
-selectStepParser = do
-  _ <- symbol "."
-  try dynamicStepParser <|> (SelectName <$> attrName)
-  where
-    dynamicStepParser = do
-      _ <- symbol "${"
-      stepExpr <- expressionParser
-      _ <- symbol "}"
-      pure (SelectDynamic stepExpr)
+selectStepParser = symbol "." *> attrKey
+
+-- | Parse one attribute key: a bare name, a quoted (possibly interpolated)
+-- string, or a `${expr}` antiquotation.
+attrKey :: Parser SelectStep
+attrKey = (SelectName <$> fieldName) <|> dynamicKey <|> stringKey
+
+dynamicKey :: Parser SelectStep
+dynamicKey = do
+  _ <- try (symbol "${")
+  stepExpr <- expressionParser
+  _ <- symbol "}"
+  pure (SelectDynamic stepExpr)
+
+stringKey :: Parser SelectStep
+stringKey = do
+  expr <- lexeme doubleQuotedExpr
+  pure $ case expr of
+    EString literal -> SelectName (stringLiteralText literal)
+    other -> SelectDynamic other
 
 -- | Parse atomic expression forms.
 atomParser :: Parser Expr
 atomParser =
-  choice
-    [ parens expressionParser,
-      recAttrSetParser,
-      attrSetParser,
-      listParser,
-      stringExpr,
-      EFloat <$> float,
-      EInt <$> integer,
-      EBool True <$ reserved "true",
-      EBool False <$ reserved "false",
-      ENull <$ reserved "null",
-      EPath <$> pathLiteral,
-      EVar "import" <$ reserved "import",
-      EVar <$> identifier
-    ]
+  located $
+    choice
+      [ parens expressionParser,
+        recAttrSetParser,
+        attrSetParser,
+        listParser,
+        stringExpr,
+        pathExpr,
+        ESearchPath <$> searchPathLiteral,
+        EFloat <$> unsignedFloat,
+        EInt <$> naturalLiteral,
+        EBool True <$ reserved "true",
+        EBool False <$ reserved "false",
+        ENull <$ reserved "null",
+        EString . DoubleQuoted <$> uriLiteral,
+        EVar <$> identifier,
+        EVar <$> asVariable
+      ]
 
 -- | Parse an attribute set.
 attrSetParser :: Parser Expr
@@ -257,6 +342,36 @@ attrSetParser = EAttrSet <$> braces (many attrParser)
 -- | Parse a recursive attribute set (`rec { ... }`).
 recAttrSetParser :: Parser Expr
 recAttrSetParser = reserved "rec" *> (ERec <$> braces (many attrParser))
+
+-- | Parse a path literal, possibly containing `${...}` antiquotations.
+--
+-- Supported prefixes are `./`, `../`, `/`, and `~/`. The first character after
+-- the prefix must be a non-slash segment character (or an antiquotation), so
+-- `//` and a bare `/` stay operators.
+pathExpr :: Parser Expr
+pathExpr = lexeme $ try $ do
+  prefix <- choice [string "../", string "./", string "~/", string "/"]
+  first <- pathSegment True
+  rest <- many (pathSegment False)
+  let parts = mergeText (StrText prefix : first : rest)
+  pure $ case parts of
+    [StrText whole] -> EPath (Text.unpack whole)
+    _ -> EPathInterp parts
+  where
+    pathSegment isFirst =
+      interpPart
+        <|> ( StrText . Text.pack
+                <$> ( if isFirst
+                        then (:) <$> satisfy segmentStart <*> many (satisfy pathChar)
+                        else some (satisfy pathChar <|> try (char '/' <* lookAhead (satisfy segmentStart <|> char '$')))
+                    )
+            )
+    pathChar c = c `elem` ("._-+" :: String) || isPathAlnum c
+    segmentStart c = pathChar c
+    isPathAlnum c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+    mergeText = foldr merge []
+    merge (StrText a) (StrText b : rest) = StrText (a <> b) : rest
+    merge part rest = part : rest
 
 -- | Parse a string literal, producing an interpolated string when it contains
 -- `${...}` antiquotations and a plain 'EString' otherwise. Both double-quoted
@@ -274,21 +389,25 @@ indentedExpr =
   mkStringExpr InterpIndented
     <$> (string "''" *> many (interpPart <|> indentedTextPart) <* string "''")
 
--- | An antiquoted `${ expr }` segment shared by both string forms. The leading
--- `${` is wrapped in 'try' so a literal `$` not followed by `{` falls through to
--- the surrounding text parser.
+-- | An antiquoted `${ expr }` segment shared by strings and paths.
 interpPart :: Parser StringPart
 interpPart = StrExpr <$> (try (string "${") *> sc *> expressionParser <* char '}')
 
 doubleTextPart :: Parser StringPart
-doubleTextPart = StrText . Text.pack <$> some doubleTextChar
+doubleTextPart = StrText . Text.concat <$> some ((try (string "$$") $> "$$") <|> (Text.singleton <$> doubleTextChar))
 
--- | A literal character inside a double-quoted string. `\$` escapes a literal
--- dollar; otherwise standard escapes are honored and `${`/`"` terminate the run.
+-- | A literal character inside a double-quoted string. Nix recognises `\n`,
+-- `\r`, and `\t`; a backslash before any other character yields that
+-- character literally. A `$` that does not open an antiquotation is literal.
 doubleTextChar :: Parser Char
 doubleTextChar =
-  (try (char '\\' *> char '$') $> '$')
-    <|> (notFollowedBy (string "${") *> notFollowedBy (char '"') *> L.charLiteral)
+  (char '\\' *> (decode <$> anySingle))
+    <|> (notFollowedBy (string "${") *> satisfy (\c -> c /= '"' && c /= '\\'))
+  where
+    decode 'n' = '\n'
+    decode 'r' = '\r'
+    decode 't' = '\t'
+    decode other = other
 
 indentedTextPart :: Parser StringPart
 indentedTextPart = StrText . Text.concat <$> some indentedChunk
@@ -301,7 +420,8 @@ indentedTextPart = StrText . Text.concat <$> some indentedChunk
 -- verbatim.
 indentedChunk :: Parser Text.Text
 indentedChunk =
-  (try (string "''${") $> "${")
+  (try (string "$$") $> "$$")
+    <|> (try (string "''${") $> "${")
     <|> (try (string "''$") $> "$")
     <|> (try (string "'''") $> "''")
     <|> (Text.singleton <$> (try (string "''\\") *> indentedEscapeChar))
@@ -328,50 +448,88 @@ mkStringExpr form parts
     literalFor InterpDouble = DoubleQuoted
     literalFor InterpIndented = Indented
 
--- | Parse either an explicit field or an `inherit` clause.
+-- | Parse either an attribute binding or an `inherit` clause.
 attrParser :: Parser AttrItem
-attrParser = try inheritParser <|> fieldParser
+attrParser = inheritItem <|> fieldParser
   where
-    inheritParser = reserved "inherit" *> (AttrInherit <$> some identifier) <* symbol ";"
+    inheritItem = do
+      (source, names) <- inheritClause
+      pure (maybe (AttrInherit names) (`AttrInheritFrom` names) source)
     fieldParser = do
-      name <- attrName
+      path <- sepBy1 attrKey (symbol ".")
       _ <- symbol "="
       expr <- expressionParser
       _ <- symbol ";"
-      pure (AttrField name expr)
+      pure $ case path of
+        [SelectName name] -> AttrField name expr
+        steps -> AttrPath steps expr
 
--- | Parse a list literal.
+-- | Parse a list literal. Elements are selection-level expressions, as in Nix;
+-- tnix additionally accepts `as` casts and a few compound forms that would
+-- otherwise need parentheses.
 listParser :: Parser Expr
 listParser = EList <$> brackets (many listItem)
   where
-    listItem = choice [ifParser, letParser, try lambdaParser, listAdditionParser]
-    listAdditionParser = chainLeft1 listCastParser (EBinaryOp OpAdd <$ symbol "+")
+    listItem = located (choice [ifParser, letParser, lambdaParser, listCastParser])
     listCastParser = do
       base <- postfixParser
       casts <- many (reserved "as" *> typeParser)
       pure (foldl ECast base casts)
 
--- | Parse a lambda binder pattern with an optional inline annotation.
+-- | Parse a lambda binder pattern.
+--
+-- Supported forms: `x`, `(x :: T)`, `{ a, b ? d, ... }`, `{ ... }@args`, and
+-- `args@{ ... }`. Attribute-set fields may carry an erased annotation:
+-- `{ name :: String, version ? "1" }`.
 patternParser :: Parser Pattern
-patternParser = try (parens typed) <|> try attrSetPattern <|> (PVar <$> identifier <*> pure Nothing)
+patternParser =
+  choice
+    [ try (parens typed),
+      try binderFirst,
+      attrSetPattern Nothing,
+      PVar <$> bindingIdentifier <*> pure Nothing
+    ]
   where
     typed = do
-      name <- identifier
+      name <- bindingIdentifier
       _ <- symbol "::"
       PVar name . Just <$> typeParser
-    attrSetPattern = braces $ do
+    binderFirst = do
+      name <- bindingIdentifier
+      _ <- symbol "@"
+      attrSetPattern (Just (BinderBefore name))
+    attrSetPattern before = do
+      (fields, open) <- braces patternBody
+      after <-
+        case before of
+          Just _ -> pure Nothing
+          Nothing -> optional (BinderAfter <$> (symbol "@" *> bindingIdentifier))
+      pure (PAttrSet fields open (maybe after Just before))
+    patternBody = do
       items <- sepEndBy patternItem (symbol ",")
-      let names = lefts items
-          open = any isEllipsis items
-      pure (PAttrSet names open)
-    patternItem = (Left <$> identifier) <|> (Right () <$ symbol "...")
-    isEllipsis item =
-      case item of
-        Right () -> True
-        Left _ -> False
+      pure (lefts items, any isRightItem items)
+    patternItem = (Right () <$ symbol "...") <|> (Left <$> patternField)
+    patternField = do
+      name <- bindingIdentifier
+      annotation <- optional (symbol "::" *> typeParser)
+      fallback <- optional (symbol "?" *> expressionParser)
+      pure PatternField{patternFieldName = name, patternFieldType = annotation, patternFieldDefault = fallback}
+    isRightItem = isJust . either (const Nothing) Just
 
 markCurrent :: Parser a -> Parser (Marked a)
 markCurrent parser = Marked <$> directiveForCurrentLine <*> parser
+
+-- | A single-character operator that must not be the prefix of a longer one
+-- (e.g. `-` vs `->`, `/` vs `//`, `<` vs `<|`).
+operator :: Text.Text -> String -> Parser ()
+operator op forbiddenNext =
+  () <$ lexeme (try (string op <* notFollowedBy (satisfy (`elem` forbiddenNext))))
+
+binary :: BinOp -> Expr -> Expr -> Expr
+binary op left right =
+  case (left, right) of
+    (ELoc (SrcSpan start _) _, ELoc (SrcSpan _ end) _) -> ELoc (SrcSpan start end) (EBinaryOp op left right)
+    _ -> EBinaryOp op left right
 
 chainLeft1 :: Parser a -> Parser (a -> a -> a) -> Parser a
 chainLeft1 item op = do

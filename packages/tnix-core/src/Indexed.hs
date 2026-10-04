@@ -45,8 +45,8 @@ import Alias (collectApps)
 import Control.Monad (unless, when)
 import Data.Maybe (isNothing)
 import Data.Text (Text)
-import Syntax (AmbientDecl (ambientEntries), AmbientEntry (ambientEntryType), AttrItem (..), Expr (..), LetItem (..), Marked (markedValue), Pattern (..), Program (..), SelectStep (..), StringPart (..))
-import Type (LiteralType (..), Name, Type (..), TypeAlias (typeAliasBody), tDynamic, tFloat, tInt, tList, tNat, tNumber)
+import Syntax (AmbientDecl (ambientEntries), AmbientEntry (ambientEntryType), Expr, Marked (markedValue), Program (..), exprAnnotations)
+import Type (mkOpenRecord, LiteralType (..), Name, Type (..), TypeAlias (typeAliasBody), tDynamic, tFloat, tInt, tList, tNat, tNumber)
 
 -- | Infer the most precise sequence type that can be justified from a list
 -- literal's member types.
@@ -145,6 +145,8 @@ mentionsIndexedConstructor = \case
   TTypeList items -> any mentionsIndexedConstructor items
   TFun _ left right -> mentionsIndexedConstructor left || mentionsIndexedConstructor right
   TRecord fields -> any mentionsIndexedConstructor fields
+  TOpenRecord fields tail' -> any mentionsIndexedConstructor fields || mentionsIndexedConstructor tail'
+  TOptional inner -> mentionsIndexedConstructor inner
   TUnion members -> any mentionsIndexedConstructor members
   TApp fun arg -> mentionsIndexedConstructor fun || mentionsIndexedConstructor arg
   TForall _ body -> mentionsIndexedConstructor body
@@ -157,6 +159,8 @@ normalizeIndexed = \case
   TTypeList items -> TTypeList (normalizeIndexedType <$> items)
   TFun mult left right -> TFun mult (normalizeIndexedType left) (normalizeIndexedType right)
   TRecord fields -> TRecord (fmap normalizeIndexedType fields)
+  TOpenRecord fields tail' -> mkOpenRecord (fmap normalizeIndexedType fields) (normalizeIndexedType tail')
+  TOptional inner -> TOptional (normalizeIndexedType inner)
   TUnion members -> TUnion (normalizeIndexedType <$> members)
   TApp fun arg ->
     case collectApps (TApp (normalizeIndexedType fun) (normalizeIndexedType arg)) of
@@ -361,45 +365,7 @@ validateAmbientDecl ambientDecl = traverse_ (validateType "ambient entry" . ambi
 -- Executable expressions themselves are not shape-validated here; only the type
 -- syntax attached to them is inspected.
 validateExpr :: Expr -> Either String ()
-validateExpr = \case
-  ELambda pattern' body -> validatePattern pattern' *> validateExpr body
-  EApp fun arg -> validateExpr fun *> validateExpr arg
-  EBinaryOp _ left right -> validateExpr left *> validateExpr right
-  EUnaryOp _ operand -> validateExpr operand
-  ELet items body -> traverse_ (validateLetItem . markedValue) items *> validateExpr body
-  EAttrSet items -> traverse_ validateAttrItem items
-  ERec items -> traverse_ validateAttrItem items
-  ESelect base steps -> validateExpr base *> traverse_ validateSelectStep steps
-  EHasAttr base _ -> validateExpr base
-  EAssert cond body -> validateExpr cond *> validateExpr body
-  EWith scope body -> validateExpr scope *> validateExpr body
-  EIf cond yesExpr noExpr -> validateExpr cond *> validateExpr yesExpr *> validateExpr noExpr
-  EList items -> traverse_ validateExpr items
-  EInterp _ parts -> traverse_ (\case StrExpr expr -> validateExpr expr; StrText _ -> pure ()) parts
-  ECast expr ty -> validateExpr expr *> validateType "term annotation" ty
-  _ -> pure ()
-
-validatePattern :: Pattern -> Either String ()
-validatePattern = \case
-  PVar _ annotation -> traverse_ (validateType "term annotation") annotation
-  PAttrSet _ _ -> pure ()
-
--- | Validate one `let` item's annotation payload, if present.
-validateLetItem :: LetItem -> Either String ()
-validateLetItem = \case
-  LetSignature _ ty -> validateType "term annotation" ty
-  LetBinding _ expr -> validateExpr expr
-
--- | Validate one attribute item's annotation payload, if present.
-validateAttrItem :: AttrItem -> Either String ()
-validateAttrItem = \case
-  AttrField _ expr -> validateExpr expr
-  AttrInherit _ -> pure ()
-
-validateSelectStep :: SelectStep -> Either String ()
-validateSelectStep = \case
-  SelectName _ -> pure ()
-  SelectDynamic expr -> validateExpr expr
+validateExpr = traverse_ (validateType "term annotation") . exprAnnotations
 
 -- | Validate one type for indexed, numeric, and unit structure.
 --
@@ -411,6 +377,8 @@ validateType label ty =
     TTypeList dims -> traverse_ (validateNatType label "tensor shape") dims
     TFun _ left right -> validateType label left *> validateType label right
     TRecord fields -> traverse_ (validateType label) fields
+    TOpenRecord fields tail' -> traverse_ (validateType label) fields *> validateType label tail'
+    TOptional inner -> validateType label inner
     TUnion members -> traverse_ (validateType label) members
     TApp fun arg ->
       case collectApps (TApp fun arg) of
@@ -581,6 +549,7 @@ isObviouslyInvalidIndex = \case
   TTypeList _ -> True
   TFun{} -> True
   TRecord _ -> True
+  TOpenRecord _ _ -> True
   TForall _ _ -> True
   TCon name -> isPrimitiveTypeName name
   ty

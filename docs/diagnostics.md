@@ -201,6 +201,15 @@ overriding fields present on both.
 **Fix:** update an attribute set with another attribute set. A gradual
 boundary (`dynamic`, `any`) on either side suppresses the error.
 
+### `TC0022` — dynamic attribute in `let`
+
+A `let` binding used a dynamic key such as `${name} = value;`. Nix rejects
+dynamic attributes in `let` blocks because the bound names must be known
+statically.
+
+**Fix:** bind a static name, or build an attribute set with the dynamic key
+and select from it.
+
 ## Driver / Project (`TDxxxx`)
 
 ### `TD0001` — failed to read

@@ -349,6 +349,8 @@ decodeAttrSet = \case
               forM items $ \case
                 AttrField name expr -> pure (name, expr)
                 AttrInherit _ -> Left "tnix.config.tnix does not support inherit in the root attrset"
+                AttrInheritFrom _ _ -> Left "tnix.config.tnix does not support inherit in the root attrset"
+                AttrPath _ _ -> Left "tnix.config.tnix does not support nested attribute paths in the root attrset"
   _ -> Left "tnix.config.tnix must evaluate to an attrset"
 
 decodeStringField :: Expr -> Either String Text

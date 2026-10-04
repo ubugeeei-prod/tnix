@@ -12,6 +12,9 @@ module Parser
   ( ParseError (..),
     parseProgram,
     parseProgramDetailed,
+    parseProgramLocated,
+    parseProgramLocatedDetailed,
+    stripProgramLocations,
   )
 where
 
@@ -59,6 +62,16 @@ data ParseError = ParseError
 parseProgram :: FilePath -> Text -> Either Text Program
 parseProgram path = either (Left . renderParseError) Right . parseProgramDetailed path
 
+-- | Parse a program keeping 'ELoc' source spans on expressions. The checker
+-- uses these to attach diagnostics to precise source regions.
+parseProgramLocated :: FilePath -> Text -> Either Text Program
+parseProgramLocated path = either (Left . renderParseError) Right . parseProgramLocatedDetailed path
+
+-- | Remove every 'ELoc' wrapper from a program.
+stripProgramLocations :: Program -> Program
+stripProgramLocations program =
+  program{programExpr = fmap stripLocations <$> programExpr program}
+
 renderParseError :: ParseError -> Text
 renderParseError err =
   Text.pack (show (parseErrorLine err))
@@ -69,7 +82,11 @@ renderParseError err =
 
 -- | Parse a complete tnix program with structured location info on failure.
 parseProgramDetailed :: FilePath -> Text -> Either ParseError Program
-parseProgramDetailed path input = do
+parseProgramDetailed path input = stripProgramLocations <$> parseProgramLocatedDetailed path input
+
+-- | 'parseProgramDetailed' without stripping source spans.
+parseProgramLocatedDetailed :: FilePath -> Text -> Either ParseError Program
+parseProgramLocatedDetailed path input = do
   directives <- mapDirectiveError input (scanDiagnosticDirectives input)
   case runParser (runReaderT (sc *> programParser <* eof) directives) path input of
     Left bundle -> Left (megaparsecError bundle)

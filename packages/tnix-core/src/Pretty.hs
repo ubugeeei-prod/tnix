@@ -95,16 +95,29 @@ prettyDecl path entries =
       "};"
     ]
 
+-- | Render an expression at a given precedence context.
+--
+-- Precedence levels (higher binds tighter) follow Nix: 1 pipes, 2 `->`,
+-- 3 `||`, 4 `&&`, 5 equality, 6 comparisons, 7 `//`, 8 `!`, 9 `+`/`-`,
+-- 10 `*`/`/`, 11 `++`, 12 `?`, 13 prefix `-`, 14 `as`, 15 application,
+-- 16 selection. Level 0 is an unrestricted expression position.
 prettyExpr :: Int -> Expr -> Doc ann
 prettyExpr p = \case
+  ELoc _ inner -> prettyExpr p inner
   EVar name -> pretty name
   EString value -> prettyStringLiteral value
-  EFloat value -> pretty (prettyFloat value)
-  EInt value -> pretty value
+  EFloat value
+    | value < 0 -> parenIf (p > 13) (pretty (prettyFloat value))
+    | otherwise -> pretty (prettyFloat value)
+  EInt value
+    | value < 0 -> parenIf (p > 13) (pretty value)
+    | otherwise -> pretty value
   EBool True -> "true"
   EBool False -> "false"
   ENull -> "null"
   EPath path -> pretty path
+  ESearchPath path -> "<" <> pretty path <> ">"
+  EPathInterp parts -> hcat (map prettyPathPart parts)
   -- Control-flow forms extend to the right, so they must be parenthesized
   -- whenever they appear in any tighter position (p > 0).
   ELambda pattern' body -> parenIf (p > 0) (prettyPattern pattern' <> ":" <+> prettyExpr 0 body)
@@ -117,51 +130,86 @@ prettyExpr p = \case
   -- one so equal-precedence nesting parenthesizes correctly.
   EBinaryOp op left right ->
     let q = binOpPrec op
-        (leftP, rightP) =
-          if binOpRightAssoc op
-            then (q + 1, q)
-            else (q, q + 1)
+        (leftP, rightP)
+          | binOpNonAssoc op = (q + 1, q + 1)
+          | binOpRightAssoc op = (q + 1, q)
+          | otherwise = (q, q + 1)
      in parenIf (p > q) (prettyExpr leftP left <+> pretty (binOpSymbol op) <+> prettyExpr rightP right)
-  EUnaryOp OpNot operand -> parenIf (p > 6) ("!" <> prettyExpr 6 operand)
-  EHasAttr base path -> parenIf (p > 10) (prettyExpr 11 base <+> "?" <+> hcat (punctuate "." (map prettyAttrName path)))
-  ECast expr ty -> parenIf (p > 11) (prettyExpr 11 expr <+> "as" <+> prettyType 0 ty)
-  EApp f x -> parenIf (p > 12) (prettyExpr 12 f <+> prettyExpr 13 x)
-  ESelect base steps -> parenIf (p > 13) (prettyExpr 13 base <> foldMap prettySelectStep steps)
+  EUnaryOp OpNot operand -> parenIf (p > 8) ("!" <> prettyExpr 8 operand)
+  EUnaryOp OpNeg operand -> parenIf (p > 13) ("-" <> prettyExpr 14 operand)
+  EHasAttr base path -> parenIf (p > 12) (prettyExpr 13 base <+> "?" <+> prettyAttrPath path)
+  ECast expr ty -> parenIf (p > 14) (prettyExpr 14 expr <+> "as" <+> prettyType 0 ty)
+  EApp f x -> parenIf (p > 15) (prettyExpr 15 f <+> prettyExpr 16 x)
+  ESelect base steps -> parenIf (p > 16) (prettyExpr 16 base <> foldMap prettySelectStep steps)
+  ESelectOr base steps fallback -> parenIf (p > 15) (prettyExpr 16 base <> foldMap prettySelectStep steps <+> "or" <+> prettyExpr 16 fallback)
   -- Self-delimiting atoms never need outer parentheses; list/application
   -- operands are rendered tightly so nested calls and operators stay grouped.
   EAttrSet items -> vsep ["{", indent 2 (vsep (map prettyAttr items)), "}"]
   ERec items -> vsep ["rec {", indent 2 (vsep (map prettyAttr items)), "}"]
-  EList items -> "[" <+> hsep (map (prettyExpr 13) items) <+> "]"
+  EList items -> "[" <+> hsep (map (prettyExpr 16) items) <+> "]"
   EInterp form parts -> prettyInterp form parts
+
+prettyPathPart :: StringPart -> Doc ann
+prettyPathPart = \case
+  StrText text -> pretty text
+  StrExpr expr -> "${" <> prettyExpr 0 expr <> "}"
 
 prettyLet :: LetItem -> Doc ann
 prettyLet = \case
   LetSignature name ty -> pretty name <+> "::" <+> prettyType 0 ty <> ";"
   LetBinding name expr -> pretty name <+> "=" <+> prettyExpr 0 expr <> ";"
+  LetInherit source names -> prettyInherit source names
+  LetPath steps expr -> prettyAttrPath steps <+> "=" <+> prettyExpr 0 expr <> ";"
+
+prettyInherit :: Maybe Expr -> [Name] -> Doc ann
+prettyInherit source names =
+  hsep (["inherit"] <> maybe [] (\expr -> [parens (prettyExpr 0 expr)]) source <> map prettyAttrName names) <> ";"
+
+prettyAttrPath :: [SelectStep] -> Doc ann
+prettyAttrPath steps = hcat (punctuate "." (map prettyKey steps))
+  where
+    prettyKey = \case
+      SelectName name -> prettyAttrName name
+      SelectDynamic expr -> prettyDynamicKey expr
+
+prettyDynamicKey :: Expr -> Doc ann
+prettyDynamicKey expr =
+  case stripLocations expr of
+    interp@EInterp{} -> prettyExpr 0 interp
+    other -> "${" <> prettyExpr 0 other <> "}"
 
 prettyPattern :: Pattern -> Doc ann
 prettyPattern = \case
   PVar name _ -> pretty name
-  PAttrSet names open ->
-    case map pretty names <> [ellipsis | open] of
-      [] -> "{}"
-      items -> "{ " <> hsep (punctuate "," items) <> " }"
+  PAttrSet fields open binder ->
+    let body =
+          case map prettyField fields <> ["..." | open] of
+            [] -> "{ }"
+            items -> "{ " <> hsep (punctuate "," items) <> " }"
+     in case binder of
+          Nothing -> body
+          Just (BinderBefore name) -> pretty name <> "@" <> body
+          Just (BinderAfter name) -> body <> "@" <> pretty name
     where
-      ellipsis = "..."
+      prettyField field =
+        pretty (patternFieldName field)
+          <> maybe mempty (\expr -> " ?" <+> prettyExpr 0 expr) (patternFieldDefault field)
 
 prettySelectStep :: SelectStep -> Doc ann
 prettySelectStep = \case
   SelectName name -> "." <> prettyAttrName name
-  SelectDynamic expr -> ".${" <> prettyExpr 0 expr <> "}"
+  SelectDynamic expr -> "." <> prettyDynamicKey expr
 
 prettyAttr :: AttrItem -> Doc ann
 prettyAttr = \case
   AttrField name expr -> prettyAttrName name <+> "=" <+> prettyExpr 0 expr <> ";"
-  AttrInherit names -> "inherit" <+> hsep (pretty <$> names) <> ";"
+  AttrInherit names -> prettyInherit Nothing names
+  AttrInheritFrom source names -> prettyInherit (Just source) names
+  AttrPath steps expr -> prettyAttrPath steps <+> "=" <+> prettyExpr 0 expr <> ";"
 
 prettyAttrName :: Name -> Doc ann
 prettyAttrName name
-  | isBareAttrName name && name /= "inherit" = pretty name
+  | isBareAttrName name && name `notElem` ["inherit", "rec", "let", "in", "if", "then", "else", "assert", "with", "or"] = pretty name
   | otherwise = prettyQuoted name
 
 prettyStringLiteral :: StringLiteral -> Doc ann
@@ -187,9 +235,15 @@ prettyInterp form parts =
 prettyStringPart :: InterpForm -> Bool -> Bool -> StringPart -> Doc ann
 prettyStringPart form atStart atEnd = \case
   StrText text ->
-    case form of
-      InterpDouble -> pretty (escapeDoubleQuoted text)
-      InterpIndented -> verbatim (escapeIndented atStart atEnd text)
+    -- A `$` right before an antiquotation would read back as the `$${`
+    -- literal escape, so it is escaped explicitly.
+    let (body, trailingDollar) =
+          if not atEnd && "$" `Text.isSuffixOf` text
+            then (Text.dropEnd 1 text, True)
+            else (text, False)
+     in case form of
+          InterpDouble -> pretty (escapeDoubleQuoted body) <> (if trailingDollar then "\\$" else mempty)
+          InterpIndented -> verbatim (escapeIndented atStart (atEnd || trailingDollar) body) <> (if trailingDollar then "''$" else mempty)
   StrExpr expr -> "${" <> prettyExpr 0 expr <> "}"
 
 prettyType :: Int -> Type -> Doc ann
@@ -223,12 +277,28 @@ prettyType p ty =
                       One -> "%1 ->"
                       Many -> "->"
                in parenIf (p > 0) (prettyType 1 a <+> arrow <+> prettyType 0 b)
-            TRecord fields -> vsep ["{", indent 2 (vsep [prettyAttrName k <+> "::" <+> prettyType 0 v <> ";" | (k, v) <- Map.toList fields]), "}"]
+            TRecord fields -> prettyRecordType fields Nothing
+            TOpenRecord fields tail' -> prettyRecordType fields (Just tail')
+            TOptional inner -> prettyType p inner
             TUnion members -> parenIf (p > 1) (hsep (punctuate " |" (map (prettyType 2) members)))
             TApp f x -> parenIf (p > 2) (prettyType 2 f <+> prettyType 3 x)
             TForall vars body -> parenIf (p > 0) ("forall" <+> hsep (pretty <$> vars) <> "." <+> prettyType 0 body)
             TConditional a b c d -> parenIf (p > 0) (prettyType 2 a <+> "extends" <+> prettyType 2 b <+> "?" <+> prettyType 0 c <+> ":" <+> prettyType 0 d)
             TInfer name -> "infer" <+> pretty name
+
+-- | Render a record type. Optional fields print as `name? :: T;`, and an open
+-- row ends in `...` (or `...r` when the row is a named variable).
+prettyRecordType :: Map.Map Name Type -> Maybe Type -> Doc ann
+prettyRecordType fields rowTail =
+  vsep ["{", indent 2 (vsep (map prettyField (Map.toList fields) <> rowLine)), "}"]
+  where
+    prettyField (k, TOptional v) = prettyAttrName k <> "?" <+> "::" <+> prettyType 0 v <> ";"
+    prettyField (k, v) = prettyAttrName k <+> "::" <+> prettyType 0 v <> ";"
+    rowLine =
+      case rowTail of
+        Nothing -> []
+        Just (TVar name) -> ["..." <> pretty name]
+        Just _ -> ["..."]
 
 -- | Emit text with its own line breaks, immune to the surrounding layout.
 --
@@ -312,25 +382,43 @@ parenIf False = id
 -- the parser's precedence ladder so re-parsing reproduces the same tree.
 binOpPrec :: BinOp -> Int
 binOpPrec = \case
-  OpOr -> 1
-  OpAnd -> 2
-  OpEq -> 3
-  OpNeq -> 3
-  OpLt -> 4
-  OpGt -> 4
-  OpLe -> 4
-  OpGe -> 4
-  OpUpdate -> 5
-  OpAdd -> 7
-  OpSub -> 7
-  OpMul -> 8
-  OpConcat -> 9
+  OpPipeRight -> 1
+  OpPipeLeft -> 1
+  OpImpl -> 2
+  OpOr -> 3
+  OpAnd -> 4
+  OpEq -> 5
+  OpNeq -> 5
+  OpLt -> 6
+  OpGt -> 6
+  OpLe -> 6
+  OpGe -> 6
+  OpUpdate -> 7
+  OpAdd -> 9
+  OpSub -> 9
+  OpMul -> 10
+  OpDiv -> 10
+  OpConcat -> 11
+
+-- | Equality and ordered comparisons do not chain in Nix (`a == b == c` is a
+-- syntax error), so nested comparisons are always parenthesized.
+binOpNonAssoc :: BinOp -> Bool
+binOpNonAssoc = \case
+  OpEq -> True
+  OpNeq -> True
+  OpLt -> True
+  OpGt -> True
+  OpLe -> True
+  OpGe -> True
+  _ -> False
 
 -- | List concatenation and attribute-set update are right-associative.
 binOpRightAssoc :: BinOp -> Bool
 binOpRightAssoc = \case
   OpUpdate -> True
   OpConcat -> True
+  OpImpl -> True
+  OpPipeLeft -> True
   _ -> False
 
 binOpSymbol :: BinOp -> Text
@@ -348,6 +436,10 @@ binOpSymbol = \case
   OpGe -> ">="
   OpAnd -> "&&"
   OpOr -> "||"
+  OpDiv -> "/"
+  OpImpl -> "->"
+  OpPipeRight -> "|>"
+  OpPipeLeft -> "<|"
 
 prettyFloat :: Double -> String
 prettyFloat n =

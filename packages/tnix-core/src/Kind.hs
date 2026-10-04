@@ -139,6 +139,8 @@ inferKind env local = \case
   TUnknown -> pure KType
   TFun _ left right -> inferTypeLeaf env local left >> inferTypeLeaf env local right >> pure KType
   TRecord fields -> traverse_ (inferTypeLeaf env local) fields >> pure KType
+  TOpenRecord fields tail' -> traverse_ (inferTypeLeaf env local) fields >> inferTypeLeaf env local tail' >> pure KType
+  TOptional inner -> inferTypeLeaf env local inner >> pure KType
   TUnion members -> traverse_ (inferTypeLeaf env local) members >> pure KType
   TApp fun arg -> do
     funKind <- inferKind env local fun
@@ -244,51 +246,6 @@ occursKind needle = \case
   KFun left right -> occursKind needle left || occursKind needle right
   KType -> False
 
-exprAnnotations :: Expr -> [Type]
-exprAnnotations = \case
-  EVar _ -> []
-  EString _ -> []
-  EFloat _ -> []
-  EInt _ -> []
-  EBool _ -> []
-  ENull -> []
-  EPath _ -> []
-  ELambda pattern' body -> patternAnnotations pattern' <> exprAnnotations body
-  EApp fun arg -> exprAnnotations fun <> exprAnnotations arg
-  EBinaryOp _ left right -> exprAnnotations left <> exprAnnotations right
-  EUnaryOp _ operand -> exprAnnotations operand
-  ELet items body -> foldMap (letItemAnnotations . markedValue) items <> exprAnnotations body
-  EAttrSet items -> foldMap attrAnnotations items
-  ERec items -> foldMap attrAnnotations items
-  ESelect base steps -> exprAnnotations base <> foldMap selectStepAnnotations steps
-  EHasAttr base _ -> exprAnnotations base
-  EAssert cond body -> exprAnnotations cond <> exprAnnotations body
-  EWith scope body -> exprAnnotations scope <> exprAnnotations body
-  EIf cond yesExpr noExpr -> foldMap exprAnnotations [cond, yesExpr, noExpr]
-  EList members -> foldMap exprAnnotations members
-  EInterp _ parts -> foldMap (\case StrExpr expr -> exprAnnotations expr; StrText _ -> []) parts
-  ECast expr ty -> exprAnnotations expr <> [ty]
-
-patternAnnotations :: Pattern -> [Type]
-patternAnnotations = \case
-  PVar _ annotation -> maybe [] pure annotation
-  PAttrSet _ _ -> []
-
-selectStepAnnotations :: SelectStep -> [Type]
-selectStepAnnotations = \case
-  SelectName _ -> []
-  SelectDynamic expr -> exprAnnotations expr
-
-letItemAnnotations :: LetItem -> [Type]
-letItemAnnotations = \case
-  LetSignature _ ty -> [ty]
-  LetBinding _ expr -> exprAnnotations expr
-
-attrAnnotations :: AttrItem -> [Type]
-attrAnnotations = \case
-  AttrField _ expr -> exprAnnotations expr
-  AttrInherit _ -> []
-
 builtinKinds :: AliasKindEnv
 builtinKinds =
   Map.fromList
@@ -296,6 +253,7 @@ builtinKinds =
       ("Float", KType),
       ("Int", KType),
       ("List", KFun KType KType),
+      ("AttrsOf", KFun KType KType),
       ("Matrix", KFun KType (KFun KType (KFun KType KType))),
       ("Nat", KType),
       ("Null", KType),

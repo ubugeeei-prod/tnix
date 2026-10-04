@@ -25,12 +25,15 @@
 -- system for dependent types. It is a pragmatic static approximation that keeps
 -- useful facts alive for later phases.
 module Subtyping
-  ( foldRight1,
+  ( attrsOfView,
+    foldRight1,
     isConsistent,
     isSubtype,
     joinTypes,
     lookupRecordField,
+    recordView,
     resolveType,
+    unOptional,
   )
 where
 
@@ -80,6 +83,8 @@ resolveType env = go 0 . prepare . eraseForall
             TTypeList items -> TTypeList (map (go depth) items)
             TFun mult a b -> TFun mult (go depth a) (go depth b)
             TRecord fields -> TRecord (fmap (go depth) fields)
+            TOpenRecord fields tail' -> mkOpenRecord (fmap (go depth) fields) (go depth tail')
+            TOptional inner -> TOptional (go depth inner)
             TUnion members -> flattenUnion (TUnion (map (go depth) members))
             TApp f x -> TApp (go depth f) (go depth x)
             TForall vars body -> TForall vars (go depth body)
@@ -123,7 +128,14 @@ conditionalReductionBudget = 32
 lookupRecordField :: AliasEnv -> Type -> Name -> Maybe Type
 lookupRecordField env ty field =
   case resolveType env ty of
-    TRecord fields -> Map.lookup field fields
+    TRecord fields -> unOptional <$> Map.lookup field fields
+    TOpenRecord fields tail' ->
+      case Map.lookup field fields of
+        Just fieldTy -> Just (unOptional fieldTy)
+        Nothing
+          | tail' == tDynamic || tail' == tAny -> Just tail'
+          | otherwise -> Nothing
+    TApp (TCon "AttrsOf") valueTy -> Just valueTy
     TUnion members ->
       let hits = mapMaybe (\member -> lookupRecordField env member field) members
        in case hits of
@@ -319,10 +331,47 @@ isSubtype env left right = go (resolveType env left) (resolveType env right)
           go leftList b
     go (TFun leftMult a b) (TFun rightMult c d) =
       multiplicitySubtype leftMult rightMult && go c a && go b d
-    go (TRecord fields) (TRecord expected) =
-      all (\(name, ty) -> maybe False (`go` ty) (Map.lookup name fields)) (Map.toList expected)
+    go a b
+      | Just (fields, actualTail) <- recordView a,
+        Just (expected, _) <- recordView b =
+          -- Width subtyping; an optional expected field may be absent, and an
+          -- actual row with a `dynamic` tail may hold any further field.
+          all (fieldSatisfied fields actualTail) (Map.toList expected)
+      | Just (fields, actualTail) <- recordView a,
+        Just valueTy <- attrsOfView b =
+          all (\ty -> go (unOptional ty) valueTy) (Map.elems fields)
+            && maybe True (\tail' -> tail' == tDynamic || tail' == tAny) actualTail
+    go (TOptional a) (TOptional b) = go a b
     go (TApp f x) (TApp g y) = go f g && go x y
     go _ _ = False
+
+    fieldSatisfied fields actualTail (name, expectedTy) =
+      case (Map.lookup name fields, expectedTy) of
+        (Just (TOptional actualTy), TOptional inner) -> go actualTy inner
+        (Just (TOptional _), _) -> False
+        (Just actualTy, TOptional inner) -> go actualTy inner
+        (Just actualTy, _) -> go actualTy expectedTy
+        (Nothing, TOptional _) -> True
+        (Nothing, _) -> actualTail == Just tDynamic || actualTail == Just tAny
+
+-- | View a closed or open record as its fields plus an optional row tail.
+recordView :: Type -> Maybe (Map.Map Name Type, Maybe Type)
+recordView = \case
+  TRecord fields -> Just (fields, Nothing)
+  TOpenRecord fields tail' -> Just (fields, Just tail')
+  _ -> Nothing
+
+-- | Recognize the built-in dictionary type `AttrsOf a`.
+attrsOfView :: Type -> Maybe Type
+attrsOfView = \case
+  TApp (TCon "AttrsOf") valueTy -> Just valueTy
+  _ -> Nothing
+
+-- | Drop an optional-field marker.
+unOptional :: Type -> Type
+unOptional = \case
+  TOptional inner -> inner
+  other -> other
 
 -- | Multiplicity subtyping for function arrows.
 --
