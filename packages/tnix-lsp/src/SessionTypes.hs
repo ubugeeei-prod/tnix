@@ -97,5 +97,7 @@ data SemanticToken = SemanticToken
   { semanticTokenLine :: Int,
     semanticTokenStart :: Int,
     semanticTokenLength :: Int,
-    semanticTokenType :: Int
+    semanticTokenType :: Int,
+    -- | bit set over the legend's token modifiers
+    semanticTokenModifiers :: Int
   }

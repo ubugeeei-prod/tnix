@@ -2,184 +2,206 @@
 
 -- | Semantic-tokens provider for tnix LSP.
 --
--- Produces the per-token list and the LSP-encoded delta stream that the
--- `textDocument/semanticTokens/full` request expects. Token types match the
--- legend advertised by the server in @initializeResult@.
+-- Tokens come from the error-tolerant scanner, so multi-line strings and
+-- comments, string interpolation, and half-typed code all highlight
+-- correctly. Identifiers are classified with scope and type information:
+-- type names vs. type parameters inside annotations, functions vs. plain
+-- values (by inferred or declared type), parameters, attribute keys and
+-- selected fields as properties, and @builtins@ / @import@ as default-library
+-- symbols. Declarations carry the @declaration@ modifier.
+--
+-- The legend (see 'semanticTokenTypes' / 'semanticTokenModifiers') keeps the
+-- original eight types at their original indices and appends the new ones.
 module SessionSemanticTokens
   ( encodeSemanticTokens,
     semanticTokensFor,
+    semanticTokensForScan,
+    semanticTokenTypes,
+    semanticTokenModifierNames,
   )
 where
 
-import Data.Char (isAlphaNum, isDigit, isLetter, isUpper)
+import Data.Bits ((.|.))
+import Data.Char (isUpper)
 import Data.List (sortOn)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Driver (Analysis (..))
-import Server (textOffsetToUtf16Column)
+import SessionCompletion (isFunction)
+import SessionResolve
+import SessionScan
 import SessionTypes (SemanticToken (..))
-import Subtyping (resolveType)
-import Syntax (Program (programAliases))
-import Type
-  ( Scheme (schemeType),
-    Type (..),
-    TypeAlias (typeAliasName),
-  )
+import Type (Scheme (..))
+
+semanticTokenTypes :: [Text]
+semanticTokenTypes =
+  [ "keyword",
+    "type",
+    "function",
+    "variable",
+    "property",
+    "string",
+    "number",
+    "operator",
+    "parameter",
+    "typeParameter",
+    "comment",
+    "namespace",
+    "decorator"
+  ]
+
+semanticTokenModifierNames :: [Text]
+semanticTokenModifierNames = ["declaration", "readonly", "defaultLibrary", "deprecated"]
+
+tKeyword, tType, tFunction, tVariable, tProperty, tString, tNumber, tOperator, tParameter, tTypeParameter, tComment, tNamespace, tDecorator :: Int
+tKeyword = 0
+tType = 1
+tFunction = 2
+tVariable = 3
+tProperty = 4
+tString = 5
+tNumber = 6
+tOperator = 7
+tParameter = 8
+tTypeParameter = 9
+tComment = 10
+tNamespace = 11
+tDecorator = 12
+
+mDeclaration, mDefaultLibrary :: Int
+mDeclaration = 1
+mDefaultLibrary = 4
 
 -- | Produce the per-document token list ready for `encodeSemanticTokens`.
---
--- The set of "known" function / type / root field names is extracted from
--- the analysis result so highlighting matches the symbol table the LSP
--- already reasoned about.
 semanticTokensFor :: Text -> Either String Analysis -> [SemanticToken]
-semanticTokensFor content result =
-  let functionNames = case result of
-        Left _ -> []
-        Right analysis ->
-          [ name
-          | (name, scheme) <- Map.toList (analysisBindings analysis),
-            case schemeType scheme of
-              TFun{} -> True
-              _ -> False
+semanticTokensFor content result = semanticTokensForScan (mkCtx "" content result)
+
+semanticTokensForScan :: Ctx -> [SemanticToken]
+semanticTokensForScan ctx =
+  concatMap splitLines (concatMap classify (zip [0 :: Int ..] (scanAllTokens scan)))
+  where
+    scan = ctxScan ctx
+    idx = scanLineIndex scan
+    analysis = ctxAnalysis ctx
+    aliases = ctxAliases ctx
+    codeStarts = Map.fromList [(tokStart t, i) | i <- [0 .. codeTokenCount scan - 1], Just t <- [codeToken scan i]]
+    textAt k = maybe "" tokText (codeToken scan k)
+    kindAt k = tokKind <$> codeToken scan k
+    binderTokens = Map.fromList [(binderToken b, b) | b <- scanBinders scan]
+    typeParams = [b | b <- scanBinders scan, binderKind b == BindTypeParam]
+    localAliases = [binderName b | b <- scanBinders scan, binderKind b == BindTypeAlias]
+    topFunctions = case analysis of
+      Just a -> Map.keysSet (Map.filter (isFunction . schemeType) (analysisBindings a))
+      Nothing -> mempty
+
+    classify (_, t) = case tokKind t of
+      KComment
+        | "@tnix-" `Text.isInfixOf` tokText t -> [(t, tDecorator, 0)]
+        | otherwise -> [(t, tComment, 0)]
+      KString -> [(t, tString, 0)]
+      KPath -> [(t, tString, 0)]
+      KNumber -> [(t, tNumber, 0)]
+      KKeyword -> [(t, tKeyword, 0)]
+      KSymbol
+        | tokText t `elem` operators -> [(t, tOperator, 0)]
+        | otherwise -> []
+      KIdent -> case Map.lookup (tokStart t) codeStarts of
+        Just i -> [(t, ty, mods) | (ty, mods) <- [identifier i t]]
+        Nothing -> []
+      KUnknown -> []
+
+    operators = ["::", "->", "|>", "<|", "==", "!=", "<=", ">=", "&&", "||", "++", "//", "%1", "=", "+", "-", "*", "/", "<", ">", "!", "|", "?", ":", ".", "@", "..."]
+
+    identifier i t
+      | name `elem` ["true", "false", "null"] = (tKeyword, 0)
+      | name == "or" && textAt (i - 2) == "." = (tKeyword, 0)
+      | isTypeToken scan i = typeIdentifier i t
+      | name `elem` ["type", "declare"] && kindAt (i + 1) `elem` [Just KIdent, Just KString, Just KPath] && textAt (i + 1) /= "=" && atStatementStart i = (tKeyword, 0)
+      | name == "as" && isTypeToken scan (i + 1) = (tKeyword, 0)
+      | Just b <- Map.lookup i binderTokens = binderToken' b mDeclaration
+      | textAt (i - 1) == "." =
+          if textAt (i - 2) == "builtins" then (memberKind i, mDefaultLibrary) else (memberKind i, 0)
+      | isAttrKey i = (tProperty, mDeclaration)
+      | Just b <- resolvedBinder i t = binderToken' b 0
+      | name == "builtins" = (tNamespace, mDefaultLibrary)
+      | name == "import" = (tFunction, mDefaultLibrary)
+      | name `elem` topFunctions = (tFunction, 0)
+      | otherwise = (tVariable, 0)
+      where
+        name = tokText t
+
+    atStatementStart i = i == 0 || textAt (i - 1) `elem` [";", "}"]
+
+    typeIdentifier i t
+      | name `elem` ["forall", "infer", "extends"] = (tKeyword, 0)
+      | name `elem` ["dynamic", "any", "unknown"] = (tType, mDefaultLibrary)
+      | textAt (i + 1) == "::" = (tProperty, mDeclaration)
+      | any (\b -> binderName b == name && binderScopeStart b <= tokStart t && tokStart t <= binderScopeEnd b) typeParams = (tTypeParameter, if Map.member i binderTokens then mDeclaration else 0)
+      | Map.member name aliases || name `elem` localAliases = (tType, if Map.member i binderTokens then mDeclaration else 0)
+      | maybe False (isUpper . fst) (Text.uncons name) = (tType, if name `elem` builtinTypes then mDefaultLibrary else 0)
+      | otherwise = (tTypeParameter, 0)
+      where
+        name = tokText t
+
+    builtinTypes = ["Int", "Float", "Number", "Nat", "String", "Bool", "Path", "Null", "List", "Vec", "Matrix", "Tensor", "Range", "Unit", "Tuple"]
+
+    resolvedBinder _ t = resolveNameAt scan (tokText t) (tokStart t)
+
+    binderToken' b mods = case binderKind b of
+      BindParam -> (tParameter, mods)
+      BindPatternField -> (tParameter, mods)
+      BindPatternAlias -> (tParameter, mods)
+      BindRecField -> (tProperty, mods)
+      _ -> (if valueIsFunction b then tFunction else tVariable, mods)
+
+    valueIsFunction b =
+      case binderType ctx b of
+        Just ty -> isFunction ty
+        Nothing -> case binderValue b of
+          Just (from, _) -> textAt (from + 1) == ":" || (textAt from == "{" && closesIntoLambda from)
+          Nothing -> False
+    closesIntoLambda from = case matchingCloser scan from of
+      Just c -> textAt (c + 1) `elem` [":", "@"]
+      Nothing -> False
+
+    memberKind i =
+      let path = selection i
+       in case exprPathType ctx (maybe 0 tokStart (codeToken scan (i - 2 * (length path - 1)))) path of
+            Just ty | isFunction ty -> tFunction
+            _ -> tProperty
+    selection i
+      | textAt (i - 1) == "." && kindAt (i - 2) == Just KIdent = selection (i - 2) <> [textAt i]
+      | otherwise = [textAt i]
+
+    -- attribute keys: `key =` / `key.sub =` at a statement start of an attrset
+    isAttrKey i =
+      (textAt (i + 1) `elem` ["=", "."])
+        && (textAt (i - 1) `elem` ["{", ";", "."])
+        && not (isReferenceToken scan i)
+
+    -- split multi-line tokens so clients without multiline support render them
+    splitLines (t, ty, mods) =
+      let pieces = zip [0 :: Int ..] (Text.splitOn "\n" (tokText t))
+          startOffsets = scanl (\acc (_, piece) -> acc + Text.length piece + 1) (tokStart t) pieces
+       in [ SemanticToken
+              { semanticTokenLine = line,
+                semanticTokenStart = col,
+                semanticTokenLength = endCol - col,
+                semanticTokenType = ty,
+                semanticTokenModifiers = mods
+              }
+          | ((_, piece), off) <- zip pieces startOffsets,
+            not (Text.null piece),
+            let (line, col) = offsetToPosition idx off
+                (_, endCol) = offsetToPosition idx (off + Text.length piece),
+            endCol > col
           ]
-      typeNames = case result of
-        Left _ -> []
-        Right analysis -> map typeAliasName (programAliases (analysisProgram analysis))
-      rootFieldNames = case result of
-        Left _ -> []
-        Right analysis ->
-          case analysisRoot analysis of
-            Just scheme ->
-              case resolveType (analysisAliases analysis) (schemeType scheme) of
-                TRecord fields -> Map.keys fields
-                _ -> []
-            Nothing -> []
-   in concatMap (uncurry (semanticTokensForLine functionNames typeNames rootFieldNames)) (zip [0 ..] (Text.lines content))
-
-semanticTokensForLine :: [Text] -> [Text] -> [Text] -> Int -> Text -> [SemanticToken]
-semanticTokensForLine functionNames typeNames rootFieldNames lineNo line = go 0 []
-  where
-    go index acc
-      | index >= Text.length line = reverse acc
-      | "#" `Text.isPrefixOf` Text.drop index line = reverse acc
-      | otherwise =
-          case Text.drop index line of
-            rest
-              | Just token <- stringToken index rest ->
-                  go (index + semanticTokenLength token) (clientToken token : acc)
-              | Just token <- numberToken index rest ->
-                  go (index + semanticTokenLength token) (clientToken token : acc)
-              | Just token <- operatorToken index rest ->
-                  go (index + semanticTokenLength token) (clientToken token : acc)
-              | Just (tokenText, width) <- identifierToken rest ->
-                  let token =
-                        SemanticToken
-                          { semanticTokenLine = lineNo,
-                            semanticTokenStart = index,
-                            semanticTokenLength = width,
-                            semanticTokenType = classifyIdentifier functionNames typeNames rootFieldNames line index tokenText
-                          }
-                   in go (index + width) (clientToken token : acc)
-              | otherwise -> go (index + 1) acc
-    clientToken token =
-      let startColumn = textOffsetToUtf16Column line (semanticTokenStart token)
-          endColumn = textOffsetToUtf16Column line (semanticTokenStart token + semanticTokenLength token)
-       in token
-            { semanticTokenLine = lineNo,
-              semanticTokenStart = startColumn,
-              semanticTokenLength = endColumn - startColumn
-            }
-
-stringToken :: Int -> Text -> Maybe SemanticToken
-stringToken index rest = do
-  ('"', _) <- Text.uncons rest
-  let body = Text.drop 1 rest
-      len =
-        case Text.findIndex (== '"') body of
-          Just endIx -> endIx + 2
-          Nothing -> Text.length rest
-  pure SemanticToken{semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = len, semanticTokenType = 5}
-
-numberToken :: Int -> Text -> Maybe SemanticToken
-numberToken index rest = do
-  (char, _) <- Text.uncons rest
-  if isDigit char
-    then
-      let width = Text.length (Text.takeWhile numberChar rest)
-       in Just SemanticToken{semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = width, semanticTokenType = 6}
-    else Nothing
-  where
-    numberChar c = isDigit c || c `elem` (".eE+-" :: String)
-
-operatorToken :: Int -> Text -> Maybe SemanticToken
-operatorToken index rest =
-  listToMaybe
-    [ SemanticToken{semanticTokenLine = 0, semanticTokenStart = index, semanticTokenLength = Text.length operator, semanticTokenType = 7}
-    | operator <- ["::", "->", "%1", ".", "=", "+", "|", "?", ":"],
-      operator `Text.isPrefixOf` rest
-    ]
-
-identifierToken :: Text -> Maybe (Text, Int)
-identifierToken rest = do
-  (char, _) <- Text.uncons rest
-  if identStart char
-    then
-      let tokenText = Text.takeWhile identChar rest
-       in Just (tokenText, Text.length tokenText)
-    else Nothing
-
-classifyIdentifier :: [Text] -> [Text] -> [Text] -> Text -> Int -> Text -> Int
-classifyIdentifier functionNames typeNames rootFieldNames line index token
-  | token `elem` reservedWords = 0
-  | token `elem` typeNames = 1
-  | token `elem` rootFieldNames = 4
-  | previousNonSpace line index == Just '.' = 4
-  | nextOperator line (index + Text.length token) == Just "::" =
-      if lineStartsWithType line
-        then 1
-        else if token `elem` functionNames then 2 else 4
-  | nextOperator line (index + Text.length token) == Just "=" =
-      if token `elem` functionNames then 2 else 3
-  | Text.any isUpper token && maybe False (isUpper . fst) (Text.uncons token) = 1
-  | token `elem` functionNames = 2
-  | otherwise = 3
-
-previousNonSpace :: Text -> Int -> Maybe Char
-previousNonSpace line index =
-  listToMaybe
-    [ char
-    | char <- reverse (Text.unpack (Text.take index line)),
-      char `notElem` [' ', '\t']
-    ]
-
-nextOperator :: Text -> Int -> Maybe Text
-nextOperator line index =
-  let suffix = Text.dropWhile (`elem` [' ', '\t']) (Text.drop index line)
-   in listToMaybe
-        [ operator
-        | operator <- ["::", "=", ":"],
-          operator `Text.isPrefixOf` suffix
-        ]
-
-lineStartsWithType :: Text -> Bool
-lineStartsWithType = ("type " `Text.isPrefixOf`) . Text.stripStart
-
-identStart :: Char -> Bool
-identStart char = isLetter char || char == '_'
-
-identChar :: Char -> Bool
-identChar char = isAlphaNum char || char `elem` ("_'-" :: String)
-
-reservedWords :: [Text]
-reservedWords =
-  ["Tuple", "any", "as", "declare", "dynamic", "else", "extends", "false", "forall", "if", "import", "in", "infer", "inherit", "let", "null", "then", "true", "type", "unknown"]
 
 -- | Convert the per-token list into the LSP integer delta stream that the
 -- spec requires.
 encodeSemanticTokens :: [SemanticToken] -> [Int]
-encodeSemanticTokens tokens = snd (foldl step (Nothing, []) (sortOn (\token -> (semanticTokenLine token, semanticTokenStart token)) tokens))
+encodeSemanticTokens tokens = concat (reverse (snd (foldl step (Nothing, []) (sortOn (\token -> (semanticTokenLine token, semanticTokenStart token)) tokens))))
   where
     step (previous, acc) token =
       let deltaLine = maybe (semanticTokenLine token) (\prev -> semanticTokenLine token - semanticTokenLine prev) previous
@@ -194,6 +216,6 @@ encodeSemanticTokens tokens = snd (foldl step (Nothing, []) (sortOn (\token -> (
               deltaStart,
               semanticTokenLength token,
               semanticTokenType token,
-              0
+              semanticTokenModifiers token .|. 0
             ]
-       in (Just token, acc <> encoded)
+       in (Just token, encoded : acc)

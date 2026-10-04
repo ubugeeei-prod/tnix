@@ -23,7 +23,13 @@ library
     , SessionFolding
     , SessionInlayHints
     , SessionLinks
+    , SessionCompletion
+    , SessionHover
+    , SessionNavigation
+    , SessionPublish
     , SessionReferences
+    , SessionResolve
+    , SessionScan
     , SessionSemanticTokens
     , SessionSymbols
     , SessionText
@@ -44,6 +50,7 @@ library
 executable tnix-lsp
   main-is: Main.hs
   hs-source-dirs: app
+  ghc-options: -threaded -rtsopts
   other-modules:
       Paths_tnix_lsp
   build-depends:
@@ -145,6 +152,35 @@ test-suite tnix-lsp-session-text-spec
     , tnix-lsp
   default-language: GHC2021
 
+test-suite tnix-lsp-session-features-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionFeatures.spec.hs
+  hs-source-dirs: test
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tnix-core
+    , tnix-lsp
+  default-language: GHC2021
+
+test-suite tnix-lsp-session-scan-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionScan.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      SessionScan
+  build-depends:
+      base >=4.19 && <5
+    , containers
+    , hspec
+    , text
+    , tnix-lsp
+  default-language: GHC2021
+
 test-suite tnix-lsp-session-workspace-spec
   type: exitcode-stdio-1.0
   main-is: SessionWorkspace.spec.hs
@@ -226,12 +262,18 @@ test-suite tnix-lsp-session-spec
     , ServerProtocol
     , ServerUri
     , Session
+    , SessionCompletion
     , SessionDiagnostics
     , SessionDocuments
     , SessionFolding
+    , SessionHover
     , SessionInlayHints
     , SessionLinks
+    , SessionNavigation
+    , SessionPublish
     , SessionReferences
+    , SessionResolve
+    , SessionScan
     , SessionSemanticTokens
     , SessionSymbols
     , SessionText

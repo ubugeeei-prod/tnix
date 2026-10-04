@@ -104,7 +104,7 @@ spec = do
     it "prefers cached content over disk when computing hover" $ do
       let docs = documentsFromList [("/tmp/main.tnix", "box")]
       hover <- hoverDocument (\_ -> pure (Left "should not read")) analyzeStub docs (hoverMessage "/tmp/main.tnix" 0 1)
-      hoverText hover `shouldBe` "```tnix\nString\n```"
+      hoverText hover `shouldBe` "```tnix\nbox :: String\n```"
 
     it "falls back to disk when the document is not cached" $ do
       hover <- hoverDocument (\_ -> pure (Right "1")) analyzeStub mempty (hoverMessage "/tmp/main.tnix" 0 0)
