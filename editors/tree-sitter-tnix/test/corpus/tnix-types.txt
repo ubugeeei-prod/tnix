@@ -1,0 +1,240 @@
+================================================================================
+forall
+================================================================================
+
+type Id = forall a. a -> a;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (forall_type
+      (type_variable)
+      (function_type
+        (type_identifier)
+        (type_identifier)))))
+
+================================================================================
+forall with several variables
+================================================================================
+
+type Map = forall a b. (a -> b) -> List a -> List b;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (forall_type
+      (type_variable)
+      (type_variable)
+      (function_type
+        (parenthesized_type
+          (function_type
+            (type_identifier)
+            (type_identifier)))
+        (function_type
+          (type_application
+            (type_identifier)
+            (type_identifier))
+          (type_application
+            (type_identifier)
+            (type_identifier)))))))
+
+================================================================================
+linear arrow
+================================================================================
+
+type Consume = Int %1 -> Int;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (function_type
+      (type_identifier)
+      (multiplicity)
+      (type_identifier))))
+
+================================================================================
+union of records
+================================================================================
+
+type Option a = { _tag :: "some"; value :: a; } | { _tag :: "none"; };
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_variable)
+    (union_type
+      (record_type
+        (type_signature
+          (identifier)
+          (literal_type
+            (string_expression
+              (string_fragment))))
+        (type_signature
+          (identifier)
+          (type_identifier)))
+      (record_type
+        (type_signature
+          (identifier)
+          (literal_type
+            (string_expression
+              (string_fragment))))))))
+
+================================================================================
+conditional with infer
+================================================================================
+
+type Element t = t extends List (infer a) ? a : dynamic;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_variable)
+    (conditional_type
+      (type_identifier)
+      (type_application
+        (type_identifier)
+        (parenthesized_type
+          (infer_type
+            (type_variable))))
+      (type_identifier)
+      (builtin_type))))
+
+================================================================================
+conditional with function pattern
+================================================================================
+
+type ReturnOf f = f extends (_ -> infer r) ? r : unknown;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_variable)
+    (conditional_type
+      (type_identifier)
+      (parenthesized_type
+        (function_type
+          (type_identifier)
+          (infer_type
+            (type_variable))))
+      (type_identifier)
+      (builtin_type))))
+
+================================================================================
+constraint
+================================================================================
+
+type Show' a = Show a => a -> String;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_variable)
+    (constrained_type
+      (type_application
+        (type_identifier)
+        (type_identifier))
+      (function_type
+        (type_identifier)
+        (type_identifier)))))
+
+================================================================================
+literal types
+================================================================================
+
+type Lit = "x" | 1 | 1.5 | true | false | -3;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (union_type
+      (literal_type
+        (string_expression
+          (string_fragment)))
+      (literal_type
+        (integer_expression))
+      (literal_type
+        (float_expression))
+      (literal_type
+        (boolean))
+      (literal_type
+        (boolean))
+      (literal_type
+        (integer_expression)))))
+
+================================================================================
+type lists
+================================================================================
+
+type Shape = Tensor [2 (Range 1 2 Nat) 1] Int;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_application
+      (type_identifier)
+      (type_list
+        (literal_type
+          (integer_expression))
+        (parenthesized_type
+          (type_application
+            (type_identifier)
+            (literal_type
+              (integer_expression))
+            (literal_type
+              (integer_expression))
+            (type_identifier)))
+        (literal_type
+          (integer_expression)))
+      (type_identifier))))
+
+================================================================================
+tuple
+================================================================================
+
+type Pair = Tuple [Int String];
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_application
+      (type_identifier)
+      (type_list
+        (type_identifier)
+        (type_identifier)))))
+
+================================================================================
+higher-kinded application
+================================================================================
+
+type Apply f a = f a;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_variable)
+    (type_variable)
+    (type_application
+      (type_identifier)
+      (type_identifier))))

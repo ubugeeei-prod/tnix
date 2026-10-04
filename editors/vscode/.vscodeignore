@@ -1,4 +1,14 @@
 src/**
+scripts/**
+test/**
+out/**
+.vscode-test/**
+.vscode-test.mjs
 tsconfig.json
+tsconfig.test.json
 node_modules/**
-dist/**/*.spec.js
+dist/**
+!dist/extension.cjs
+icons/icon.svg
+*.vsix
+.gitignore

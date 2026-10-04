@@ -1,3 +1,4 @@
+import { execFile, spawn } from "node:child_process";
 import * as vscode from "vscode";
 import {
   Executable,
@@ -6,44 +7,93 @@ import {
   ServerOptions,
   State,
 } from "vscode-languageclient/node";
-import { resolveRuntimeConfig } from "./runtime.js";
+import { resolveCliPath, resolveRuntimeConfig } from "./runtime.js";
+import {
+  ExtensionSettings,
+  INSTALL_SCRIPT_COMMAND,
+  NIX_INSTALL_COMMAND,
+  buildInitializationOptions,
+  findExecutable,
+  normalizeSeverityOverrides,
+  overrideSeverity,
+  parseVersion,
+} from "./settings.js";
+
+const COMMANDS = {
+  restart: "tnix.restartServer",
+  showOutput: "tnix.showOutput",
+  showVersion: "tnix.showVersion",
+  runDoctor: "tnix.runDoctor",
+  installServer: "tnix.installServer",
+  showMenu: "tnix.showMenu",
+} as const;
+
+const SUPPRESS_INSTALL_PROMPT_KEY = "tnix.suppressInstallPrompt";
+
+type Status = "starting" | "running" | "error" | "stopped" | "missing";
 
 let client: LanguageClient | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
-
-const RESTART_COMMAND = "tnix.restartServer";
+let outputChannel: vscode.LogOutputChannel | undefined;
+let doctorChannel: vscode.OutputChannel | undefined;
+let currentCommand = "tnix-lsp";
+let currentArgs: string[] = [];
+let serverVersion: string | undefined;
+let settings: ExtensionSettings = {
+  inlayHints: { enabled: true, typeHints: true, parameterHints: true },
+  diagnostics: { enabled: true, severityOverrides: {} },
+};
 
 /**
  * Boot the tnix language client inside VS Code.
  *
- * The extension keeps configuration deliberately small: users may override the
- * `tnix-lsp` binary path, while everything else is derived from the current
- * workspace. The runtime work itself is delegated to the Haskell LSP server.
- *
- * Startup is wrapped so a missing or crashing `tnix-lsp` shows a clear toast
- * with the resolved command, surfaces a status bar indicator, and registers a
- * `tnix.restartServer` command so users can recover without reloading the
- * window.
+ * The extension resolves `tnix-lsp` (explicit setting, Nix profiles, PATH),
+ * offers to install it when it is missing, and layers a few client-side
+ * conveniences on top of the server: a status bar menu, version/doctor
+ * commands, inlay-hint toggles, and diagnostic severity overrides.
  */
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
+  settings = readSettings();
+  outputChannel = vscode.window.createOutputChannel("tnix", { log: true });
+  doctorChannel = vscode.window.createOutputChannel("tnix doctor");
   statusBarItem = vscode.window.createStatusBarItem(
+    "tnix.status",
     vscode.StatusBarAlignment.Right,
     100,
   );
-  statusBarItem.command = RESTART_COMMAND;
-  statusBarItem.tooltip = "Click to restart the tnix language server";
-  context.subscriptions.push(statusBarItem);
+  statusBarItem.name = "tnix";
+  statusBarItem.command = COMMANDS.showMenu;
+  context.subscriptions.push(outputChannel, doctorChannel, statusBarItem);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand(RESTART_COMMAND, async () => {
+    vscode.commands.registerCommand(COMMANDS.restart, async () => {
       await stopClient();
-      await startClient(context);
+      await startClient(context, { interactive: true });
+    }),
+    vscode.commands.registerCommand(COMMANDS.showOutput, () =>
+      outputChannel?.show(true),
+    ),
+    vscode.commands.registerCommand(COMMANDS.showVersion, showVersion),
+    vscode.commands.registerCommand(COMMANDS.runDoctor, runDoctor),
+    vscode.commands.registerCommand(COMMANDS.installServer, () =>
+      offerInstall(context, "install"),
+    ),
+    vscode.commands.registerCommand(COMMANDS.showMenu, showMenu),
+    vscode.workspace.onDidChangeConfiguration(async (event) => {
+      if (!event.affectsConfiguration("tnix")) return;
+      settings = readSettings();
+      if (
+        event.affectsConfiguration("tnix.server") ||
+        event.affectsConfiguration("tnix.cli")
+      ) {
+        await vscode.commands.executeCommand(COMMANDS.restart);
+      }
     }),
   );
 
-  await startClient(context);
+  await startClient(context, { interactive: false });
 }
 
 /**
@@ -56,14 +106,57 @@ export async function deactivate(): Promise<void> {
   await stopClient();
 }
 
-async function startClient(context: vscode.ExtensionContext): Promise<void> {
+function readSettings(): ExtensionSettings {
   const config = vscode.workspace.getConfiguration("tnix");
+  return {
+    inlayHints: {
+      enabled: config.get<boolean>("inlayHints.enabled", true),
+      typeHints: config.get<boolean>("inlayHints.typeHints", true),
+      parameterHints: config.get<boolean>("inlayHints.parameterHints", true),
+    },
+    diagnostics: {
+      enabled: config.get<boolean>("diagnostics.enabled", true),
+      severityOverrides: normalizeSeverityOverrides(
+        config.get("diagnostics.severityOverrides"),
+      ),
+    },
+  };
+}
+
+async function startClient(
+  context: vscode.ExtensionContext,
+  options: { interactive: boolean },
+): Promise<void> {
+  const config = vscode.workspace.getConfiguration("tnix");
+  const explicitPath = config.get<string>("server.path")?.trim() ?? "";
   const runtime = resolveRuntimeConfig(
-    config.get<string>("server.path"),
+    explicitPath,
     config.get<string[]>("server.args"),
     config.get<string>("server.cwd"),
     vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath),
   );
+  currentCommand = runtime.command;
+  currentArgs = runtime.args;
+  serverVersion = undefined;
+
+  if (explicitPath.length === 0 && !findExecutable(runtime.command)) {
+    setStatus("missing");
+    outputChannel?.warn(
+      "tnix-lsp was not found on PATH or in the usual Nix profiles.",
+    );
+    const suppressed = context.globalState.get<boolean>(
+      SUPPRESS_INSTALL_PROMPT_KEY,
+      false,
+    );
+    if (
+      options.interactive ||
+      (!suppressed && config.get<boolean>("server.promptInstall", true))
+    ) {
+      void offerInstall(context, "missing");
+    }
+    return;
+  }
+
   const executable: Executable = {
     command: runtime.command,
     args: runtime.args,
@@ -75,10 +168,43 @@ async function startClient(context: vscode.ExtensionContext): Promise<void> {
   };
   const clientOptions: LanguageClientOptions = {
     documentSelector: runtime.documentSelector,
+    outputChannel,
+    initializationOptions: buildInitializationOptions(settings),
     synchronize: {
+      configurationSection: "tnix",
       fileEvents: vscode.workspace.createFileSystemWatcher(
         runtime.watchPattern,
       ),
+    },
+    middleware: {
+      handleDiagnostics: (uri, diagnostics, next) => {
+        if (!settings.diagnostics.enabled) return next(uri, []);
+        const overrides = settings.diagnostics.severityOverrides;
+        const adjusted: vscode.Diagnostic[] = [];
+        for (const diagnostic of diagnostics) {
+          const severity = overrideSeverity(
+            diagnostic.code,
+            diagnostic.message,
+            diagnostic.severity,
+            overrides,
+          );
+          if (severity === null) continue;
+          diagnostic.severity = severity as vscode.DiagnosticSeverity;
+          adjusted.push(diagnostic);
+        }
+        next(uri, adjusted);
+      },
+      provideInlayHints: async (document, range, token, next) => {
+        const hints = settings.inlayHints;
+        if (!hints.enabled) return [];
+        const result = await next(document, range, token);
+        if (!result) return result;
+        return result.filter((hint) =>
+          hint.kind === vscode.InlayHintKind.Parameter
+            ? hints.parameterHints
+            : hints.typeHints,
+        );
+      },
     },
   };
 
@@ -94,67 +220,258 @@ async function startClient(context: vscode.ExtensionContext): Promise<void> {
     created.onDidChangeState((event) => updateStatus(event.newState)),
   );
 
-  setStatus("starting", runtime.command);
+  setStatus("starting");
 
   try {
     await created.start();
-    setStatus("running", runtime.command);
+    serverVersion =
+      created.initializeResult?.serverInfo?.version ??
+      (await probeVersion(runtime.command));
+    setStatus("running");
   } catch (error) {
     const detail = formatError(error);
-    setStatus("error", runtime.command);
+    setStatus("error");
     const action = await vscode.window.showErrorMessage(
       `tnix-lsp failed to start using \`${describeCommand(runtime.command, runtime.args)}\`: ${detail}`,
+      "Show Output",
       "Open Settings",
       "Restart Server",
     );
-    if (action === "Open Settings") {
+    if (action === "Show Output") {
+      outputChannel?.show(true);
+    } else if (action === "Open Settings") {
       await vscode.commands.executeCommand(
         "workbench.action.openSettings",
-        "tnix.server.path",
+        "tnix.server",
       );
     } else if (action === "Restart Server") {
-      await vscode.commands.executeCommand(RESTART_COMMAND);
+      await vscode.commands.executeCommand(COMMANDS.restart);
     }
   }
 }
 
 async function stopClient(): Promise<void> {
   if (client) {
+    const stopping = client;
+    client = undefined;
     try {
-      await client.stop();
+      await stopping.stop();
     } catch {
       // Stopping a client that already died is fine; suppress so deactivate stays clean.
     }
-    client = undefined;
   }
 }
 
-type Status = "starting" | "running" | "error" | "stopped";
+async function offerInstall(
+  context: vscode.ExtensionContext,
+  reason: "missing" | "install",
+): Promise<void> {
+  const installScript = "Install (script)";
+  const installNix = "Install with Nix";
+  const setPath = "Set Path…";
+  const never = "Don't Show Again";
+  const message =
+    reason === "missing"
+      ? "tnix-lsp was not found. Install the tnix toolchain to enable type checking, hover and completion."
+      : "Install the tnix toolchain (tnix and tnix-lsp).";
+  const choices =
+    reason === "missing"
+      ? [installScript, installNix, setPath, never]
+      : [installScript, installNix, setPath];
+  const choice = await vscode.window.showInformationMessage(
+    message,
+    ...choices,
+  );
+  if (choice === installScript || choice === installNix) {
+    const terminal = vscode.window.createTerminal({ name: "tnix install" });
+    terminal.show();
+    terminal.sendText(
+      choice === installScript ? INSTALL_SCRIPT_COMMAND : NIX_INSTALL_COMMAND,
+    );
+    const restart = await vscode.window.showInformationMessage(
+      "Restart the tnix language server once the installation finishes.",
+      "Restart Server",
+    );
+    if (restart) await vscode.commands.executeCommand(COMMANDS.restart);
+  } else if (choice === setPath) {
+    await vscode.commands.executeCommand(
+      "workbench.action.openSettings",
+      "tnix.server.path",
+    );
+  } else if (choice === never) {
+    await context.globalState.update(SUPPRESS_INSTALL_PROMPT_KEY, true);
+  }
+}
 
-function setStatus(status: Status, command: string): void {
+function workspaceCwd(): string | undefined {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
+
+function cliCommand(): string {
+  return resolveCliPath(
+    vscode.workspace.getConfiguration("tnix").get<string>("cli.path"),
+  );
+}
+
+function probeVersion(command: string): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    execFile(
+      command,
+      ["--version"],
+      { timeout: 5000, cwd: workspaceCwd() },
+      (error, stdout, stderr) => {
+        if (error) return resolve(undefined);
+        resolve(parseVersion(`${stdout}\n${stderr}`));
+      },
+    );
+  });
+}
+
+async function showVersion(): Promise<void> {
+  const [lsp, cli] = await Promise.all([
+    serverVersion
+      ? Promise.resolve(serverVersion)
+      : probeVersion(currentCommand),
+    probeVersion(cliCommand()),
+  ]);
+  const extensionVersion =
+    vscode.extensions.getExtension("ubugeeei.tnix")?.packageJSON.version ??
+    "unknown";
+  const parts = [
+    `tnix-lsp ${lsp ?? "(not found)"}`,
+    `tnix ${cli ?? "(not found)"}`,
+    `extension ${extensionVersion}`,
+  ];
+  const message = parts.join(" · ");
+  outputChannel?.info(message);
+  if (!lsp || !cli) {
+    const action = await vscode.window.showWarningMessage(
+      message,
+      "Install tnix",
+    );
+    if (action) await vscode.commands.executeCommand(COMMANDS.installServer);
+  } else {
+    void vscode.window.showInformationMessage(message);
+  }
+}
+
+async function runDoctor(): Promise<void> {
+  const channel = doctorChannel;
+  if (!channel) return;
+  const command = cliCommand();
+  channel.clear();
+  channel.show(true);
+  channel.appendLine(`$ ${command} doctor`);
+  await new Promise<void>((resolve) => {
+    const child = spawn(command, ["doctor"], {
+      cwd: workspaceCwd(),
+      env: process.env,
+    });
+    child.stdout.on("data", (chunk: Buffer) =>
+      channel.append(chunk.toString()),
+    );
+    child.stderr.on("data", (chunk: Buffer) =>
+      channel.append(chunk.toString()),
+    );
+    child.on("error", async (error: NodeJS.ErrnoException) => {
+      channel.appendLine(
+        `\nfailed to run \`${command} doctor\`: ${error.message}`,
+      );
+      resolve();
+      if (error.code === "ENOENT") {
+        const action = await vscode.window.showErrorMessage(
+          `The tnix CLI (\`${command}\`) was not found.`,
+          "Install tnix",
+          "Set Path…",
+        );
+        if (action === "Install tnix") {
+          await vscode.commands.executeCommand(COMMANDS.installServer);
+        } else if (action === "Set Path…") {
+          await vscode.commands.executeCommand(
+            "workbench.action.openSettings",
+            "tnix.cli.path",
+          );
+        }
+      }
+    });
+    child.on("close", (code) => {
+      channel.appendLine(`\n[exit ${code ?? "?"}]`);
+      if (code === 0) {
+        void vscode.window.showInformationMessage(
+          "tnix doctor: all checks passed.",
+        );
+      } else if (code !== null) {
+        void vscode.window.showWarningMessage(
+          "tnix doctor reported problems. See the “tnix doctor” output.",
+        );
+      }
+      resolve();
+    });
+  });
+}
+
+async function showMenu(): Promise<void> {
+  const items: (vscode.QuickPickItem & { command: string })[] = [
+    {
+      label: "$(debug-restart) Restart Language Server",
+      command: COMMANDS.restart,
+    },
+    { label: "$(output) Show Output", command: COMMANDS.showOutput },
+    { label: "$(info) Show Version", command: COMMANDS.showVersion },
+    { label: "$(checklist) Run Doctor", command: COMMANDS.runDoctor },
+    {
+      label: "$(cloud-download) Install tnix…",
+      command: COMMANDS.installServer,
+    },
+    {
+      label: "$(gear) Open Settings",
+      command: "workbench.action.openSettings",
+    },
+  ];
+  const picked = await vscode.window.showQuickPick(items, {
+    title: statusBarItem?.tooltip?.toString() ?? "tnix",
+    placeHolder: "tnix",
+  });
+  if (!picked) return;
+  if (picked.command === "workbench.action.openSettings") {
+    await vscode.commands.executeCommand(picked.command, "@ext:ubugeeei.tnix");
+  } else {
+    await vscode.commands.executeCommand(picked.command);
+  }
+}
+
+function setStatus(status: Status): void {
   if (!statusBarItem) return;
+  const command = describeCommand(currentCommand, currentArgs);
+  const version = serverVersion ? ` ${serverVersion}` : "";
+  statusBarItem.backgroundColor = undefined;
   switch (status) {
     case "starting":
       statusBarItem.text = "$(sync~spin) tnix";
       statusBarItem.tooltip = `Starting tnix-lsp (${command})`;
-      statusBarItem.backgroundColor = undefined;
       break;
     case "running":
-      statusBarItem.text = "$(check) tnix";
-      statusBarItem.tooltip = `tnix-lsp running (${command}). Click to restart.`;
-      statusBarItem.backgroundColor = undefined;
+      statusBarItem.text = `$(check) tnix${version}`;
+      statusBarItem.tooltip = `tnix-lsp${version} running (${command}). Click for actions.`;
       break;
     case "error":
       statusBarItem.text = "$(error) tnix";
-      statusBarItem.tooltip = `tnix-lsp failed (${command}). Click to retry.`;
+      statusBarItem.tooltip = `tnix-lsp failed (${command}). Click for actions.`;
       statusBarItem.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.errorBackground",
       );
       break;
     case "stopped":
       statusBarItem.text = "$(circle-slash) tnix";
-      statusBarItem.tooltip = "tnix-lsp stopped. Click to start.";
-      statusBarItem.backgroundColor = undefined;
+      statusBarItem.tooltip = "tnix-lsp stopped. Click for actions.";
+      break;
+    case "missing":
+      statusBarItem.text = "$(warning) tnix";
+      statusBarItem.tooltip =
+        "tnix-lsp not found. Click to install or configure tnix.server.path.";
+      statusBarItem.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.warningBackground",
+      );
       break;
   }
   statusBarItem.show();
@@ -162,16 +479,15 @@ function setStatus(status: Status, command: string): void {
 
 function updateStatus(state: State): void {
   if (!client || !statusBarItem) return;
-  const command = client.clientOptions.outputChannel?.name ?? "tnix-lsp";
   switch (state) {
     case State.Starting:
-      setStatus("starting", command);
+      setStatus("starting");
       break;
     case State.Running:
-      setStatus("running", command);
+      setStatus("running");
       break;
     case State.Stopped:
-      setStatus("stopped", command);
+      setStatus("stopped");
       break;
   }
 }

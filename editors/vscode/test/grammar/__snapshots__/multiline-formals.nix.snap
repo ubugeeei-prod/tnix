@@ -1,0 +1,82 @@
+  1 "{" meta.braces.tnix punctuation.section.braces.begin.tnix
+  2 "lib" meta.braces.tnix variable.parameter.tnix
+  2 "," meta.braces.tnix punctuation.separator.comma.tnix
+  3 "stdenv" meta.braces.tnix variable.parameter.tnix
+  3 "," meta.braces.tnix punctuation.separator.comma.tnix
+  4 "fetchurl" meta.braces.tnix variable.parameter.tnix
+  4 "?" meta.braces.tnix keyword.operator.default.tnix
+  4 "null" meta.braces.tnix constant.language.null.tnix
+  4 "," meta.braces.tnix punctuation.separator.comma.tnix
+  5 "..." meta.braces.tnix keyword.operator.ellipsis.tnix
+  6 "}" meta.braces.tnix punctuation.section.braces.end.tnix
+  6 ":" storage.type.function.arrow.tnix
+  8 "stdenv" variable.other.readwrite.tnix
+  8 "." punctuation.accessor.tnix
+  8 "mkDerivation" variable.other.property.tnix
+  8 "rec" storage.modifier.rec.tnix
+  8 "{" meta.braces.tnix punctuation.section.braces.begin.tnix
+  9 "pname" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+  9 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+  9 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+  9 "hello" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+  9 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+  9 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 10 "version" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 10 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 10 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 10 "2.12" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 10 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 10 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 11 "src" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 11 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 11 "fetchurl" meta.braces.tnix meta.binding.tnix variable.other.readwrite.tnix
+ 11 "{" meta.braces.tnix meta.binding.tnix meta.braces.tnix punctuation.section.braces.begin.tnix
+ 12 "url" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 12 "=" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 12 "\"" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 12 "mirror://gnu/hello/" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 12 "${" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix meta.embedded.interpolation.tnix punctuation.section.embedded.begin.tnix
+ 12 "pname" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix meta.embedded.interpolation.tnix variable.other.readwrite.tnix
+ 12 "}" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix meta.embedded.interpolation.tnix punctuation.section.embedded.end.tnix
+ 12 "-" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 12 "${" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix meta.embedded.interpolation.tnix punctuation.section.embedded.begin.tnix
+ 12 "version" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix meta.embedded.interpolation.tnix variable.other.readwrite.tnix
+ 12 "}" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix meta.embedded.interpolation.tnix punctuation.section.embedded.end.tnix
+ 12 ".tar.gz" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 12 "\"" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 12 ";" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 13 "hash" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 13 "=" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 13 "\"" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 13 "sha256-AAAA" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 13 "\"" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 13 ";" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 14 "}" meta.braces.tnix meta.binding.tnix meta.braces.tnix punctuation.section.braces.end.tnix
+ 14 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 15 "buildPhase" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 15 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 15 "''" meta.braces.tnix meta.binding.tnix string.quoted.other.indented.tnix punctuation.definition.string.begin.tnix
+ 16 "    make -j$NIX_BUILD_CORES" meta.braces.tnix meta.binding.tnix string.quoted.other.indented.tnix
+ 17 "''" meta.braces.tnix meta.binding.tnix string.quoted.other.indented.tnix punctuation.definition.string.end.tnix
+ 17 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 18 "meta" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 18 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 18 "with" meta.braces.tnix meta.binding.tnix meta.with.tnix keyword.other.with.tnix
+ 18 "lib" meta.braces.tnix meta.binding.tnix meta.with.tnix variable.other.readwrite.tnix
+ 18 ";" meta.braces.tnix meta.binding.tnix meta.with.tnix punctuation.terminator.with.tnix
+ 18 "{" meta.braces.tnix meta.binding.tnix meta.braces.tnix punctuation.section.braces.begin.tnix
+ 19 "description" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 19 "=" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 19 "\"" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 19 "A program that produces a familiar, friendly greeting" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 19 "\"" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 19 ";" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 20 "platforms" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 20 "=" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 20 "platforms" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix variable.other.readwrite.tnix
+ 20 "." meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix punctuation.accessor.tnix
+ 20 "all" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix variable.other.property.tnix
+ 20 ";" meta.braces.tnix meta.binding.tnix meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 21 "}" meta.braces.tnix meta.binding.tnix meta.braces.tnix punctuation.section.braces.end.tnix
+ 21 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 22 "}" meta.braces.tnix punctuation.section.braces.end.tnix

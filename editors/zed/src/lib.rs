@@ -1,8 +1,10 @@
 use std::env;
 use std::path::Path;
 use zed_extension_api::{
-    register_extension, settings::LspSettings, Command, Extension, LanguageServerId, Result,
-    Worktree,
+    register_extension,
+    serde_json::{self, Value},
+    settings::LspSettings,
+    Command, Extension, LanguageServerId, Result, Worktree,
 };
 
 /// Zed extension entry point for tnix.
@@ -68,6 +70,19 @@ where
         .find(|candidate| exists(candidate))
 }
 
+/// Wrap user-provided `lsp.tnix-lsp.settings` under the `tnix` section that
+/// tnix-lsp requests through `workspace/configuration`.
+///
+/// Settings that are already namespaced (`{ "tnix": { ... } }`) are passed
+/// through unchanged so both spellings work in Zed's settings.json.
+fn workspace_configuration(settings: Option<Value>) -> Option<Value> {
+    let settings = settings?;
+    match &settings {
+        Value::Object(map) if map.len() == 1 && map.contains_key("tnix") => Some(settings),
+        _ => Some(serde_json::json!({ "tnix": settings })),
+    }
+}
+
 fn resolve_default_binary() -> Option<String> {
     let home = env::var("HOME").ok();
     resolve_default_binary_with(home.as_deref(), |candidate| Path::new(candidate).exists())
@@ -108,6 +123,32 @@ impl Extension for Tnix {
             .ok_or_else(|| "tnix-lsp must be installed and available in $PATH.".to_string())?;
         Ok(build_command(path, vec![], env))
     }
+
+    /// Forward `lsp.tnix-lsp.initialization_options` from Zed settings.
+    fn language_server_initialization_options(
+        &mut self,
+        language_server_id: &LanguageServerId,
+        worktree: &Worktree,
+    ) -> Result<Option<Value>> {
+        Ok(
+            LspSettings::for_worktree(language_server_id.as_ref(), worktree)
+                .ok()
+                .and_then(|settings| settings.initialization_options),
+        )
+    }
+
+    /// Forward `lsp.tnix-lsp.settings` as the `tnix` configuration section.
+    fn language_server_workspace_configuration(
+        &mut self,
+        language_server_id: &LanguageServerId,
+        worktree: &Worktree,
+    ) -> Result<Option<Value>> {
+        Ok(workspace_configuration(
+            LspSettings::for_worktree(language_server_id.as_ref(), worktree)
+                .ok()
+                .and_then(|settings| settings.settings),
+        ))
+    }
 }
 
 register_extension!(Tnix);
@@ -116,8 +157,9 @@ register_extension!(Tnix);
 mod tests {
     use super::{
         build_command, default_binary_candidates, normalize_binary_arguments,
-        normalize_binary_path, resolve_default_binary_with,
+        normalize_binary_path, resolve_default_binary_with, workspace_configuration,
     };
+    use zed_extension_api::serde_json::json;
 
     #[test]
     fn normalize_binary_path_drops_blank_values() {
@@ -191,6 +233,19 @@ mod tests {
         assert_eq!(
             resolve_default_binary_with(Some("/home/alice"), |_| false),
             None
+        );
+    }
+
+    #[test]
+    fn workspace_configuration_namespaces_plain_settings() {
+        assert_eq!(workspace_configuration(None), None);
+        assert_eq!(
+            workspace_configuration(Some(json!({ "inlayHints": { "enabled": false } }))),
+            Some(json!({ "tnix": { "inlayHints": { "enabled": false } } }))
+        );
+        assert_eq!(
+            workspace_configuration(Some(json!({ "tnix": { "trace": "off" } }))),
+            Some(json!({ "tnix": { "trace": "off" } }))
         );
     }
 }

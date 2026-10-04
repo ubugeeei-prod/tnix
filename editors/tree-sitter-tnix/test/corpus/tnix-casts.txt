@@ -1,0 +1,103 @@
+================================================================================
+simple cast
+================================================================================
+
+x as Int
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (cast_expression
+    (variable_expression
+      (identifier))
+    (type_identifier)))
+
+================================================================================
+cast binds looser than application
+================================================================================
+
+f x as Int
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (cast_expression
+    (apply_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))
+    (type_identifier)))
+
+================================================================================
+chained casts
+================================================================================
+
+(f x) as { name :: String; } as unknown
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (cast_expression
+    (cast_expression
+      (parenthesized_expression
+        (apply_expression
+          (variable_expression
+            (identifier))
+          (variable_expression
+            (identifier))))
+      (record_type
+        (type_signature
+          (identifier)
+          (type_identifier))))
+    (builtin_type)))
+
+================================================================================
+cast to function type
+================================================================================
+
+x as Int -> Int
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (cast_expression
+    (variable_expression
+      (identifier))
+    (function_type
+      (type_identifier)
+      (type_identifier))))
+
+================================================================================
+cast inside list
+================================================================================
+
+[ (x as Int) y ]
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (list_expression
+    (parenthesized_expression
+      (cast_expression
+        (variable_expression
+          (identifier))
+        (type_identifier)))
+    (variable_expression
+      (identifier))))
+
+================================================================================
+cast followed by operator
+================================================================================
+
+x as Int + 1
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (binary_expression
+    (cast_expression
+      (variable_expression
+        (identifier))
+      (type_identifier))
+    (integer_expression)))

@@ -1,0 +1,18 @@
+type Option a = { _tag :: "some"; value :: a; } | { _tag :: "none"; };
+type Element t = t extends List (infer a) ? a : dynamic;
+type Apply f a = f a;
+type Pair = Tuple [Int String];
+type NixpkgsSystem =
+  "aarch64-linux"
+  | "x86_64-darwin";
+type Shape = Tensor [2 3 4] Number;
+type Timeout = Unit "ms" (Range 0 5000 Nat);
+type Show a = Showable a => a -> String;
+
+declare "./legacy/default.nix" {
+  # entries are signatures
+  default :: { name :: String; "quoted-key" :: Int; };
+  mkPkg :: { name :: String; } -> Derivation;
+};
+
+declare ./lib.nix { value :: any; };
