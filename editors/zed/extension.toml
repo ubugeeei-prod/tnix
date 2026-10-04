@@ -4,7 +4,7 @@ version = "0.5.0"
 schema_version = 1
 authors = ["tnix contributors"]
 description = "tnix (typed Nix) syntax highlighting and tnix-lsp support"
-repository = "https://github.com/ubugeeei/tnix"
+repository = "https://github.com/ubugeeei-prod/tnix"
 
 [language_servers.tnix-lsp]
 name = "tnix LSP"
@@ -26,6 +26,6 @@ languages = ["tnix", "Nix"]
 #   repository = "file:///absolute/path/to/tnix"
 # and set `rev` to a local commit sha that contains the grammar.
 [grammars.tnix]
-repository = "https://github.com/ubugeeei/tnix"
-rev = "f1b622462608fa949a6b418b3e5af7db0caa767f"
+repository = "https://github.com/ubugeeei-prod/tnix"
+rev = "e0c9d7ff7b72d4c2305a267aa865c8793f5da027"
 path = "editors/tree-sitter-tnix"
