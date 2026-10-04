@@ -2,9 +2,9 @@
 
 This is the executable surface grammar of `.tnix` and `.d.tnix` files as
 implemented by the parser in
-[`packages/tnix-core/src/ParserExpr.hs`](../packages/tnix-core/src/ParserExpr.hs),
-[`packages/tnix-core/src/ParserType.hs`](../packages/tnix-core/src/ParserType.hs),
-and [`packages/tnix-core/src/ParserLexer.hs`](../packages/tnix-core/src/ParserLexer.hs).
+[`packages/tnix-core/src/ParserExpr.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/ParserExpr.hs),
+[`packages/tnix-core/src/ParserType.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/ParserType.hs),
+and [`packages/tnix-core/src/ParserLexer.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/ParserLexer.hs).
 
 The notation is EBNF with these conventions:
 
@@ -316,9 +316,9 @@ expressions, declarations, and lists can all span multiple lines freely.
   vs attrset-pattern split).
 - `programParser` requires the input to end with `eof`, so unterminated
   expressions are rejected with a structured `ParseError` (see
-  [`Parser.hs`](../packages/tnix-core/src/Parser.hs)).
+  [`Parser.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Parser.hs)).
 - The integration tests in
-  [`Parser.spec.hs`](../packages/tnix-core/src/Parser.spec.hs) double as
+  [`Parser.spec.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Parser.spec.hs) double as
   executable examples for every production in this document; if you change
   the grammar, mirror the change there first.
 

@@ -37,7 +37,7 @@ per-artifact CycloneDX SBOMs are all attested with GitHub artifact attestations
 before upload. Consumers can verify release assets with:
 
 ```bash
-gh attestation verify <artifact> -R ubugeeei/tnix
+gh attestation verify <artifact> -R ubugeeei-prod/tnix
 ```
 
 ## Software Bill of Materials
@@ -56,7 +56,7 @@ materials for any release artifact they ingest.
 
 ## Dependency Updates
 
-[`.github/dependabot.yml`](../.github/dependabot.yml) opens weekly update PRs for
+[`.github/dependabot.yml`](https://github.com/ubugeeei-prod/tnix/blob/main/.github/dependabot.yml) opens weekly update PRs for
 three ecosystems:
 
 - `github-actions` across every workflow
@@ -68,7 +68,7 @@ updating `flake.lock` rather than waiting on Dependabot.
 
 ## Code Owners and Branch Protection
 
-[`.github/CODEOWNERS`](../.github/CODEOWNERS) requests reviewers automatically
+[`.github/CODEOWNERS`](https://github.com/ubugeeei-prod/tnix/blob/main/.github/CODEOWNERS) requests reviewers automatically
 based on the changed paths. The recommended branch protection rule for `main`
 is:
 

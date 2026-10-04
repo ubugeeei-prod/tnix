@@ -253,7 +253,7 @@ Apply (Id List) Int
 
 ```tnix
 type Element t = t extends List (infer a) ? a : t;
-type ReturnOf f = f extends (_ -> infer r) ? r : dynamic;
+type ReturnOf f = f extends (infer a -> infer r) ? r : dynamic;
 ```
 
 ### Tuple Types

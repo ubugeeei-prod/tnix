@@ -15,8 +15,8 @@ Install the CLI (and language server) from the flake, or vendor the repository
 and run through the dev shell:
 
 ```bash
-nix profile install github:ubugeeei/tnix#tnix
-nix profile install github:ubugeeei/tnix#tnix-lsp
+nix profile install github:ubugeeei-prod/tnix#tnix
+nix profile install github:ubugeeei-prod/tnix#tnix-lsp
 ```
 
 Verify it runs:
@@ -60,7 +60,7 @@ This is the core bridge:
 
 For flakes, keep the full implementation in `flake.nix` and write a typed
 *projection* over the parts you want checked. The pattern (adapted from
-[`dogfood/flake-surface.tnix`](../dogfood/flake-surface.tnix)):
+[`dogfood/flake-surface.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/dogfood/flake-surface.tnix)):
 
 ```tnix
 let
@@ -125,4 +125,4 @@ Executable `.tnix` targets a Nix-like subset, not full parser parity. For
 modules that use constructs outside that subset, prefer ambient typing
 (steps 3–4) over rewriting them as `.tnix`. The supported subset and its current
 exclusions are documented in [grammar.md](./grammar.md) and the
-[README](../README.md).
+[README](https://github.com/ubugeeei-prod/tnix/blob/main/README.md).

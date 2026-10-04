@@ -1,14 +1,14 @@
 # Troubleshooting
 
 Common problems and how to resolve them. If none of these match, open an issue
-with a minimal reproduction (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
+with a minimal reproduction (see [CONTRIBUTING.md](https://github.com/ubugeeei-prod/tnix/blob/main/CONTRIBUTING.md)).
 
 ## The CLI
 
 ### `tnix: command not found`
 
 The binary is not on your `PATH`. Either install it from the flake
-(`nix profile install github:ubugeeei/tnix#tnix`) or, when working from a
+(`nix profile install github:ubugeeei-prod/tnix#tnix`) or, when working from a
 checkout, run it through Cabal inside the dev shell:
 
 ```bash
@@ -37,7 +37,7 @@ isn't filtering everything out.
 Executable `.tnix` targets a reliable Nix-like subset, not full parser parity.
 Constructs outside that subset are reported as parse errors. See the
 "not yet supported" notes in [grammar.md](./grammar.md) and the parity statement
-in the [README](../README.md). For existing `.nix` modules you usually want
+in the [README](https://github.com/ubugeeei-prod/tnix/blob/main/README.md). For existing `.nix` modules you usually want
 *ambient typing* with a `.d.tnix` file rather than compiling them — see
 [migration.md](./migration.md).
 
@@ -68,7 +68,7 @@ Use the directive comments documented in
 
 Make sure the file is recognized as a tnix document. The VS Code extension
 activates on `.tnix`/`.d.tnix` (and `.nix`); see the
-[editor integrations](../editors) for how each editor associates files.
+[editor integrations](https://github.com/ubugeeei-prod/tnix/tree/main/editors) for how each editor associates files.
 
 ## The Nix dev shell
 

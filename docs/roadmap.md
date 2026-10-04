@@ -4,7 +4,7 @@ Status legend: ✅ shipped · 🚧 in progress.
 
 Phases 0–4 shipped in the integrated `0.5.0` toolchain release. Phase 5 hardening
 is largely shipped; the remaining production-readiness work is tracked under the
-[**Production Ready (v1.0)**](https://github.com/ubugeeei/tnix/milestone/1)
+[**Production Ready (v1.0)**](https://github.com/ubugeeei-prod/tnix/milestone/1)
 milestone.
 
 ## Phase 0: Spec First ✅
@@ -60,7 +60,7 @@ Deliverables:
 ## Toward v1.0: Production Ready 🚧
 
 Tracked under the
-[**Production Ready (v1.0)**](https://github.com/ubugeeei/tnix/milestone/1)
+[**Production Ready (v1.0)**](https://github.com/ubugeeei-prod/tnix/milestone/1)
 milestone, organized as epics:
 
 - Nix-language parity (string interpolation, operators, nested attr paths)

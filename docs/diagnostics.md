@@ -253,7 +253,7 @@ has no root expression.
 ## Listing Codes Programmatically
 
 The canonical list lives in
-[`packages/tnix-core/src/Diagnostics.hs`](../packages/tnix-core/src/Diagnostics.hs).
+[`packages/tnix-core/src/Diagnostics.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Diagnostics.hs).
 The `DiagnosticCode` data type is exposed alongside `diagnosticCodeText` and
 `withCode`, so downstream tooling can pattern match on stable variants
 rather than parsing the prefix back out of the message.

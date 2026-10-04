@@ -15,6 +15,12 @@ export default defineConfig({
       "docs:build": {
         command: "vp build --config vite.docs.config.ts",
       },
+      // Publishes dist/docs to the `tnix` Cloudflare Pages project (tnix.dev).
+      // Requires `wrangler login` or CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID.
+      "docs:deploy": {
+        command: "vp run docs:build && pnpm dlx wrangler@4.147.0 pages deploy dist/docs --project-name tnix",
+        cache: false,
+      },
       ide: {
         command: "node --experimental-strip-types ./scripts/install-ide.ts",
         cache: false,
