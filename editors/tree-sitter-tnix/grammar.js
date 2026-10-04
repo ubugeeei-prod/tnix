@@ -439,7 +439,20 @@ module.exports = grammar({
 
     parenthesized_type: ($) => seq("(", field("type", $._type), ")"),
 
-    record_type: ($) => seq("{", repeat(field("field", $.type_signature)), "}"),
+    // Record types: `name :: T;`, optional fields `name? :: T;`, and an
+    // optional trailing open row `...` / `...r` (with or without `;`).
+    record_type: ($) =>
+      seq(
+        "{",
+        repeat(field("field", choice($.type_signature, $.optional_type_signature))),
+        optional(field("row", $.row_tail)),
+        "}",
+      ),
+
+    optional_type_signature: ($) =>
+      seq(field("name", $._signature_name), "?", "::", field("type", $._type), ";"),
+
+    row_tail: ($) => seq($.ellipses, optional(field("name", $.identifier)), optional(";")),
 
     type_list: ($) => seq("[", repeat(field("element", $._type_atom)), "]"),
 

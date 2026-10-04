@@ -1928,6 +1928,36 @@
     }
   },
   {
+    "type": "optional_type_signature",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string_expression",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_type",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "parenthesized_expression",
     "named": true,
     "fields": {
@@ -2002,11 +2032,51 @@
         "required": false,
         "types": [
           {
+            "type": "optional_type_signature",
+            "named": true
+          },
+          {
             "type": "type_signature",
             "named": true
           }
         ]
+      },
+      "row": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "row_tail",
+            "named": true
+          }
+        ]
       }
+    }
+  },
+  {
+    "type": "row_tail",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "ellipses",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -2156,6 +2226,7 @@
   {
     "type": "source_code",
     "named": true,
+    "root": true,
     "fields": {
       "declaration": {
         "multiple": true,
@@ -2850,7 +2921,8 @@
   },
   {
     "type": "comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "declare",
@@ -2858,7 +2930,8 @@
   },
   {
     "type": "directive",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "dollar_escape",

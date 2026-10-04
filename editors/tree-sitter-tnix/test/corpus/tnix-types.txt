@@ -238,3 +238,35 @@ type Apply f a = f a;
     (type_application
       (type_identifier)
       (type_identifier))))
+
+================================================================================
+optional fields and open rows
+================================================================================
+
+type Args = { name :: String; version? :: String; ... };
+type Row r = { a :: Int; ...r };
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (record_type
+      (type_signature
+        (identifier)
+        (type_identifier))
+      (optional_type_signature
+        (identifier)
+        (type_identifier))
+      (row_tail
+        (ellipses))))
+  (type_alias
+    (type_identifier)
+    (type_variable)
+    (record_type
+      (type_signature
+        (identifier)
+        (type_identifier))
+      (row_tail
+        (ellipses)
+        (identifier)))))

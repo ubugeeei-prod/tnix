@@ -645,7 +645,18 @@ const grammar = {
           endCaptures: {
             0: { name: scope("punctuation.section.braces.end") },
           },
-          patterns: [{ include: "#comments" }, { include: "#type-field" }],
+          patterns: [
+            { include: "#comments" },
+            { include: "#type-field" },
+            {
+              comment: "open row: `...` or `...r`",
+              match: String.raw`(\.\.\.)(${IDENT})?`,
+              captures: {
+                1: { name: scope("punctuation.separator.rest") },
+                2: { name: scope("entity.name.type.parameter") },
+              },
+            },
+          ],
         },
         {
           name: scope("meta.type.list"),
@@ -681,11 +692,12 @@ const grammar = {
     },
     "type-field": {
       name: scope("meta.type.field"),
-      begin: String.raw`(?:(${IDENT})|(${QSTR}))\s*(::)(?!:)`,
+      begin: String.raw`(?:(${IDENT})|(${QSTR}))\s*(\?)?\s*(::)(?!:)`,
       beginCaptures: {
         1: { name: scope("entity.other.attribute-name") },
         2: { name: scope("string.quoted.double") },
-        3: { name: scope("keyword.operator.type.annotation") },
+        3: { name: scope("keyword.operator.optional") },
+        4: { name: scope("keyword.operator.type.annotation") },
       },
       end: ";",
       endCaptures: { 0: { name: scope("punctuation.terminator.field") } },

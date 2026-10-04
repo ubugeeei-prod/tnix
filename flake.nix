@@ -452,6 +452,7 @@
             pkgs.rustc
             pkgs.cargo
             pkgs.rust-analyzer
+            pkgs.tree-sitter
             pkgs.git
             pkgs.shellcheck
             vp

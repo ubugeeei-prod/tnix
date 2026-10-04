@@ -397,4 +397,3 @@ readFileSafe file = do
     case result of
       Left err -> Left ("failed to read " <> file <> ": " <> show err)
       Right content -> Right content
-

@@ -46,7 +46,7 @@ import Control.Monad (unless, when)
 import Data.Maybe (isNothing)
 import Data.Text (Text)
 import Syntax (AmbientDecl (ambientEntries), AmbientEntry (ambientEntryType), Expr, Marked (markedValue), Program (..), exprAnnotations)
-import Type (mkOpenRecord, LiteralType (..), Name, Type (..), TypeAlias (typeAliasBody), tDynamic, tFloat, tInt, tList, tNat, tNumber)
+import Type (LiteralType (..), Name, Type (..), TypeAlias (typeAliasBody), mkOpenRecord, tDynamic, tFloat, tInt, tList, tNat, tNumber)
 
 -- | Infer the most precise sequence type that can be justified from a list
 -- literal's member types.

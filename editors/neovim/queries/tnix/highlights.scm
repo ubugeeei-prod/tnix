@@ -239,3 +239,16 @@
   "{"
   "}"
 ] @punctuation.bracket
+
+; Optional record fields (`name? :: T;`) and open rows (`...`, `...r`)
+(optional_type_signature
+  name: (identifier) @variable.member)
+
+(optional_type_signature
+  "?" @punctuation.special)
+
+(row_tail
+  (ellipses) @punctuation.special)
+
+(row_tail
+  name: (identifier) @type.parameter)

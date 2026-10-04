@@ -35,7 +35,7 @@ module ParserLexer
   )
 where
 
-import Control.Monad (when)
+import Control.Monad (void, when)
 import Control.Monad.Reader (ReaderT, asks)
 import Data.Char (isAlphaNum, isLetter)
 import Data.Map.Strict (Map)
@@ -108,12 +108,12 @@ asVariable = lexeme . try $ do
   where
     terminator =
       choice
-        [ () <$ oneOf (".;,)]}=+*/<>!&|?:" :: String),
-          () <$ string "++",
-          () <$ string "-",
-          eof
+        [ void (oneOf (".;,)]}=+*/<>!&|?:" :: String)),
+          void (string "++"),
+          void (string "-"),
+          eof,
+          void (choice (map (\w -> string w <* notFollowedBy (satisfy identCont)) ["in", "then", "else", "or"]))
         ]
-        <|> () <$ choice (map (\w -> string w <* notFollowedBy (satisfy identCont)) ["in", "then", "else", "or"])
 
 -- | Parse a type-level identifier, where tnix's type keywords are reserved.
 typeIdentifier :: Parser Name

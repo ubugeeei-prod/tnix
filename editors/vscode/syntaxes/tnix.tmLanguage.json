@@ -1013,6 +1013,18 @@
             },
             {
               "include": "#type-field"
+            },
+            {
+              "comment": "open row: `...` or `...r`",
+              "match": "(\\.\\.\\.)([A-Za-z_][A-Za-z0-9_'\\-]*)?",
+              "captures": {
+                "1": {
+                  "name": "punctuation.separator.rest.tnix"
+                },
+                "2": {
+                  "name": "entity.name.type.parameter.tnix"
+                }
+              }
             }
           ]
         },
@@ -1072,7 +1084,7 @@
     },
     "type-field": {
       "name": "meta.type.field.tnix",
-      "begin": "(?:([A-Za-z_][A-Za-z0-9_'\\-]*)|(\"(?:[^\"\\\\]|\\\\.)*\"))\\s*(::)(?!:)",
+      "begin": "(?:([A-Za-z_][A-Za-z0-9_'\\-]*)|(\"(?:[^\"\\\\]|\\\\.)*\"))\\s*(\\?)?\\s*(::)(?!:)",
       "beginCaptures": {
         "1": {
           "name": "entity.other.attribute-name.tnix"
@@ -1081,6 +1093,9 @@
           "name": "string.quoted.double.tnix"
         },
         "3": {
+          "name": "keyword.operator.optional.tnix"
+        },
+        "4": {
           "name": "keyword.operator.type.annotation.tnix"
         }
       },

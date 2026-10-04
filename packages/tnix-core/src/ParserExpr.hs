@@ -12,9 +12,11 @@
 -- checker can report span-accurate diagnostics.
 module ParserExpr (expressionParser, programParser) where
 
+import Control.Monad (void)
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Either (lefts, rights)
 import Data.Functor (($>))
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Text qualified as Text
 import ParserLexer
 import ParserType
@@ -186,7 +188,7 @@ pipeParser = do
       _ <- try (symbol "<|")
       rest <- implParser
       more <- optional (pipeLeft rest)
-      pure (binary OpPipeLeft acc (maybe rest id more))
+      pure (binary OpPipeLeft acc (fromMaybe rest more))
 
 -- | Logical implication (`->`), right-associative and looser than `||`.
 implParser :: Parser Expr
@@ -367,8 +369,8 @@ pathExpr = lexeme $ try $ do
                     )
             )
     pathChar c = c `elem` ("._-+" :: String) || isPathAlnum c
-    segmentStart c = pathChar c
-    isPathAlnum c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+    segmentStart = pathChar
+    isPathAlnum c = isAsciiLower c || isAsciiUpper c || isDigit c
     mergeText = foldr merge []
     merge (StrText a) (StrText b : rest) = StrText (a <> b) : rest
     merge part rest = part : rest
@@ -500,7 +502,7 @@ patternParser =
         case before of
           Just _ -> pure Nothing
           Nothing -> optional (BinderAfter <$> (symbol "@" *> bindingIdentifier))
-      pure (PAttrSet fields open (maybe after Just before))
+      pure (PAttrSet fields open (before <|> after))
     patternBody = do
       items <- sepEndBy patternItem (symbol ",")
       pure (lefts items, any isRightItem items)
@@ -519,7 +521,7 @@ markCurrent parser = Marked <$> directiveForCurrentLine <*> parser
 -- (e.g. `-` vs `->`, `/` vs `//`, `<` vs `<|`).
 operator :: Text.Text -> String -> Parser ()
 operator op forbiddenNext =
-  () <$ lexeme (try (string op <* notFollowedBy (satisfy (`elem` forbiddenNext))))
+  void (lexeme (try (string op <* notFollowedBy (satisfy (`elem` forbiddenNext)))))
 
 binary :: BinOp -> Expr -> Expr -> Expr
 binary op left right =

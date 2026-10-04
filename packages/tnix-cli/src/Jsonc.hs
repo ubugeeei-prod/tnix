@@ -20,6 +20,7 @@ module Jsonc
   )
 where
 
+import Data.Bifunctor (first)
 import Data.Char (isDigit, isHexDigit, isSpace, ord)
 import Data.List qualified as List
 import Data.Text (Text)
@@ -56,7 +57,7 @@ data JsonEdit
 newtype P a = P {runP :: (Text, Bool) -> Either String (a, (Text, Bool))}
 
 instance Functor P where
-  fmap f (P p) = P $ \s -> fmap (\(a, s') -> (f a, s')) (p s)
+  fmap f (P p) = P $ fmap (first f) . p
 
 instance Applicative P where
   pure a = P $ \s -> Right (a, s)

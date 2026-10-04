@@ -30,7 +30,7 @@ spec = do
   describe "commandParser" $ do
     it "parses compile with output" $
       parse ["compile", "main.tnix", "-o", "dist/main.nix"]
-        `shouldBe` Just (Compile "main.tnix" (Just "dist/main.nix"))
+        `shouldBe` Just (Compile "main.tnix" (Just "dist/main.nix") False)
 
     it "parses check, emit, init, scaffold, and project commands" $ do
       parse ["check", "main.tnix"] `shouldBe` Just (Check "main.tnix" TextFormat)
@@ -90,7 +90,7 @@ spec = do
 
   describe "commandOutputPath" $
     it "tracks explicit destinations only for write commands" $ do
-      commandOutputPath (Compile "main.tnix" (Just "dist/main.nix")) `shouldBe` Just "dist/main.nix"
+      commandOutputPath (Compile "main.tnix" (Just "dist/main.nix") False) `shouldBe` Just "dist/main.nix"
       commandOutputPath (Emit "main.tnix" (Just "types/main.d.tnix")) `shouldBe` Just "types/main.d.tnix"
       commandOutputPath (Check "main.tnix" TextFormat) `shouldBe` Nothing
       commandOutputPath (Init Nothing []) `shouldBe` Nothing
@@ -105,7 +105,7 @@ spec = do
       commandOutputFormat (BuildProject Nothing JsonFormat) `shouldBe` Just JsonFormat
       commandOutputFormat (EmitProject Nothing JsonFormat) `shouldBe` Just JsonFormat
       commandOutputFormat (Version JsonFormat) `shouldBe` Just JsonFormat
-      commandOutputFormat (Compile "main.tnix" Nothing) `shouldBe` Nothing
+      commandOutputFormat (Compile "main.tnix" Nothing False) `shouldBe` Nothing
       commandOutputFormat (Init Nothing []) `shouldBe` Nothing
       commandOutputFormat (Lsp Nothing) `shouldBe` Nothing
 
@@ -135,7 +135,7 @@ spec = do
           )
         ]
         ( \root -> do
-            output <- executeCommand (Compile (root <> "/main.tnix") Nothing) >>= expectRight
+            output <- executeCommand (Compile (root <> "/main.tnix") Nothing False) >>= expectRight
             output `shouldBe` Text.stripEnd (source ["let", "  value = 1;", "in value"])
         )
 
@@ -176,7 +176,7 @@ spec = do
     it "surfaces driver failures without writing partial output" $
       withTempTree [("types.d.tnix", "declare \"./lib.nix\" { default :: Int; };")] $
         \root ->
-          executeCommand (Compile (root <> "/types.d.tnix") Nothing)
+          executeCommand (Compile (root <> "/types.d.tnix") Nothing False)
             >>= (`expectLeftContaining` "declaration-only")
 
     it "surfaces missing source files as user-facing errors" $

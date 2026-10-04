@@ -61,7 +61,7 @@ doctorChecks env selfVersion = do
   nixCheck <- checkNix
   pure (concat [tnixCheck, lspCheck, [projectCheck], editorChecks, [nixCheck]])
   where
-    run cmd args = ideRunProcess env cmd args
+    run = ideRunProcess env
     -- A missing or mismatched `tnix` on PATH only warns (the running binary
     -- may come from `nix run`); a missing or mismatched `tnix-lsp` breaks
     -- every editor integration, so it fails.

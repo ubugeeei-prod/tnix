@@ -43,7 +43,7 @@ module Ide
 where
 
 import Control.Exception (IOException, try)
-import Control.Monad (filterM, forM)
+import Control.Monad (filterM, forM, (>=>))
 import Data.Array (Array, listArray, (!))
 import Data.Char (isSpace, toLower)
 import Data.List (isPrefixOf)
@@ -168,10 +168,10 @@ defaultIdeEnv = do
   cwd <- getCurrentDirectory
   pure
     IdeEnv
-      { ideFindExecutable = \name -> findExecutable name >>= traverse makeAbsolute,
+      { ideFindExecutable = findExecutable >=> traverse makeAbsolute,
         ideRunProcess = runProcessWithTimeout,
         ideHome = home,
-        ideConfigHome = maybe (home </> ".config") id (nonEmpty xdg),
+        ideConfigHome = fromMaybe (home </> ".config") (nonEmpty xdg),
         ideAppData = nonEmpty appData,
         ideOs = SystemInfo.os,
         ideCwd = cwd

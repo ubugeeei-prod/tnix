@@ -23,8 +23,8 @@ import Control.Applicative ((<|>))
 import Control.Monad (foldM, forM, forM_, unless, void, when, zipWithM)
 import Control.Monad.State.Strict
 import Data.Functor (($>), (<&>))
-import Data.List (group, intercalate, isInfixOf, nub, sort)
 import Data.Graph (flattenSCC, stronglyConnComp)
+import Data.List (group, intercalate, isInfixOf, nub, sort)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, isJust)
@@ -141,7 +141,6 @@ checkProgramDetailed :: CheckContext -> Program -> Either CheckError CheckResult
 checkProgramDetailed ctx program =
   evalStateT (inferTop ctx (globalEnvironment ctx)) (InferState 0 Map.empty Set.empty)
   where
-
     inferTop local env = case programExpr program of
       Nothing -> pure (CheckResult Nothing Map.empty)
       Just markedExpr -> inferRootExpression local env markedExpr
@@ -586,7 +585,7 @@ inferLet ctx env items = do
       groups =
         stronglyConnComp
           [ (name, name, Set.toList (Set.intersection (exprFreeNames expr) (Set.fromList bindNames)))
-            | (name, expr, _) <- binds
+          | (name, expr, _) <- binds
           ]
   (finalEnv, inferredList) <- foldM (inferGroup unsigned bindMap) (baseEnv, []) (map flattenSCC groups)
   let finals = Map.fromList inferredList <> inherited
@@ -690,7 +689,7 @@ inferPatternBindings ctx env = \case
     let names = patternFieldNames patternFields <> maybe [] (pure . binderName) binder
         dups = duplicateNames names
     unless (null dups) (throwCheck (withCode TC0007DuplicatePatternBinding ("duplicate pattern bindings: " <> quoteNames dups)))
-    fieldTys <- traverse (\field -> maybe freshSoftMeta pure (patternFieldType field)) patternFields
+    fieldTys <- traverse (maybe freshSoftMeta pure . patternFieldType) patternFields
     rowTail <- freshMeta
     let markOptional field ty = if isJust (patternFieldDefault field) then TOptional ty else ty
         fields = Map.fromList [(patternFieldName field, markOptional field ty) | (field, ty) <- zip patternFields fieldTys]
@@ -704,8 +703,8 @@ inferPatternBindings ctx env = \case
         -- `x ? null` is Nix's idiom for "optional": it says nothing about the
         -- type of a supplied value, so it does not constrain the field.
         unless (isNullLiteral fallback) $ do
-        -- An unannotated defaulted argument takes the default's *widened*
-        -- type: `b ? 2` accepts any Int, not just the literal 2.
+          -- An unannotated defaulted argument takes the default's *widened*
+          -- type: `b ? 2` accepts any Int, not just the literal 2.
           let target = if isJust (patternFieldType field) then fallbackTy else widenLiterals fallbackTy
           void (constrain ctx target fieldTy)
     pure (argTy, patternEnv)
@@ -735,18 +734,14 @@ inferStaticSelect ctx ty field =
           _ -> inferStaticSelectKnown ctx resolvedTy base' field
 
 inferStaticSelectKnown :: CheckContext -> Type -> Type -> Name -> InferM Type
-inferStaticSelectKnown ctx resolvedTy base' field =
-       if base' == tAny
-          then pure tAny
-          else
-            if base' == tDynamic
-              then pure tDynamic
-              else
-                if base' == tUnknown
-                  then throwCheck (withCode TC0008SelectOnUnknown ("cannot select field " <> quoteName field <> " from unknown"))
-                  else case lookupRecordField (checkAliases ctx) resolvedTy field of
-                    Just fieldTy -> instantiate (schemeFromAnnotation fieldTy)
-                    Nothing -> throwCheck (withCode TC0009MissingField ("missing field " <> quoteName field <> " on " <> showType resolvedTy))
+inferStaticSelectKnown ctx resolvedTy base' field
+  | base' == tAny = pure tAny
+  | base' == tDynamic = pure tDynamic
+  | base' == tUnknown = throwCheck (withCode TC0008SelectOnUnknown ("cannot select field " <> quoteName field <> " from unknown"))
+  | otherwise =
+      case lookupRecordField (checkAliases ctx) resolvedTy field of
+        Just fieldTy -> instantiate (schemeFromAnnotation fieldTy)
+        Nothing -> throwCheck (withCode TC0009MissingField ("missing field " <> quoteName field <> " on " <> showType resolvedTy))
 
 inferDynamicSelect :: CheckContext -> Type -> Type -> InferM Type
 inferDynamicSelect ctx baseTy keyTy = do
@@ -759,7 +754,7 @@ inferDynamicSelect ctx baseTy keyTy = do
     _
       | base' == tAny || key' == tAny -> pure tAny
       | base' == tDynamic || key' == tDynamic || isMeta base' -> pure tDynamic
-      | Just valueTy <- attrsOfView base' -> constrain ctx resolvedKeyTy tString *> pure valueTy
+      | Just valueTy <- attrsOfView base' -> constrain ctx resolvedKeyTy tString $> valueTy
       | base' == tUnknown -> throwCheck (withCode TC0008SelectOnUnknown "cannot select dynamic field from unknown")
       | key' == tUnknown -> throwCheck (withCode TC0011DynamicKeyTypeMismatch "dynamic field selection expects a string-like key, but got unknown")
       | Just names <- selectionKeyNames key' ->
@@ -1042,16 +1037,16 @@ recordMismatchDetail aliases actual expected = do
   let open = actualTail == Just tDynamic || actualTail == Just tAny
       missing =
         [ name
-          | (name, ty) <- Map.toList expectedFields,
-            not (isOptionalField ty),
-            not (Map.member name actualFields),
-            not open
+        | (name, ty) <- Map.toList expectedFields,
+          not (isOptionalField ty),
+          not (Map.member name actualFields),
+          not open
         ]
       wrong =
         [ (name, unOptional a, unOptional e)
-          | (name, e) <- Map.toList expectedFields,
-            Just a <- [Map.lookup name actualFields],
-            not (isSubtype aliases (unOptional a) (unOptional e))
+        | (name, e) <- Map.toList expectedFields,
+          Just a <- [Map.lookup name actualFields],
+          not (isSubtype aliases (unOptional a) (unOptional e))
         ]
   case (missing, wrong) of
     (name : _, _) ->
@@ -1147,7 +1142,7 @@ unify ctx left right = do
     -- Rows unify field-wise on their common labels; each side's tail absorbs
     -- the labels only the other side has, sharing one fresh rest-row.
     unifyRows leftTy rightTy a ta b tb = do
-      _ <- sequence (Map.intersectionWith (unify ctx) a b)
+      sequence_ (Map.intersectionWith (unify ctx) a b)
       let onlyA = Map.difference a b
           onlyB = Map.difference b a
       case (ta, tb) of
@@ -1310,18 +1305,21 @@ inferRelational ctx env left right = do
         | otherwise = tString
   if gradual leftResolved || gradual rightResolved || (comparable leftResolved && comparable rightResolved)
     then pure tBool
-    else if isMeta leftResolved && comparable rightResolved
-      then constrain ctx leftTy (comparisonBase rightResolved) $> tBool
-    else if isMeta rightResolved && comparable leftResolved
-      then constrain ctx rightTy (comparisonBase leftResolved) $> tBool
-    else if hasUnresolvedMetas leftResolved rightResolved
-      then pure tBool
     else
-      throwCheck
-            ( withCode
-                TC0019NotComparable
-                ("cannot compare " <> showType leftResolved <> " with " <> showType rightResolved)
-            )
+      if isMeta leftResolved && comparable rightResolved
+        then constrain ctx leftTy (comparisonBase rightResolved) $> tBool
+        else
+          if isMeta rightResolved && comparable leftResolved
+            then constrain ctx rightTy (comparisonBase leftResolved) $> tBool
+            else
+              if hasUnresolvedMetas leftResolved rightResolved
+                then pure tBool
+                else
+                  throwCheck
+                    ( withCode
+                        TC0019NotComparable
+                        ("cannot compare " <> showType leftResolved <> " with " <> showType rightResolved)
+                    )
 
 -- | Boolean connectives (`&&`/`||`) require `Bool` operands and yield `Bool`.
 inferLogical :: CheckContext -> TypeEnv -> Expr -> Expr -> InferM Type
@@ -1349,22 +1347,22 @@ inferConcat ctx env left right = do
       if leftResolved == tDynamic || rightResolved == tDynamic
         then pure tDynamic
         else do
-         left' <- listIfMeta leftResolved
-         right' <- listIfMeta rightResolved
-         case (listElementType left', listElementType right') of
-          (Just leftElem, Just rightElem) -> do
-            leftElem' <- zonk leftElem
-            rightElem' <- zonk rightElem
-            if hasUnresolvedMetas leftElem' rightElem'
-              then tList <$> joinBranches ctx leftElem' rightElem'
-              else pure (tList (joinTypes aliases leftElem' rightElem'))
-          _ | hasUnresolvedMetas left' right' -> pure tDynamic
-          _ ->
-            throwCheck
-                  ( withCode
-                      TC0020NotConcatenable
-                      ("cannot concatenate " <> showType leftResolved <> " with " <> showType rightResolved)
-                  )
+          left' <- listIfMeta leftResolved
+          right' <- listIfMeta rightResolved
+          case (listElementType left', listElementType right') of
+            (Just leftElem, Just rightElem) -> do
+              leftElem' <- zonk leftElem
+              rightElem' <- zonk rightElem
+              if hasUnresolvedMetas leftElem' rightElem'
+                then tList <$> joinBranches ctx leftElem' rightElem'
+                else pure (tList (joinTypes aliases leftElem' rightElem'))
+            _ | hasUnresolvedMetas left' right' -> pure tDynamic
+            _ ->
+              throwCheck
+                ( withCode
+                    TC0020NotConcatenable
+                    ("cannot concatenate " <> showType leftResolved <> " with " <> showType rightResolved)
+                )
 
 -- | Attribute-set update (`//`) merges two record types, with the right-hand
 -- side overriding fields present on both. A gradual operand on either side

@@ -15,6 +15,7 @@ module Driver
     analyzeText,
     analyzeTextWith,
     compileFile,
+    compileFileUnchecked,
     compileFileWith,
     compileText,
     emitFileAs,
@@ -193,6 +194,16 @@ compileTextWith cache path input = do
 -- | Compile a file from disk.
 compileFile :: FilePath -> IO (Either String Text)
 compileFile path = newSupportCache >>= \cache -> compileFileWith cache path
+
+-- | Erase types without type-checking (like TypeScript's transpile-only
+-- mode): parse errors still fail, type errors do not.
+compileFileUnchecked :: FilePath -> IO (Either String Text)
+compileFileUnchecked path = do
+  inputResult <- readTextFile path
+  pure $ do
+    input <- inputResult
+    program <- parseText path input
+    either (Left . Text.unpack) Right (compileProgram program)
 
 -- | 'compileFile' reusing declaration support already loaded into @cache@.
 compileFileWith :: SupportCache -> FilePath -> IO (Either String Text)

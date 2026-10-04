@@ -48,6 +48,9 @@ jobs:
       - name: Validate release metadata
         run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/check-version-sync.ts
 
+      - name: Check the embedded builtins prelude is up to date
+        run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/generate-prelude.ts --check
+
   flake:
     name: Flake (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -202,6 +205,9 @@ jobs:
 
       - name: Check example projects
         run: nix develop --accept-flake-config --command cabal run tnix -- check-project ./examples --format json
+
+      - name: Check Nix syntax parity against nixpkgs
+        run: nix develop --accept-flake-config --command bash -c 'sh scripts/check-nix-parity.sh "$(cabal list-bin tnix)" 25 1000'
 
   vscode:
     name: VS Code Extension
@@ -391,6 +397,45 @@ jobs:
       - name: Check Neovim plugin
         run: nix develop --accept-flake-config --command nvim --headless -u NONE -c "lua vim.opt.runtimepath:append(vim.fn.getcwd() .. '/editors/neovim')" -l editors/neovim/test/config_spec.lua
 
+      - name: Check Neovim tree-sitter integration
+        run: nix develop --accept-flake-config --command sh scripts/test-neovim-treesitter.sh
+
+  tree-sitter:
+    name: Tree-sitter Grammar
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources (Blacksmith)
+        if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: useblacksmith/checkout@0647fdbab2614a5eb86d2971070e325060d91056 # v1
+        with:
+          persist-credentials: false
+
+      - name: Check out sources
+        if: ${{ !startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run grammar corpus tests
+        working-directory: editors/tree-sitter-tnix
+        run: nix develop --accept-flake-config --command tree-sitter test
+
+      - name: Parse the repository corpus without errors
+        working-directory: editors/tree-sitter-tnix
+        run: nix develop --accept-flake-config --command node scripts/parse-corpus.mjs
+
+      - name: Check editor queries are in sync and compile
+        working-directory: editors/tree-sitter-tnix
+        run: nix develop --accept-flake-config --command node scripts/sync-queries.mjs --check
+
   lint:
     name: Lint (formatters)
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
@@ -524,6 +569,7 @@ jobs:
       - vscode-integration
       - zed
       - neovim
+      - tree-sitter
       - lint
       - haskell-lint
     if: ${{ always() }}

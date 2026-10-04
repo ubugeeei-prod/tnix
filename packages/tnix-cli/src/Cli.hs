@@ -28,7 +28,7 @@ import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TextEncoding
 import Data.Text.IO qualified as TextIO
 import Doctor (doctorChecks, doctorSucceeded, renderDoctor, renderDoctorJson)
-import Driver (Analysis (..), SupportCache, analyzeFile, analyzeFileWith, compileFile, compileFileWith, emitFile, emitFileAsWith, newSupportCache)
+import Driver (Analysis (..), SupportCache, analyzeFile, analyzeFileWith, compileFile, compileFileUnchecked, compileFileWith, emitFile, emitFileAsWith, newSupportCache)
 import Ide (Editor (..), InstallOptions (..), Scope (..), defaultIdeEnv, defaultInstallOptions, editorFromName, listEditors, runInstall)
 import Options.Applicative
 import Pretty (renderScheme)
@@ -43,7 +43,7 @@ data OutputFormat
 
 -- | Supported subcommands.
 data Command
-  = Compile FilePath (Maybe FilePath)
+  = Compile FilePath (Maybe FilePath) Bool
   | Check FilePath OutputFormat
   | Emit FilePath (Maybe FilePath)
   | Init (Maybe FilePath) [Editor]
@@ -92,7 +92,11 @@ commandParser =
             <> showDefaultWith renderFormat
             <> metavar "text|json"
         )
-    compileP = Compile <$> fileArg <*> outputOpt
+    compileP =
+      Compile
+        <$> fileArg
+        <*> outputOpt
+        <*> switch (long "no-check" <> help "Erase types without type-checking (parse errors still fail)")
     checkP = Check <$> fileArg <*> formatOpt
     emitP = Emit <$> fileArg <*> outputOpt
     initP =
@@ -148,7 +152,7 @@ editorReader = eitherReader editorFromName
 commandOutputPath :: Command -> Maybe FilePath
 commandOutputPath cmd =
   case cmd of
-    Compile _ output -> output
+    Compile _ output _ -> output
     Emit _ output -> output
     Check _ _ -> Nothing
     Init _ _ -> Nothing
@@ -172,7 +176,7 @@ commandOutputFormat cmd =
     EmitProject _ format -> Just format
     Version format -> Just format
     Doctor format -> Just format
-    Compile _ _ -> Nothing
+    Compile{} -> Nothing
     Emit _ _ -> Nothing
     Init _ _ -> Nothing
     Scaffold _ -> Nothing
@@ -184,7 +188,8 @@ commandOutputFormat cmd =
 executeCommand :: Command -> IO (Either String Text)
 executeCommand cmd =
   case cmd of
-    Compile input _ -> compileFile input
+    Compile input _ False -> compileFile input
+    Compile input _ True -> compileFileUnchecked input
     Check input format -> do
       result <- analyzeFile input
       pure (renderSingleCheck input format result)

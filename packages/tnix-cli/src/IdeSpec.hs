@@ -6,6 +6,7 @@
 module IdeSpec (ideSpec) where
 
 import Control.Exception (bracket)
+import Data.Either (fromLeft)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
@@ -74,7 +75,7 @@ ideSpec = do
                      SetKey ["files.associations", "*.tnix"] (JString "tnix"),
                      SetKey ["files.associations", "*.d.tnix"] (JString "tnix")
                    ]
-      vscodeSettingsEdits Nothing `shouldSatisfy` all (not . isServerPath)
+      vscodeSettingsEdits Nothing `shouldSatisfy` (not . any isServerPath)
 
     it "targets the Zed language-server id from extension.toml" $
       zedSettingsEdits (Just "/bin/tnix-lsp")
@@ -176,7 +177,7 @@ ideSpec = do
       withFakeEnv [("cursor", "/bin/cursor")] (Map.fromList [("/bin/cursor", (ExitSuccess, "foo.bar\nUbugeeei.tnix\n"))]) $ \env _ -> do
         (_, steps) <- planInstall env (defaultInstallOptions Cursor)
         steps `shouldSatisfy` elem (StepOk "extension ubugeeei.tnix is already installed")
-        steps `shouldSatisfy` all (not . isRun)
+        steps `shouldSatisfy` (not . any isRun)
 
     it "explains how to install manually when the editor CLI is missing" $
       withFakeEnv [] Map.empty $ \env _ -> do
@@ -249,7 +250,7 @@ ideSpec = do
     it "fails when the extension install fails" $
       withFakeEnv [("code", "/bin/code")] (Map.fromList [("/bin/code", (ExitFailure 2, ""))]) $ \env _ -> do
         result <- runInstall env (defaultInstallOptions VSCode)
-        either id (const "") result `shouldSatisfy` (\err -> "exited with 2" `Text.isInfixOf` Text.pack err)
+        fromLeft "" result `shouldSatisfy` (\err -> "exited with 2" `Text.isInfixOf` Text.pack err)
 
   describe "doctor" $ do
     it "passes when tnix-lsp starts and matches the CLI version"
