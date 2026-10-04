@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="tnix: TypeScript-grade types for Nix, zero runtime">
+  <title>tnix: TypeScript-grade types for Nix, zero runtime</title>
+  <defs>
+    <linearGradient id="og-mark" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7EBAE4"/>
+      <stop offset="0.5" stop-color="#3B63E0"/>
+      <stop offset="1" stop-color="#2449B8"/>
+    </linearGradient>
+    <radialGradient id="og-glow" cx="980" cy="120" r="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3B63E0" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#3B63E0" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="og-hex" width="56" height="97" patternUnits="userSpaceOnUse" patternTransform="translate(0 0)">
+      <path d="M28 0 56 16.2v32.3L28 64.7 0 48.5V16.2zM28 64.7V97" fill="none" stroke="#22304D" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="#0A0F1C"/>
+  <rect width="1200" height="630" fill="url(#og-hex)" opacity="0.55"/>
+  <rect width="1200" height="630" fill="url(#og-glow)"/>
+
+  <g transform="translate(80 72) scale(1.25)">
+    <path d="M58 32 45 54.5H19L6 32 19 9.5h26z" fill="url(#og-mark)" stroke="url(#og-mark)" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M26.5 16.5v22.5q0 7.5 7.5 7.5h2.5M19.5 26.5h15" fill="none" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="45" cy="30.5" r="3.75" fill="#5FE0BC"/>
+    <circle cx="45" cy="43" r="3.75" fill="#5FE0BC"/>
+    <g fill="none" stroke="#F4F7FC" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M84 15.5v23.5q0 7.5 7.5 7.5h2M77.5 26.5h15"/>
+      <path d="M103 26.5v20M103 35q0-8.5 8.5-8.5t8.5 8.5v11.5"/>
+      <path d="M131 28v18.5"/>
+      <path d="M142.5 27l17 19.5M159.5 27l-17 19.5"/>
+    </g>
+    <circle cx="131" cy="17" r="3.9" fill="#F4F7FC"/>
+  </g>
+
+  <g font-family="Geist, 'Helvetica Neue', Helvetica, Arial, sans-serif" fill="#F4F7FC">
+    <text x="80" y="268" font-size="64" font-weight="700" letter-spacing="-1.5">TypeScript-grade types</text>
+    <text x="80" y="342" font-size="64" font-weight="700" letter-spacing="-1.5">for <tspan fill="#8DB4FF">Nix</tspan>. Zero runtime.</text>
+    <text x="80" y="404" font-size="28" font-weight="400" fill="#A3B0C7">Write .tnix, check it, ship plain .nix.</text>
+  </g>
+
+  <g transform="translate(80 452)">
+    <rect width="1040" height="104" rx="14" fill="#0B1220" stroke="#22304D"/>
+    <g font-family="'Geist Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="26">
+      <text x="32" y="46" xml:space="preserve"><tspan fill="#DCE6F8">greet </tspan><tspan fill="#F2B441">:: String -&gt; String;</tspan></text>
+      <text x="32" y="82" xml:space="preserve"><tspan fill="#DCE6F8">greet = name: </tspan><tspan fill="#5FE0BC">"Hello, ${name}!"</tspan><tspan fill="#8FA0BF">;</tspan></text>
+      <text x="1008" y="82" text-anchor="end" fill="#7F8DAA" font-size="22"># types erased at build</text>
+    </g>
+  </g>
+
+  <text x="1120" y="110" text-anchor="end" font-family="'Geist Mono', 'SF Mono', Menlo, monospace" font-size="24" fill="#8DB4FF">tnix.dev</text>
+</svg>

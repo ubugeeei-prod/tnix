@@ -40,9 +40,9 @@ tnix emit ./examples/main.tnix -o ./dist/main.d.tnix
 If you are using the published flake directly:
 
 ```bash
-nix run github:ubugeeei/tnix#tnix -- check ./main.tnix
-nix run github:ubugeeei/tnix#tnix -- compile ./main.tnix -o ./main.nix
-nix run github:ubugeeei/tnix#tnix -- emit ./main.tnix -o ./main.d.tnix
+nix run github:ubugeeei-prod/tnix#tnix -- check ./main.tnix
+nix run github:ubugeeei-prod/tnix#tnix -- compile ./main.tnix -o ./main.nix
+nix run github:ubugeeei-prod/tnix#tnix -- emit ./main.tnix -o ./main.d.tnix
 ```
 
 ## Scaffolding A Project
@@ -139,7 +139,7 @@ For flakes, the most reliable workflow today is to keep the runtime flake logic
 in `.nix` and use `.tnix` as a typed projection over the parts you want to
 check.
 
-Example adapted from [`dogfood/flake-surface.tnix`](../dogfood/flake-surface.tnix):
+Example adapted from [`dogfood/flake-surface.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/dogfood/flake-surface.tnix):
 
 ```tnix
 let
@@ -354,30 +354,32 @@ Today these directives are aimed at root expressions and `let` items.
 
 `tnix emit` turns a `.tnix` file into a `.d.tnix` API surface.
 
-Source:
+Source (`user.tnix`):
 
 ```tnix
 type User = { name :: String; };
 
 {
-  make = name: { inherit name; };
+  make = (name :: String): { inherit name; } as User;
 }
 ```
 
 Emitted declaration:
 
 ```tnix
-type User = { name :: String; };
-
-declare "./current-file.nix" {
-  default :: { make :: String -> User; };
+type User  = {
+  name :: String;
+};
+declare "./user.nix" {
+  make :: String %1 -> User;
 };
 ```
 
 The `declare` target is not a literal string: `tnix emit` derives it from the
 source path by replacing the `.tnix` extension with `.nix`, expressed relative
 to the emitted `.d.tnix` file's directory. So emitting `widget.tnix` produces
-`declare "./widget.nix" { … }`.
+`declare "./widget.nix" { … }`. The `%1 ->` arrow marks a function that uses its
+argument exactly once; see [Annotations and inference](./tutorial/annotations.md#functions-and-the-1-arrow).
 
 ## Suggested Learning Path
 
@@ -389,6 +391,7 @@ to the emitted `.d.tnix` file's directory. So emitting `widget.tnix` produces
 
 ## Next Docs
 
+- [Tutorial](./tutorial/index.md)
 - [Language Reference](./language-reference.md)
 - [Type System](./type-system.md)
 - [Language Design](./language-design.md)

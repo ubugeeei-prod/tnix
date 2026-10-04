@@ -16,6 +16,8 @@ pairLits = "pairLits"
 # edit-distance ("closest candidate") features. Do not "fix" these.
 mising = "mising"
 valeu = "valeu"
+# Deliberate typo in the docs landing page example of a missing-field error.
+nmae = "nmae"
 # Valid English variant used in a test description.
 unparseable = "unparseable"
 # Part of the fourmolu `indent-wheres` option name.

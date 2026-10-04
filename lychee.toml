@@ -10,6 +10,10 @@ include_verbatim = false
 # option takes one of "none", "anchor-only", "text-only", or "full".
 include_fragments = "none"
 
+# Root-relative links in docs pages (e.g. `/brand/tnix-logo.svg`) refer to
+# files that the docs site serves from docs/public.
+root_dir = "docs/public"
+
 # Skip mailto:, javascript:, and similar non-HTTP schemes.
 exclude_path = [
   "node_modules",

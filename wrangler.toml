@@ -1,0 +1,9 @@
+# Cloudflare Pages project for the tnix.dev documentation site.
+#
+# Build the site first (`vp run docs:build`), then deploy with
+#   vp run docs:deploy
+# which runs `wrangler pages deploy dist/docs --project-name tnix`.
+# See docs/docs-site.md for authentication and preview deployments.
+name = "tnix"
+pages_build_output_dir = "dist/docs"
+compatibility_date = "2026-10-01"

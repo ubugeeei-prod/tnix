@@ -75,7 +75,7 @@ type Element t = t extends List (infer a) ? a : t;
 `infer` introduces pattern variables inside the right-hand side of conditional types.
 
 ```tnix
-type ReturnOf f = f extends (_ -> infer r) ? r : dynamic;
+type ReturnOf f = f extends (infer a -> infer r) ? r : dynamic;
 ```
 
 ### 11. Indexed dependent-ish containers
@@ -202,16 +202,18 @@ Examples:
 - Use annotations on lambda parameters when present.
 - Use `let` annotations as checking boundaries.
 - Infer unannotated regions with meta variables.
-- Generalize at `let` bindings.
+- Generalize at `let` bindings. An unannotated binding becomes polymorphic for
+  code after its `let` group; inside the group, give it a `forall` signature.
+
+See [How Checking Works](./reference/type-system-internals.md) for the full
+algorithm.
 
 ### `import`
 
-`import ./foo.nix` is typed from workspace declarations:
-
-- `./foo.d.tnix`
-- `declare "./foo.nix" { ... }`
-
-If neither exists, the checker falls back to `dynamic`.
+`import ./foo.nix` is typed from a `declare "./foo.nix" { ... }` block, either
+inline in the importing file or in any `.d.tnix` file under the workspace root
+(conventionally `./foo.d.tnix` next to the module). If no declaration exists,
+the checker falls back to `dynamic`.
 
 Examples:
 
@@ -229,7 +231,10 @@ import ./missing.nix
 Attribute sets are modeled as `Record` types. Users should be able to annotate only the public surface they care about while still permitting additional fields.
 
 ```tnix
-{ name = "a"; version = "1"; } :: { name :: String; }
+let
+  pkg :: { name :: String; };
+  pkg = { name = "a"; version = "1"; };
+in pkg
 ```
 
 ## Type-class-like behavior
@@ -254,22 +259,33 @@ The emitter extracts only the public type surface from `.tnix`.
 - Any other root value is emitted as a `default`-style export.
 - Required type aliases are emitted alongside it.
 
-Examples:
+- The `declare` target is the compiled `.nix` path, relative to the emitted
+  declaration file.
+
+Example, for `user.tnix`:
 
 ```tnix
 type User = { name :: String; };
-{ make = name: { inherit name; }; }
+
+{
+  make = (name :: String): { inherit name; } as User;
+}
 ```
 
 Generated declaration:
 
 ```tnix
-type User = { name :: String; };
-
-declare "./current-file.nix" {
-  default :: { make :: String -> User; };
+type User  = {
+  name :: String;
+};
+declare "./user.nix" {
+  make :: String %1 -> User;
 };
 ```
+
+If the root is polymorphic (for example `{ make = name: { inherit name; }; }`,
+whose type is `forall t0. { make :: t0 %1 -> { name :: t0; }; }`), the whole
+root is emitted as a single `default` member with a `forall`.
 
 ## Future Work
 

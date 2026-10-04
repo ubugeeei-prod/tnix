@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="tnix">
+  <title>tnix</title>
+  <mask id="mm" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"/><path d="M26.5 16.5v22.5q0 7.5 7.5 7.5h2.5M19.5 26.5h15" fill="none" stroke="#000" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="45" cy="30.5" r="3.75" fill="#000"/><circle cx="45" cy="43" r="3.75" fill="#000"/></mask><path d="M58 32 45 54.5H19L6 32 19 9.5h26z" fill="#0E1525" stroke="#0E1525" stroke-width="6" stroke-linejoin="round" mask="url(#mm)"/>
+</svg>
