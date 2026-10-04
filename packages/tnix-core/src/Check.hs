@@ -231,7 +231,7 @@ inferExpr ctx env = \case
         | otherwise -> throwCheck (withCode TC0001UnboundName ("unbound name: " <> quoteName name))
   EString text -> pure (TLit (LString (stringLiteralText text)))
   EInterp _ parts -> do
-    mapM_ (\case StrExpr expr -> void (inferExpr ctx env expr); StrText _ -> pure ()) parts
+    mapM_ (\case StrExpr expr -> void (inferExpr ctx env expr); _ -> pure ()) parts
     pure tString
   EFloat n -> pure (TLit (LFloat n))
   EInt n -> pure (TLit (LInt n))
@@ -240,7 +240,7 @@ inferExpr ctx env = \case
   EPath _ -> pure tPath
   ESearchPath _ -> pure tPath
   EPathInterp parts -> do
-    mapM_ (\case StrExpr expr -> void (inferExpr ctx env expr); StrText _ -> pure ()) parts
+    mapM_ (\case StrExpr expr -> void (inferExpr ctx env expr); _ -> pure ()) parts
     pure tPath
   ELambda pattern' body -> do
     (argTy, patternEnv) <- inferPatternBindings ctx env pattern'
@@ -600,9 +600,14 @@ inferLet ctx env items = do
       results <- forM members $ \name -> do
         (expr, inlineDirective) <-
           maybe (throwCheck (withCode TC0017MissingPlaceholder ("internal: missing binding " <> show name))) pure (Map.lookup name bindMap)
-        expected <- case Map.lookup name groupEnv of
-          Just scheme -> instantiate scheme
-          Nothing -> throwCheck (withCode TC0017MissingPlaceholder ("internal: missing placeholder for binding " <> show name))
+        -- A signed binding is checked against its signature with the
+        -- quantified variables held *rigid* (skolemized): `forall a. a -> a`
+        -- must work for every `a`, so a body returning `1` is rejected.
+        -- Other bindings still use the signature polymorphically.
+        expected <- case (Map.lookup name (signaturesOf items), Map.lookup name groupEnv) of
+          (Just (Scheme _ signatureTy), _) -> pure signatureTy
+          (Nothing, Just scheme) -> instantiate scheme
+          (Nothing, Nothing) -> throwCheck (withCode TC0017MissingPlaceholder ("internal: missing placeholder for binding " <> show name))
         let directive = inlineDirective <|> Map.lookup name (sigDirectivesOf items)
         attempt <-
           catchInfer $ do
@@ -823,7 +828,7 @@ exprFreeNames = go
       _ -> Set.empty
     goPart = \case
       StrExpr e -> go e
-      StrText _ -> Set.empty
+      _ -> Set.empty
     goStep = \case
       SelectDynamic e -> go e
       SelectName _ -> Set.empty

@@ -343,9 +343,14 @@ spec = describe "parseProgram" $ do
     expectStringBody "'' ''${ ''" " ${ "
     expectStringBody "'' ''' ''" " '' "
     expectStringBody "'' ''\\' ''" " ' "
-    expectStringBody "'' ''\\n ''" " \n "
-    expectStringBody "'' ''\\t ''" " \t "
     expectStringBody "'' ''\\x ''" " x "
+
+  it "keeps whitespace escapes verbatim so indentation stripping is preserved" $ do
+    -- Nix computes the indentation to strip from literal lines only, so an
+    -- escaped newline must not be turned into a real one on output.
+    program <- expectRight (parseProgram "main.tnix" "'' a''\\nb ''\\t ''")
+    (markedValue <$> programExpr program)
+      `shouldBe` Just (EInterp InterpIndented [StrText " a", StrEscape 'n', StrText "b ", StrEscape 't', StrText " "])
 
   it "keeps an escaped antiquotation out of the interpolation parts" $ do
     program <- expectRight (parseProgram "main.tnix" "'' ''${value} ''")

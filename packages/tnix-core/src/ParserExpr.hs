@@ -387,7 +387,12 @@ doubleQuotedExpr =
 indentedExpr :: Parser Expr
 indentedExpr =
   mkStringExpr InterpIndented
-    <$> (string "''" *> many (interpPart <|> indentedTextPart) <* string "''")
+    <$> (string "''" *> many (interpPart <|> indentedEscape <|> indentedTextPart) <* string "''")
+
+-- | An `''\n`, `''\r`, or `''\t` escape, kept verbatim (see 'StrEscape').
+-- Any other `''\c` stands for the character itself and is read as text.
+indentedEscape :: Parser StringPart
+indentedEscape = StrEscape <$> try (string "''\\" *> oneOf ("nrt" :: String))
 
 -- | An antiquoted `${ expr }` segment shared by strings and paths.
 interpPart :: Parser StringPart
@@ -424,17 +429,8 @@ indentedChunk =
     <|> (try (string "''${") $> "${")
     <|> (try (string "''$") $> "$")
     <|> (try (string "'''") $> "''")
-    <|> (Text.singleton <$> (try (string "''\\") *> indentedEscapeChar))
+    <|> (Text.singleton <$> (try (string "''\\" <* notFollowedBy (oneOf ("nrt" :: String))) *> anySingle))
     <|> (Text.singleton <$> (notFollowedBy (string "${") *> notFollowedBy (string "''") *> anySingle))
-
--- | Decode the character following an `''\\` escape inside an indented string.
-indentedEscapeChar :: Parser Char
-indentedEscapeChar = decode <$> anySingle
-  where
-    decode 'n' = '\n'
-    decode 'r' = '\r'
-    decode 't' = '\t'
-    decode other = other
 
 -- | Collapse parsed segments into a plain 'EString' when there is no
 -- interpolation; otherwise keep the interpolated representation.
@@ -444,7 +440,7 @@ mkStringExpr form parts
   | otherwise = EInterp form parts
   where
     isText StrText{} = True
-    isText StrExpr{} = False
+    isText _ = False
     literalFor InterpDouble = DoubleQuoted
     literalFor InterpIndented = Indented
 

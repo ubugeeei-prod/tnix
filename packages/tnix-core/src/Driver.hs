@@ -59,7 +59,7 @@ import Kind
 import Parser
 import Pretty (renderExpr)
 import Syntax
-import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
+import System.Directory (doesDirectoryExist, doesFileExist, listDirectory, pathIsSymbolicLink)
 import System.FilePath (isAbsolute, joinPath, normalise, replaceExtension, splitDirectories, takeDirectory, (</>))
 import Type
 
@@ -504,22 +504,39 @@ findDeclarationFiles dir = do
         then findDeclarationFiles path
         else pure [normalise path | ".d.tnix" `isSuffixOf` name]
 
+-- | Find the `.d.tnix` files a workspace contributes.
+--
+-- Only a real workspace (one with a marker such as `tnix.config.tnix`,
+-- `flake.nix`, or `.git`) is searched recursively; a bare directory only
+-- contributes its own files, so running tnix in `$HOME` or a temp directory
+-- never walks an unbounded tree. Hidden directories, build outputs, and
+-- symlinked directories (e.g. Nix `result` links into the store) are skipped.
 findWorkspaceDeclarationFiles :: FilePath -> IO [FilePath]
-findWorkspaceDeclarationFiles root = go root
+findWorkspaceDeclarationFiles root = do
+  marked <- hasWorkspaceMarker root
+  go marked root
   where
-    go dir = do
+    go recursive dir = do
       names <- sort <$> listDirectory dir
       fmap concat $
         forM names $ \name -> do
           let path = dir </> name
           isDir <- doesDirectoryExist path
+          isLink <- pathIsSymbolicLink path
           if isDir
-            then do
-              nestedWorkspace <- if normalise path == normalise root then pure False else hasWorkspaceMarker path
-              if nestedWorkspace
+            then
+              if not recursive || isLink || ignoredDirectory name
                 then pure []
-                else go path
+                else do
+                  nestedWorkspace <- if normalise path == normalise root then pure False else hasWorkspaceMarker path
+                  if nestedWorkspace
+                    then pure []
+                    else go recursive path
             else pure [normalise path | ".d.tnix" `isSuffixOf` name]
+    ignoredDirectory name =
+      take 1 name == "."
+        || name `elem` ["node_modules", "dist-newstyle", "dist", "target", "result"]
+        || take 7 name == "result-"
 
 -- | Resolve an ambient declaration target.
 --

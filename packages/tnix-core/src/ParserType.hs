@@ -16,7 +16,7 @@ import Type
 
 -- | Entry point for type parsing.
 typeParser :: Parser Type
-typeParser = forallParser <|> conditionalParser
+typeParser = forallParser <|> (optional constraintContext *> conditionalParser)
 
 -- | Parse explicit universal quantification.
 forallParser :: Parser Type
@@ -25,6 +25,18 @@ forallParser = try $ do
   vars <- some typeIdentifier
   _ <- symbol "."
   TForall vars <$> typeParser
+
+-- | Parse a Haskell-style constraint context such as `Functor f =>` or
+-- `(Eq a, Show a) =>`.
+--
+-- Constraints are accepted so signatures can document the capabilities they
+-- rely on, but they are not enforced yet: tnix has no type classes, so the
+-- context is dropped after parsing.
+constraintContext :: Parser [Type]
+constraintContext = try $ do
+  constraints <- try (parens (sepBy1 appParser (symbol ","))) <|> (pure <$> appParser)
+  _ <- symbol "=>"
+  pure constraints
 
 -- | Parse conditional types of the form `A extends B ? C : D`.
 conditionalParser :: Parser Type

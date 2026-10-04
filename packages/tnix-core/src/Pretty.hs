@@ -152,6 +152,7 @@ prettyExpr p = \case
 prettyPathPart :: StringPart -> Doc ann
 prettyPathPart = \case
   StrText text -> pretty text
+  StrEscape c -> pretty (Text.pack ['\\', c])
   StrExpr expr -> "${" <> prettyExpr 0 expr <> "}"
 
 prettyLet :: LetItem -> Doc ann
@@ -222,7 +223,12 @@ prettyStringLiteral = \case
 prettyInterp :: InterpForm -> [StringPart] -> Doc ann
 prettyInterp form parts =
   let lastIndex = length parts - 1
-      body = hcat [prettyStringPart form (index == 0) (index == lastIndex) part | (index, part) <- zip [0 ..] parts]
+      -- A segment followed by an escape (`''\n`) borders a `''` just like
+      -- the closing delimiter, so it gets the same quote escaping.
+      bordersQuotes index = index == lastIndex || isEscape (drop (index + 1) parts)
+      isEscape (StrEscape _ : _) = True
+      isEscape _ = False
+      body = hcat [prettyStringPart form (index == 0) (bordersQuotes index) part | (index, part) <- zip [0 ..] parts]
    in case form of
         InterpDouble -> dquotes body
         InterpIndented -> "''" <> body <> "''"
@@ -245,6 +251,16 @@ prettyStringPart form atStart atEnd = \case
           InterpDouble -> pretty (escapeDoubleQuoted body) <> (if trailingDollar then "\\$" else mempty)
           InterpIndented -> verbatim (escapeIndented atStart (atEnd || trailingDollar) body) <> (if trailingDollar then "''$" else mempty)
   StrExpr expr -> "${" <> prettyExpr 0 expr <> "}"
+  StrEscape c ->
+    case form of
+      InterpIndented -> "''\\" <> pretty (Text.singleton c)
+      InterpDouble -> pretty (escapeDoubleQuoted (Text.singleton (decodeEscape c)))
+  where
+    decodeEscape = \case
+      'n' -> '\n'
+      'r' -> '\r'
+      't' -> '\t'
+      other -> other
 
 prettyType :: Int -> Type -> Doc ann
 prettyType p ty =

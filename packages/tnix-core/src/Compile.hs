@@ -44,7 +44,7 @@ eraseExpr expr =
 
 eraseStringPart :: StringPart -> StringPart
 eraseStringPart (StrExpr expr) = StrExpr (eraseExpr expr)
-eraseStringPart (StrText text) = StrText text
+eraseStringPart part = part
 
 erasePattern :: Pattern -> Pattern
 erasePattern (PVar name _) = PVar name Nothing

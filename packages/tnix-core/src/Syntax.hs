@@ -151,6 +151,10 @@ data InterpForm
 -- antiquoted @${expr}@ expression.
 data StringPart
   = StrText Text
+  | -- | An indented-string escape `''\c`, kept verbatim. Escaped newlines and
+    -- tabs must not become literal ones on output, because Nix computes the
+    -- indentation to strip from the literal lines only.
+    StrEscape Char
   | StrExpr Expr
   deriving (Eq, Show)
 
@@ -348,6 +352,7 @@ exprAnnotations = go
     goPart = \case
       StrExpr e -> go e
       StrText _ -> []
+      StrEscape _ -> []
     goStep = \case
       SelectDynamic e -> go e
       SelectName _ -> []
