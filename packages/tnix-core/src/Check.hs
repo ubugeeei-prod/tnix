@@ -71,7 +71,13 @@ data CheckError = CheckError
   }
   deriving (Eq, Show)
 
-data InferState = InferState {nextMeta :: Int, substitutions :: Map Int Type}
+-- | Inference state: the meta supply, solved metas, and the set of "soft"
+-- metas. A soft meta stands for an injected dependency whose real type is
+-- unknown and usually polymorphic (an attrset-pattern argument such as
+-- `fetchFromGitHub`, or a field selected from an unknown record such as
+-- `lib.mkOption`). Calling one is gradual rather than pinning it to the
+-- monotype of the first call site.
+data InferState = InferState {nextMeta :: Int, substitutions :: Map Int Type, softMetas :: Set.Set Int}
 
 type InferM = StateT InferState (Either CheckError)
 
@@ -133,7 +139,7 @@ checkProgram ctx = either (Left . checkErrorMessage) Right . checkProgramDetaile
 -- | Like 'checkProgram', but keeps the source span of the failure.
 checkProgramDetailed :: CheckContext -> Program -> Either CheckError CheckResult
 checkProgramDetailed ctx program =
-  evalStateT (inferTop ctx (globalEnvironment ctx)) (InferState 0 Map.empty)
+  evalStateT (inferTop ctx (globalEnvironment ctx)) (InferState 0 Map.empty Set.empty)
   where
 
     inferTop local env = case programExpr program of
@@ -261,14 +267,16 @@ inferExpr ctx env = \case
             _
               | definitelyNotCallable resolvedFunTy ->
                   throwCheck (withCode TC0018NotCallable ("cannot call " <> describeNonCallable resolvedFunTy <> " as a function"))
-              | otherwise -> do
-                  -- The callee is still unknown: its parameter type is
-                  -- inferred from this argument, widened so one call site's
-                  -- literal does not pin the parameter to a singleton.
-                  outTy <- freshMeta
-                  argTy' <- widenLiterals <$> zonk argTy
-                  _ <- unify ctx funTy (TFun Many argTy' outTy)
-                  zonk outTy
+              | TMeta n <- resolvedFunTy -> do
+                  soft <- isSoftMeta n
+                  if soft
+                    then do
+                      -- An injected dependency: stay gradual instead of
+                      -- fixing its type from this one call site.
+                      _ <- bindMeta n (TFun Many tDynamic tDynamic)
+                      pure tDynamic
+                    else applyUnknown ctx funTy argTy
+              | otherwise -> applyUnknown ctx funTy argTy
   EBinaryOp op left right -> inferBinaryOp ctx env op left right
   EUnaryOp OpNot operand -> do
     operandTy <- inferExpr ctx env operand
@@ -415,6 +423,22 @@ widenLiterals = \case
   other -> other
   where
     nubOrdTypes = Set.toList . Set.fromList
+
+isNullLiteral :: Expr -> Bool
+isNullLiteral expr =
+  case unloc expr of
+    ENull -> True
+    _ -> False
+
+-- | Apply a callee whose type is not known yet. Its parameter type is
+-- inferred from this argument, widened so one call site's literal does not
+-- pin the parameter to a singleton.
+applyUnknown :: CheckContext -> Type -> Type -> InferM Type
+applyUnknown ctx funTy argTy = do
+  outTy <- freshMeta
+  argTy' <- widenLiterals <$> zonk argTy
+  _ <- unify ctx funTy (TFun Many argTy' outTy)
+  zonk outTy
 
 -- | Recognize `import <path>` targets that can be resolved statically.
 importTarget :: Expr -> Maybe FilePath
@@ -661,7 +685,7 @@ inferPatternBindings ctx env = \case
     let names = patternFieldNames patternFields <> maybe [] (pure . binderName) binder
         dups = duplicateNames names
     unless (null dups) (throwCheck (withCode TC0007DuplicatePatternBinding ("duplicate pattern bindings: " <> quoteNames dups)))
-    fieldTys <- traverse (\field -> maybe freshMeta pure (patternFieldType field)) patternFields
+    fieldTys <- traverse (\field -> maybe freshSoftMeta pure (patternFieldType field)) patternFields
     rowTail <- freshMeta
     let markOptional field ty = if isJust (patternFieldDefault field) then TOptional ty else ty
         fields = Map.fromList [(patternFieldName field, markOptional field ty) | (field, ty) <- zip patternFields fieldTys]
@@ -672,10 +696,13 @@ inferPatternBindings ctx env = \case
     forM_ (zip patternFields fieldTys) $ \(field, fieldTy) ->
       forM_ (patternFieldDefault field) $ \fallback -> do
         fallbackTy <- inferExpr ctx (patternEnv <> env) fallback
+        -- `x ? null` is Nix's idiom for "optional": it says nothing about the
+        -- type of a supplied value, so it does not constrain the field.
+        unless (isNullLiteral fallback) $ do
         -- An unannotated defaulted argument takes the default's *widened*
         -- type: `b ? 2` accepts any Int, not just the literal 2.
-        let target = if isJust (patternFieldType field) then fallbackTy else widenLiterals fallbackTy
-        constrain ctx target fieldTy
+          let target = if isJust (patternFieldType field) then fallbackTy else widenLiterals fallbackTy
+          void (constrain ctx target fieldTy)
     pure (argTy, patternEnv)
   where
     binderName = \case
@@ -690,13 +717,13 @@ inferStaticSelect ctx ty field =
           -- Selecting from a not-yet-known value: record the requirement as an
           -- open row, so later selections extend it (row polymorphism).
           TMeta n -> do
-            fieldTy <- freshMeta
+            fieldTy <- freshSoftMeta
             rowTail <- freshMeta
             _ <- bindMeta n (TOpenRecord (Map.singleton field fieldTy) rowTail)
             pure fieldTy
           TOpenRecord fields (TMeta n)
             | not (Map.member field fields) -> do
-                fieldTy <- freshMeta
+                fieldTy <- freshSoftMeta
                 rowTail <- freshMeta
                 _ <- bindMeta n (TOpenRecord (Map.singleton field fieldTy) rowTail)
                 pure fieldTy
@@ -821,6 +848,18 @@ instantiate :: Scheme -> InferM Type
 instantiate (Scheme vars ty) = do
   reps <- traverse (const freshMeta) vars
   pure (substituteTypeVars (Map.fromList (zip vars reps)) ty)
+
+-- | Allocate a fresh soft meta (see 'InferState').
+freshSoftMeta :: InferM Type
+freshSoftMeta = do
+  meta <- freshMeta
+  case meta of
+    TMeta n -> modify' (\st -> st{softMetas = Set.insert n (softMetas st)})
+    _ -> pure ()
+  pure meta
+
+isSoftMeta :: Int -> InferM Bool
+isSoftMeta n = gets (Set.member n . softMetas)
 
 -- | Allocate a fresh inference meta variable.
 freshMeta :: InferM Type
@@ -947,6 +986,14 @@ constrain ctx actual expected = do
         Just expectedList <- sequenceListView expected' ->
           constrain ctx actual' expectedList
     (TMeta n, TMeta m) | n == m -> pure actual'
+    -- Passing a still-unknown value where *anything* (or any attribute set)
+    -- is accepted must not pin it to that top type: `builtins.hasAttr k x`
+    -- says nothing about the rest of `x`.
+    (TMeta _, TUnknown) -> pure expected'
+    (TMeta n, TApp (TCon "AttrsOf") TUnknown) -> do
+      rowTail <- freshMeta
+      _ <- bindMeta n (TOpenRecord Map.empty rowTail)
+      pure expected'
     (TMeta n, ty) -> bindMeta n ty
     (ty, TMeta n) -> bindMeta n ty
     (TTypeList xs, TTypeList ys)
@@ -1068,6 +1115,13 @@ unify ctx left right = do
     (TTypeList xs, TTypeList ys)
       | length xs == length ys ->
           TTypeList <$> zipWithM (unify ctx) xs ys
+    -- Two exact sequence shapes that disagree (a 1-element and a 3-element
+    -- list literal, say) meet at their common `List` view.
+    _
+      | Just leftList <- sequenceListView left',
+        Just rightList <- sequenceListView right',
+        hasUnresolvedMetas left' right' || not (isSubtype (checkAliases ctx) left' right' || isSubtype (checkAliases ctx) right' left') ->
+          unify ctx leftList rightList
     (TFun leftMult a b, TFun rightMult c d)
       | leftMult == rightMult ->
           TFun leftMult <$> unify ctx a c <*> unify ctx b d
@@ -1244,9 +1298,19 @@ inferRelational ctx env left right = do
       leftResolved = resolveType aliases leftTy
       rightResolved = resolveType aliases rightTy
       gradual ty = ty == tAny || ty == tDynamic
-      comparable ty = isSubtype aliases ty tNumber || isSubtype aliases ty tString
+      comparable ty = isSubtype aliases ty tNumber || isSubtype aliases ty tString || isSubtype aliases ty tPath
+      comparisonBase ty
+        | isSubtype aliases ty tNumber = tNumber
+        | isSubtype aliases ty tPath = tPath
+        | otherwise = tString
   if gradual leftResolved || gradual rightResolved || (comparable leftResolved && comparable rightResolved)
     then pure tBool
+    else if isMeta leftResolved && comparable rightResolved
+      then constrain ctx leftTy (comparisonBase rightResolved) $> tBool
+    else if isMeta rightResolved && comparable leftResolved
+      then constrain ctx rightTy (comparisonBase leftResolved) $> tBool
+    else if hasUnresolvedMetas leftResolved rightResolved
+      then pure tBool
     else
       throwCheck
             ( withCode
@@ -1279,8 +1343,17 @@ inferConcat ctx env left right = do
     else
       if leftResolved == tDynamic || rightResolved == tDynamic
         then pure tDynamic
-        else case (listElementType leftResolved, listElementType rightResolved) of
-          (Just leftElem, Just rightElem) -> pure (tList (joinTypes aliases leftElem rightElem))
+        else do
+         left' <- listIfMeta leftResolved
+         right' <- listIfMeta rightResolved
+         case (listElementType left', listElementType right') of
+          (Just leftElem, Just rightElem) -> do
+            leftElem' <- zonk leftElem
+            rightElem' <- zonk rightElem
+            if hasUnresolvedMetas leftElem' rightElem'
+              then tList <$> joinBranches ctx leftElem' rightElem'
+              else pure (tList (joinTypes aliases leftElem' rightElem'))
+          _ | hasUnresolvedMetas left' right' -> pure tDynamic
           _ ->
             throwCheck
                   ( withCode
@@ -1325,12 +1398,23 @@ inferUpdate ctx env left right = do
               | Just (leftFields, _) <- recordView left',
                 Just rightValue <- attrsOfView right' ->
                   pure (tAttrsOf (foldr (joinTypes aliases . unOptional) rightValue (Map.elems leftFields)))
+              -- A shape that is still partly unknown (say, a union with an
+              -- unsolved member) cannot be judged yet; stay gradual.
+              | hasUnresolvedMetas left' right' -> pure tDynamic
             _ ->
               throwCheck
                 ( withCode
                     TC0021NotUpdatable
                     ("cannot update " <> showType leftResolved <> " with " <> showType rightResolved)
                 )
+
+-- | A `++` operand whose type is still unknown must be a list.
+listIfMeta :: Type -> InferM Type
+listIfMeta = \case
+  TMeta n -> do
+    elemTy <- freshMeta
+    bindMeta n (tList elemTy)
+  other -> pure other
 
 -- | An attribute-set operand whose type is still unknown becomes an open row,
 -- so `//` can proceed and later uses refine it.
