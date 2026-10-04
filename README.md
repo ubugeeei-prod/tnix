@@ -92,19 +92,35 @@ the parser, checker, and compiler.
 
 ## Installation
 
-Install the CLI and language server from the published flake:
+On Linux and macOS, install the prebuilt CLI and language server with:
 
 ```bash
-nix profile install github:ubugeeei/tnix#tnix
-nix profile install github:ubugeeei/tnix#tnix-lsp
+curl -fsSL https://tnix.dev/install.sh | sh
 ```
 
-Or download the prebuilt archives attached to each GitHub release and place
-`tnix` / `tnix-lsp` somewhere on your `PATH`. Prebuilt archives ship for
-Linux x64 and macOS arm64 today; see [docs/support-matrix.md](./docs/support-matrix.md)
-for the full per-platform tier table. **Windows users:** the CLI is not tested
-on Windows. Use WSL2 with the Linux x64 instructions, or build from source
-through the flake on a Linux/macOS host.
+The installer picks the archive for your platform (Linux x64/arm64, macOS
+arm64/x64), verifies its SHA-256 checksum, and installs `tnix` and `tnix-lsp`
+into `~/.tnix/bin`. The binaries do not depend on Nix. Pin a release with
+`curl -fsSL https://tnix.dev/install.sh | TNIX_VERSION=0.5.0 sh`, choose
+another directory with `TNIX_INSTALL_DIR`, and remove everything with
+`curl -fsSL https://tnix.dev/install.sh | sh -s -- --uninstall`.
+
+With Nix, use the flake instead:
+
+```bash
+nix profile install github:ubugeeei-prod/tnix        # tnix + tnix-lsp
+nix run github:ubugeeei-prod/tnix -- check ./main.tnix
+```
+
+The flake also provides `overlays.default` and NixOS / nix-darwin / Home Manager
+modules (`programs.tnix.enable = true;`). See
+[docs/getting-started.md](./docs/getting-started.md#installation) for details.
+
+You can also download the archives (`tnix-<version>-<target>.tar.gz`, with
+`.sha256` checksums and build provenance attestations) from GitHub Releases.
+See [docs/support-matrix.md](./docs/support-matrix.md) for the per-platform
+tier table. **Windows users:** the CLI is not tested on Windows. Use WSL2 and
+run the install script there.
 
 Quick verification:
 

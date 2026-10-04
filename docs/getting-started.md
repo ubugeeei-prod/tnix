@@ -10,14 +10,79 @@
 
 If you already know Nix, the goal is that `tnix` feels like "Nix plus a type surface", not a different runtime language.
 
-## Supported Platforms
+## Installation
 
-Prebuilt `tnix` and `tnix-lsp` archives ship for Linux x64 and macOS arm64.
-Linux arm64 and macOS x64 are best-effort and build through the Nix flake on
-the target host. Windows is not tested today — use WSL2 with the Linux x64
-instructions, or build from source through the flake on a Linux/macOS host.
-See [support-matrix.md](./support-matrix.md) for the full per-platform tier
-table.
+### Install script (Linux, macOS)
+
+```bash
+curl -fsSL https://tnix.dev/install.sh | sh
+```
+
+The script detects your OS and CPU, downloads the matching release archive,
+verifies its SHA-256 checksum, and installs `tnix` and `tnix-lsp` into
+`~/.tnix/bin` (it prints the line to add to your shell profile if that
+directory is not on `PATH`). The binaries do not need Nix: Linux builds are
+fully static, and macOS builds only link system libraries.
+
+Options can be passed after `sh -s --`, or as environment variables:
+
+```bash
+# A specific release
+curl -fsSL https://tnix.dev/install.sh | sh -s -- --version 0.5.0   # or TNIX_VERSION=0.5.0
+# A custom install directory
+curl -fsSL https://tnix.dev/install.sh | TNIX_INSTALL_DIR="$HOME/.local/bin" sh
+# Uninstall
+curl -fsSL https://tnix.dev/install.sh | sh -s -- --uninstall
+```
+
+Re-running the script upgrades to the latest release.
+
+### Nix flake
+
+```bash
+# Install tnix and tnix-lsp into your profile
+nix profile install github:ubugeeei-prod/tnix
+
+# Or run without installing
+nix run github:ubugeeei-prod/tnix -- check ./main.tnix
+```
+
+The flake also exports `overlays.default` (adds `pkgs.tnix`, `pkgs.tnix-lsp`
+and `pkgs.tnix-toolchain`) and modules that install the toolchain with
+`programs.tnix.enable = true;`:
+
+```nix
+# flake.nix: inputs.tnix.url = "github:ubugeeei-prod/tnix";
+
+# NixOS (use tnix.darwinModules.default for nix-darwin)
+{ inputs, ... }:
+{
+  imports = [ inputs.tnix.nixosModules.default ];
+  programs.tnix.enable = true;
+}
+
+# Home Manager
+{ inputs, ... }:
+{
+  imports = [ inputs.tnix.homeManagerModules.default ];
+  programs.tnix.enable = true;
+}
+```
+
+### Supported platforms
+
+Prebuilt `tnix` and `tnix-lsp` archives ship for Linux x64, Linux arm64, macOS
+arm64 (Apple silicon), and macOS x64 (Intel). Other platforms can build from
+source through the Nix flake. Windows is not tested today. Use WSL2 and the
+Linux install script there. See [support-matrix.md](./support-matrix.md) for
+the full per-platform tier table.
+
+Check the install:
+
+```bash
+tnix --version
+tnix-lsp --version
+```
 
 ## First Commands
 
