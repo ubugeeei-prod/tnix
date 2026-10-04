@@ -10,9 +10,11 @@ module Cli
     commandOutputPath,
     commandParser,
     executeCommand,
+    ideInstallParser,
     lspCommandArgs,
     renderAnalysis,
     renderVersion,
+    runDoctor,
     writeOutput,
   )
 where
@@ -25,7 +27,9 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TextEncoding
 import Data.Text.IO qualified as TextIO
+import Doctor (doctorChecks, doctorSucceeded, renderDoctor, renderDoctorJson)
 import Driver (Analysis (..), SupportCache, analyzeFile, analyzeFileWith, compileFile, compileFileWith, emitFile, emitFileAsWith, newSupportCache)
+import Ide (Editor (..), InstallOptions (..), Scope (..), defaultIdeEnv, defaultInstallOptions, editorFromName, listEditors, runInstall)
 import Options.Applicative
 import Pretty (renderScheme)
 import Project
@@ -42,13 +46,16 @@ data Command
   = Compile FilePath (Maybe FilePath)
   | Check FilePath OutputFormat
   | Emit FilePath (Maybe FilePath)
-  | Init (Maybe FilePath)
+  | Init (Maybe FilePath) [Editor]
   | Scaffold (Maybe FilePath)
   | CheckProject (Maybe FilePath) OutputFormat
   | BuildProject (Maybe FilePath) OutputFormat
   | EmitProject (Maybe FilePath) OutputFormat
   | Version OutputFormat
   | Lsp (Maybe FilePath)
+  | IdeInstall InstallOptions
+  | IdeList
+  | Doctor OutputFormat
   deriving (Eq, Show)
 
 data PlannedWrite = PlannedWrite FilePath Text
@@ -69,6 +76,8 @@ commandParser =
         <> command "emit-project" (info emitProjectP (progDesc "Emit declaration files for every discovered project source file"))
         <> command "version" (info versionP (progDesc "Show the tnix version"))
         <> command "lsp" (info lspP (progDesc "Launch the tnix language server over stdio"))
+        <> command "ide" (info ideP (progDesc "Set up editor integrations (install, list)"))
+        <> command "doctor" (info doctorP (progDesc "Check the tnix toolchain, project, and editor setup"))
     )
   where
     fileArg = strArgument (metavar "FILE")
@@ -86,13 +95,54 @@ commandParser =
     compileP = Compile <$> fileArg <*> outputOpt
     checkP = Check <$> fileArg <*> formatOpt
     emitP = Emit <$> fileArg <*> outputOpt
-    initP = Init <$> dirArg
+    initP =
+      Init
+        <$> dirArg
+        <*> many
+          ( option
+              editorReader
+              ( long "editor"
+                  <> metavar "EDITOR"
+                  <> help "Also run `tnix ide install EDITOR` for the new project (repeatable)"
+              )
+          )
     scaffoldP = Scaffold <$> dirArg
     checkProjectP = CheckProject <$> dirArg <*> formatOpt
     buildProjectP = BuildProject <$> dirArg <*> formatOpt
     emitProjectP = EmitProject <$> dirArg <*> formatOpt
     versionP = Version <$> formatOpt
     lspP = Lsp <$> optional (strOption (long "log-file" <> metavar "PATH"))
+    ideP =
+      hsubparser
+        ( command "install" (info (IdeInstall <$> ideInstallParser) (progDesc "Install the tnix extension and write editor config"))
+            <> command "list" (info (pure IdeList) (progDesc "List supported editors and whether they are detected"))
+        )
+    doctorP = Doctor <$> formatOpt
+
+-- | Options for `tnix ide install`.
+ideInstallParser :: Parser InstallOptions
+ideInstallParser =
+  InstallOptions
+    <$> argument editorReader (metavar "vscode|cursor|vscodium|zed|neovim|helix")
+    <*> scopeP
+    <*> switch (long "dry-run" <> short 'n' <> help "Print the planned changes without touching anything")
+    <*> (not <$> switch (long "no-extension" <> help "Only write config; skip installing the editor extension"))
+    <*> switch (long "force" <> help "Rewrite files that cannot be merged safely, keeping a .bak backup")
+    <*> optional
+      ( strOption
+          ( long "lsp-path"
+              <> metavar "PATH"
+              <> help "tnix-lsp path to pin in editor settings (default: resolved from PATH; \"\" to leave unset)"
+          )
+      )
+  where
+    scopeP =
+      (ProjectScope <$> strOption (long "project" <> metavar "DIR" <> help "Write project settings under DIR (default: current directory)"))
+        <|> flag' GlobalScope (long "global" <> short 'g' <> help "Write user-level settings instead of project settings")
+        <|> pure DefaultScope
+
+editorReader :: ReadM Editor
+editorReader = eitherReader editorFromName
 
 -- | Extract the explicit destination path carried by a command, if any.
 commandOutputPath :: Command -> Maybe FilePath
@@ -101,13 +151,16 @@ commandOutputPath cmd =
     Compile _ output -> output
     Emit _ output -> output
     Check _ _ -> Nothing
-    Init _ -> Nothing
+    Init _ _ -> Nothing
     Scaffold _ -> Nothing
     CheckProject _ _ -> Nothing
     BuildProject _ _ -> Nothing
     EmitProject _ _ -> Nothing
     Version _ -> Nothing
     Lsp _ -> Nothing
+    IdeInstall _ -> Nothing
+    IdeList -> Nothing
+    Doctor _ -> Nothing
 
 -- | Extract the requested machine-readable output format, if a command has one.
 commandOutputFormat :: Command -> Maybe OutputFormat
@@ -118,11 +171,14 @@ commandOutputFormat cmd =
     BuildProject _ format -> Just format
     EmitProject _ format -> Just format
     Version format -> Just format
+    Doctor format -> Just format
     Compile _ _ -> Nothing
     Emit _ _ -> Nothing
-    Init _ -> Nothing
+    Init _ _ -> Nothing
     Scaffold _ -> Nothing
     Lsp _ -> Nothing
+    IdeInstall _ -> Nothing
+    IdeList -> Nothing
 
 -- | Execute one CLI command and return the rendered text payload.
 executeCommand :: Command -> IO (Either String Text)
@@ -133,13 +189,52 @@ executeCommand cmd =
       result <- analyzeFile input
       pure (renderSingleCheck input format result)
     Emit input _ -> emitFile input
-    Init target -> initProject target
+    Init target editors -> initWithEditors target editors
     Scaffold target -> scaffoldProject target
     CheckProject target format -> executeProjectCheck target format
     BuildProject target format -> executeProjectBuild target format
     EmitProject target format -> executeProjectEmit target format
     Version format -> pure (Right (renderVersion "unknown" format))
     Lsp _ -> pure (Left "tnix lsp must be launched by the executable entry point")
+    IdeInstall opts -> defaultIdeEnv >>= \env -> runInstall env opts
+    IdeList -> defaultIdeEnv >>= fmap Right . listEditors
+    Doctor format -> do
+      (_, report) <- runDoctor "unknown" False format
+      pure (Right report)
+
+-- | Run `tnix doctor`, returning whether it passed and the rendered report.
+runDoctor :: Text -> Bool -> OutputFormat -> IO (Bool, Text)
+runDoctor version color format = do
+  env <- defaultIdeEnv
+  checks <- doctorChecks env version
+  pure
+    ( doctorSucceeded checks,
+      case format of
+        TextFormat -> renderDoctor color checks
+        JsonFormat -> renderDoctorJson cliSchemaVersion checks
+    )
+
+-- | `tnix init`, optionally chaining into `tnix ide install` for each editor.
+-- Editors with project settings are configured inside the new project;
+-- Neovim keeps its user-level default.
+initWithEditors :: Maybe FilePath -> [Editor] -> IO (Either String Text)
+initWithEditors target editors = do
+  initResult <- initProject target
+  case initResult of
+    Left err -> pure (Left err)
+    Right summary -> go [summary] editors
+  where
+    go acc [] = pure (Right (Text.intercalate "\n" (reverse acc)))
+    go acc (editor : rest) = do
+      env <- defaultIdeEnv
+      let scope = case (editor, target) of
+            (Neovim, _) -> DefaultScope
+            (_, Just dir) -> ProjectScope dir
+            (_, Nothing) -> DefaultScope
+      result <- runInstall env ((defaultInstallOptions editor){installScope = scope})
+      case result of
+        Left err -> pure (Left (Text.unpack (Text.intercalate "\n" (reverse acc)) <> "\n" <> err))
+        Right report -> go (report : acc) rest
 
 -- | Pretty-print the inferred root and bindings for `tnix check`.
 renderAnalysis :: Analysis -> Text

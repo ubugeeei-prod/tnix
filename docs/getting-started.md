@@ -45,6 +45,9 @@ nix run github:ubugeeei/tnix#tnix -- compile ./main.tnix -o ./main.nix
 nix run github:ubugeeei/tnix#tnix -- emit ./main.tnix -o ./main.d.tnix
 ```
 
+To set up an editor, run `tnix ide install vscode` (or `cursor`, `vscodium`,
+`zed`, `neovim`, `helix`), then `tnix doctor`. See [Editor Setup](./editors.md).
+
 ## Scaffolding A Project
 
 `tnix init` creates a starter project in the target directory:
@@ -389,6 +392,7 @@ to the emitted `.d.tnix` file's directory. So emitting `widget.tnix` produces
 
 ## Next Docs
 
+- [Editor Setup](./editors.md)
 - [Language Reference](./language-reference.md)
 - [Type System](./type-system.md)
 - [Language Design](./language-design.md)

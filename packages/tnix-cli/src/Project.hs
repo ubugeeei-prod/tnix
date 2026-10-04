@@ -348,7 +348,9 @@ decodeAttrSet = \case
             fmap Map.fromList $
               forM items $ \case
                 AttrField name expr -> pure (name, expr)
-                AttrInherit _ -> Left "tnix.config.tnix does not support inherit in the root attrset"
+                -- Catch-all so new attribute forms (inherit-from, dotted
+                -- paths) are rejected rather than crashing the decoder.
+                _ -> Left "tnix.config.tnix does not support inherit in the root attrset; use plain `name = value;` fields"
   _ -> Left "tnix.config.tnix must evaluate to an attrset"
 
 decodeStringField :: Expr -> Either String Text

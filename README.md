@@ -115,6 +115,21 @@ tnix check ./examples/main.tnix
 tnix check-project ./examples
 ```
 
+### Editor setup
+
+One command installs the editor extension and writes the editor config:
+
+```bash
+tnix ide install vscode     # or: cursor, vscodium, zed, neovim, helix
+tnix ide install zed --global --dry-run   # preview user-level changes
+tnix ide list               # supported editors and what is detected
+tnix doctor                 # check tnix / tnix-lsp / project / editor wiring
+```
+
+Settings are merged, never clobbered, and re-running is a no-op. See
+[docs/editors.md](./docs/editors.md) for what each editor gets and for every
+flag.
+
 For local development, enter the reproducible shell first:
 
 ```bash
