@@ -1,37 +1,49 @@
-# Common `nixpkgs.lib` surface aliases.
+# Types for nixpkgs `lib` (https://github.com/NixOS/nixpkgs/tree/master/lib).
 #
-# This file is intentionally alias-only so projects can reuse the names from
-# their own `declare "./some-file.nix"` blocks without having to match one
-# exact upstream path layout.
+# This pack is alias-only: it declares *types*, not files. Connect it to a
+# value with your own `declare` block or annotation, for example
+#
+#   declare "./nix/lib.nix" { default :: NixpkgsLib; };
+#   { lib :: NixpkgsLib, ... }: lib.mapAttrs (name: value: value + 1) { a = 1; }
+#
+# Every sub-library is available both nested (`lib.attrsets.mapAttrs`) and at
+# the top level (`lib.mapAttrs`), matching what nixpkgs re-exports. All library
+# records are open (`...`), so members that are not listed here are `dynamic`
+# instead of an error. Signatures follow nixpkgs 26.11; `dynamic` is used only
+# where a member is genuinely untypable (deep recursion, overloads on runtime
+# shape, module-system internals).
+#
+# This file is self-contained. The other packs in `registry/ecosystem/` build
+# on it (`nixpkgs-pkgs`, `nixos-modules`, `flake-ecosystem`, ...), so load the
+# whole directory through `declarationPacks`.
+#
+# Checker notes that shaped these signatures:
+# - Aliases must not form cycles through more than one field (e.g. a package
+#   set containing itself twice): recursive aliases are unrolled eagerly, so a
+#   branching cycle explodes. That is why `override`, `pkgsStatic`, `extend`
+#   and friends return `NixpkgsDerivationCore` / `dynamic`.
+# - Option types carry their value type in the *contravariant* `check` field,
+#   so `mkOption { type = types.int; default = "x"; }` is rejected while
+#   `default = 8080` is accepted (the default may be a literal subtype).
 
+# --- Basic shapes ------------------------------------------------------------
+
+# Any attribute set. Fields selected from it are `dynamic`.
+type NixpkgsAttrs = { ... };
+
+# Systems nixpkgs builds for. Positions that *produce* a system use this union;
+# positions that *accept* one take `String` so `builtins.currentSystem` works.
 type NixpkgsSystem =
-  "aarch64-linux"
+  "x86_64-linux"
+  | "aarch64-linux"
+  | "x86_64-darwin"
   | "aarch64-darwin"
-  | "x86_64-linux"
-  | "x86_64-darwin";
-
-type NixpkgsLicense = {
-  shortName :: String;
-  fullName :: String | Null;
-  free :: Bool | Null;
-  redistributable :: Bool | Null;
-};
-
-type NixpkgsMaintainer = {
-  name :: String | Null;
-  email :: String | Null;
-  github :: String | Null;
-  githubId :: Int | Null;
-};
-
-type NixpkgsMeta = {
-  description :: String | Null;
-  homepage :: String | List String | Null;
-  license :: NixpkgsLicense | List NixpkgsLicense | dynamic;
-  maintainers :: List NixpkgsMaintainer | dynamic;
-  platforms :: List NixpkgsSystem | dynamic;
-  broken :: Bool | Null;
-};
+  | "armv6l-linux"
+  | "armv7l-linux"
+  | "i686-linux"
+  | "powerpc64le-linux"
+  | "riscv64-linux"
+  | "x86_64-freebsd";
 
 type NixpkgsNameValuePair a = {
   name :: String;
@@ -43,94 +55,1688 @@ type NixpkgsMapper a b = a -> b;
 type NixpkgsNamedMapper a b = String -> a -> b;
 type NixpkgsFolder a b = a -> b -> a;
 
-type NixpkgsListsLib = {
-  map :: forall a b. NixpkgsMapper a b -> List a -> List b;
-  filter :: forall a. NixpkgsPredicate a -> List a -> List a;
-  foldl' :: forall a b. NixpkgsFolder a b -> a -> List b -> a;
-  any :: forall a. NixpkgsPredicate a -> List a -> Bool;
-  all :: forall a. NixpkgsPredicate a -> List a -> Bool;
-  concatMap :: forall a b. NixpkgsMapper a (List b) -> List a -> List b;
-  flatten :: dynamic -> List dynamic;
-  length :: forall a. List a -> Int;
-  head :: forall a. List a -> a;
-  tail :: forall a. List a -> List a;
-  singleton :: forall a. a -> List a;
-  optional :: forall a. Bool -> a -> List a;
-  optionals :: forall a. Bool -> List a -> List a;
-  findFirst :: forall a. NixpkgsPredicate a -> a -> List a -> a;
-  findFirstIndex :: forall a b. NixpkgsPredicate a -> b -> List a -> Int | b;
-  unique :: forall a. List a -> List a;
-  genList :: forall a. (Int -> a) -> Int -> List a;
+# `final: prev: { ... }` — overlays, scope extensions, `lib.extends`.
+type NixpkgsExtension = dynamic -> dynamic -> NixpkgsAttrs;
+
+type NixpkgsFileType = "directory" | "regular" | "symlink" | "unknown";
+
+# --- Licenses, maintainers, meta ---------------------------------------------
+
+type NixpkgsLicense = {
+  shortName :: String;
+  fullName? :: String;
+  spdxId? :: String;
+  url? :: String;
+  free? :: Bool;
+  redistributable? :: Bool;
+  deprecated? :: Bool;
+  ...
 };
 
+type NixpkgsMaintainer = {
+  name? :: String;
+  email? :: String;
+  github? :: String;
+  githubId? :: Int;
+  matrix? :: String;
+  keys? :: List { fingerprint :: String; };
+  ...
+};
+
+type NixpkgsTeam = {
+  members :: List NixpkgsMaintainer;
+  scope? :: String;
+  shortName? :: String;
+  githubTeams? :: List String;
+  ...
+};
+
+type NixpkgsMeta = {
+  description? :: String;
+  longDescription? :: String;
+  homepage? :: String | List String;
+  downloadPage? :: String;
+  changelog? :: String | List String;
+  license? :: NixpkgsLicense | List NixpkgsLicense | String;
+  maintainers? :: List NixpkgsMaintainer;
+  teams? :: List NixpkgsAttrs;
+  mainProgram? :: String;
+  platforms? :: List (String | NixpkgsAttrs);
+  badPlatforms? :: List (String | NixpkgsAttrs);
+  hydraPlatforms? :: List (String | NixpkgsAttrs);
+  broken? :: Bool;
+  priority? :: Int;
+  outputsToInstall? :: List String;
+  knownVulnerabilities? :: List String;
+  sourceProvenance? :: List NixpkgsAttrs;
+  pkgConfigModules? :: List String;
+  position? :: String;
+  available? :: Bool;
+  unfree? :: Bool;
+  insecure? :: Bool;
+  timeout? :: Int;
+  ...
+};
+
+# --- Platforms and derivations -----------------------------------------------
+
+# `stdenv.hostPlatform`, `lib.systems.elaborate "x86_64-linux"`, ...
+type NixpkgsPlatform = {
+  system :: String;
+  config :: String;
+  parsed :: dynamic;
+  libc :: String;
+  linker :: String;
+  isLinux :: Bool;
+  isDarwin :: Bool;
+  isFreeBSD :: Bool;
+  isOpenBSD :: Bool;
+  isWindows :: Bool;
+  isCygwin :: Bool;
+  isUnix :: Bool;
+  isMacOS :: Bool;
+  isiOS :: Bool;
+  isAndroid :: Bool;
+  isWasm :: Bool;
+  isWasi :: Bool;
+  isAarch64 :: Bool;
+  isAarch32 :: Bool;
+  isAarch :: Bool;
+  isx86_64 :: Bool;
+  isx86_32 :: Bool;
+  isx86 :: Bool;
+  isRiscV :: Bool;
+  isRiscV64 :: Bool;
+  isPower64 :: Bool;
+  isMips :: Bool;
+  isLoongArch64 :: Bool;
+  is64bit :: Bool;
+  is32bit :: Bool;
+  isMusl :: Bool;
+  isGnu :: Bool;
+  isStatic :: Bool;
+  isLittleEndian :: Bool;
+  isBigEndian :: Bool;
+  uname :: {
+    system :: String | Null;
+    processor :: String;
+    release :: String | Null;
+  };
+  extensions :: {
+    sharedLibrary :: String;
+    staticLibrary :: String;
+    library :: String;
+    executable :: String;
+    ...
+  };
+  darwinMinVersion? :: String;
+  darwinSdkVersion? :: String;
+  emulator :: dynamic;
+  canExecute :: dynamic;
+  emulatorAvailable :: dynamic;
+  rust :: dynamic;
+  ...
+};
+
+# The fields every derivation-shaped value has; what builder inputs accept and
+# what `override*` return. Deliberately small (no `meta`): it is expanded
+# wherever it is used, and other fields are still reachable as `dynamic`.
+type NixpkgsDerivationCore = {
+  type :: "derivation";
+  name :: String;
+  outPath :: String;
+  drvPath :: String;
+  pname? :: String;
+  version? :: String;
+  ...
+};
+
+# A package from nixpkgs or `stdenv.mkDerivation`.
+type NixpkgsDerivation = {
+  type :: "derivation";
+  name :: String;
+  outPath :: String;
+  drvPath :: String;
+  system :: String;
+  outputName :: String;
+  outputs :: List String;
+  pname? :: String;
+  version? :: String;
+  meta :: NixpkgsMeta;
+  passthru? :: NixpkgsAttrs;
+  drvAttrs :: NixpkgsAttrs;
+  override :: dynamic -> NixpkgsDerivationCore;
+  overrideAttrs :: dynamic -> NixpkgsDerivationCore;
+  overrideDerivation :: (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsDerivationCore;
+  ...
+};
+
+# What `src`, `patches` and friends accept: a path, a store-path string, a
+# fetcher result, or a `lib.sources` / `lib.fileset.toSource` value.
+type NixpkgsSourceLike = Path | String | { outPath :: String | Path; ... };
+
+type NixpkgsCleanSource = {
+  outPath :: String | Path;
+  origSrc :: Path;
+  filter :: String -> String -> Bool;
+  name :: String;
+  ...
+};
+
+type NixpkgsFileset = {
+  _type :: "fileset";
+  ...
+};
+type NixpkgsFilesetLike = NixpkgsFileset | Path;
+type NixpkgsFilesetFile = {
+  name :: String;
+  type :: NixpkgsFileType;
+  hasExt :: String -> Bool;
+  ...
+};
+
+# `lib.makeExtensible` / `lib.makeScope` results.
+type NixpkgsExtensible = {
+  extend :: NixpkgsExtension -> NixpkgsAttrs;
+  __unfix__ :: dynamic;
+  ...
+};
+
+type NixpkgsScope = {
+  callPackage :: dynamic -> NixpkgsAttrs -> dynamic;
+  callPackages :: dynamic -> NixpkgsAttrs -> dynamic;
+  newScope :: NixpkgsAttrs -> dynamic -> NixpkgsAttrs -> dynamic;
+  overrideScope :: NixpkgsExtension -> NixpkgsAttrs;
+  packages :: dynamic;
+  ...
+};
+
+type NixpkgsExtendMkDerivationArgs = {
+  constructDrv :: dynamic;
+  extendDrvArgs :: dynamic -> dynamic -> NixpkgsAttrs;
+  excludeDrvArgNames? :: List String;
+  excludeFunctionArgNames? :: List String;
+  inheritFunctionArgs? :: Bool;
+  transformDrv? :: dynamic;
+};
+
+# --- Module system -----------------------------------------------------------
+
+# An option type such as `lib.types.str`. The parameter is the type of values
+# the option holds; it lives in `check` so it is contravariant (see header).
+type NixpkgsOptionType a = {
+  _type :: "option-type";
+  name :: String;
+  description :: String | Null;
+  descriptionClass :: String | Null;
+  check :: a -> Bool;
+  merge :: dynamic;
+  emptyValue :: dynamic;
+  getSubOptions :: dynamic;
+  getSubModules :: dynamic;
+  substSubModules :: dynamic;
+  typeMerge :: dynamic;
+  functor :: dynamic;
+  nestedTypes :: dynamic;
+  deprecationMessage :: String | Null;
+};
+
+type NixpkgsMkOptionTypeArgs a = {
+  name :: String;
+  description? :: String | Null;
+  descriptionClass? :: String | Null;
+  check? :: a -> Bool;
+  merge? :: dynamic;
+  emptyValue? :: dynamic;
+  getSubOptions? :: dynamic;
+  getSubModules? :: dynamic;
+  substSubModules? :: dynamic;
+  typeMerge? :: dynamic;
+  functor? :: dynamic;
+  nestedTypes? :: dynamic;
+  deprecationMessage? :: String | Null;
+};
+
+# `lib.literalExpression "pkgs.hello"`, `lib.literalMD "..."`.
+type NixpkgsLiteral = {
+  _type :: "literalExpression" | "literalMD" | "literalCode";
+  text :: String;
+  ...
+};
+
+type NixpkgsMkOptionArgs a = {
+  type? :: NixpkgsOptionType a;
+  default? :: a;
+  defaultText? :: String | NixpkgsLiteral;
+  example? :: dynamic;
+  description? :: String | NixpkgsLiteral;
+  relatedPackages? :: List dynamic;
+  apply? :: a -> dynamic;
+  internal? :: Bool;
+  visible? :: Bool | "shallow" | "transparent";
+  readOnly? :: Bool;
+};
+
+# The value `mkOption` returns (an option declaration).
+type NixpkgsOption a = {
+  _type :: "option";
+  type? :: NixpkgsOptionType a;
+  default? :: a;
+  description? :: String | NixpkgsLiteral;
+  ...
+};
+
+type NixpkgsMkPackageOptionArgs = {
+  nullable? :: Bool;
+  default? :: String | List String | Null;
+  example? :: String | List String | Null;
+  extraDescription? :: String;
+  pkgsText? :: String;
+};
+
+type NixpkgsOptionDefinition = {
+  file :: String | Path;
+  value :: dynamic;
+  ...
+};
+
+type NixpkgsSubmoduleWithArgs = {
+  modules :: List dynamic;
+  specialArgs? :: NixpkgsAttrs;
+  shorthandOnlyDefinesConfig? :: Bool;
+  description? :: String | Null;
+  class? :: String | Null;
+};
+
+type NixpkgsIntOptionTypes = {
+  between :: Int -> Int -> NixpkgsOptionType Int;
+  unsigned :: NixpkgsOptionType Int;
+  positive :: NixpkgsOptionType Int;
+  u8 :: NixpkgsOptionType Int;
+  u16 :: NixpkgsOptionType Int;
+  u32 :: NixpkgsOptionType Int;
+  s8 :: NixpkgsOptionType Int;
+  s16 :: NixpkgsOptionType Int;
+  s32 :: NixpkgsOptionType Int;
+  ...
+};
+
+type NixpkgsNumberOptionTypes = {
+  between :: Number -> Number -> NixpkgsOptionType Number;
+  nonnegative :: NixpkgsOptionType Number;
+  positive :: NixpkgsOptionType Number;
+  ...
+};
+
+# Values produced by `mkIf`, `mkMerge`, `mkOverride` (`mkDefault`, `mkForce`),
+# `mkOrder` (`mkBefore`, `mkAfter`) and `mkDefinition`.
+type NixpkgsModuleIf a = {
+  _type :: "if";
+  condition :: Bool;
+  content :: a;
+};
+type NixpkgsModuleMerge a = {
+  _type :: "merge";
+  contents :: List a;
+};
+type NixpkgsModuleOverride a = {
+  _type :: "override";
+  priority :: Int;
+  content :: a;
+};
+type NixpkgsModuleOrder a = {
+  _type :: "order";
+  priority :: Int;
+  content :: a;
+};
+type NixpkgsModuleDefinition a = {
+  _type :: "definition";
+  file :: String | Path;
+  value :: a;
+};
+
+# What `mkRenamedOptionModule` and friends return: a module function.
+type NixpkgsModuleFunction = NixpkgsAttrs -> NixpkgsAttrs;
+
+type NixpkgsDoRenameArgs = {
+  from :: List String;
+  to :: List String;
+  visible :: Bool;
+  warn :: Bool;
+  use :: dynamic -> dynamic;
+  withPriority? :: Bool;
+  condition? :: Bool;
+};
+
+type NixpkgsEvalModulesArgs = {
+  modules :: List dynamic;
+  specialArgs? :: NixpkgsAttrs;
+  class? :: String | Null;
+  prefix? :: List String;
+  args? :: NixpkgsAttrs;
+  check? :: Bool;
+};
+
+type NixpkgsEvalModulesResult = {
+  config :: dynamic;
+  options :: dynamic;
+  type :: NixpkgsOptionType dynamic;
+  extendModules :: dynamic -> NixpkgsAttrs;
+  _module :: dynamic;
+  _type :: "configuration";
+  class :: String | Null;
+  ...
+};
+
+type NixpkgsSystemDoubles = {
+  all :: List String;
+  linux :: List String;
+  darwin :: List String;
+  freebsd :: List String;
+  unix :: List String;
+  windows :: List String;
+  x86_64 :: List String;
+  aarch64 :: List String;
+  ...
+};
+
+# `nixpkgs.lib.nixosSystem { ... }`.
+type NixosSystemArgs = {
+  system? :: String | Null;
+  modules :: List dynamic;
+  specialArgs? :: NixpkgsAttrs;
+  pkgs? :: dynamic;
+  lib? :: dynamic;
+  extraModules? :: List dynamic;
+  baseModules? :: List dynamic;
+  modulesLocation? :: Path | Null;
+  prefix? :: List String;
+};
+
+# The result of `nixosSystem` / `darwinSystem` / `homeManagerConfiguration`.
+type NixosConfiguration = {
+  _type :: "configuration";
+  config :: dynamic;
+  options :: dynamic;
+  pkgs :: dynamic;
+  extendModules :: dynamic -> dynamic;
+  type :: NixpkgsOptionType dynamic;
+  class :: String | Null;
+  _module :: dynamic;
+  ...
+};
+
+# --- Sub-libraries -----------------------------------------------------------
+
+# lib.trivial: combinators, booleans, warnings, version info
+type NixpkgsTrivialLib = {
+  add :: Int -> Int -> Int;
+  and :: Bool -> Bool -> Bool;
+  bitAnd :: Int -> Int -> Int;
+  bitNot :: Int -> Int;
+  bitOr :: Int -> Int -> Int;
+  bitXor :: Int -> Int -> Int;
+  boolToString :: Bool -> String;
+  boolToYesNo :: Bool -> String;
+  ceil :: Number -> Int;
+  checkListOfEnum :: forall a b. String -> List a -> List a -> b -> b;
+  codeName :: String;
+  compare :: forall a. a -> a -> Int;
+  concat :: forall a. List a -> List a -> List a;
+  const :: forall a b. a -> b -> a;
+  deepSeq :: forall a b. a -> b -> b;
+  defaultTo :: forall a. a -> a | Null -> a;
+  div :: Int -> Int -> Int;
+  flip :: forall a b c. (a -> b -> c) -> b -> a -> c;
+  floor :: Number -> Int;
+  fromHexString :: String -> Int;
+  functionArgs :: unknown -> AttrsOf Bool;
+  genericClosure :: dynamic -> List dynamic;
+  id :: forall a. a -> a;
+  importJSON :: Path -> dynamic;
+  importTOML :: Path -> dynamic;
+  info :: forall a. String -> a -> a;
+  inNixShell :: Bool;
+  inPureEvalMode :: Bool;
+  isBool :: unknown -> Bool;
+  isFloat :: unknown -> Bool;
+  isFunction :: unknown -> Bool;
+  isInOldestRelease :: Int -> Bool;
+  isInt :: unknown -> Bool;
+  lessThan :: forall a. a -> a -> Bool;
+  mapNullable :: forall a b. (a -> b) -> a | Null -> b | Null;
+  max :: forall a. a -> a -> a;
+  mergeAttrs :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  min :: forall a. a -> a -> a;
+  mirrorFunctionArgs :: dynamic -> dynamic -> dynamic;
+  mod :: Int -> Int -> Int;
+  mul :: Int -> Int -> Int;
+  nixpkgsVersion :: String;
+  oldestSupportedRelease :: Int;
+  oldestSupportedReleaseIsAtLeast :: Int -> Bool;
+  "or" :: Bool -> Bool -> Bool;
+  pathExists :: Path | String -> Bool;
+  pipe :: forall a. a -> List dynamic -> dynamic;
+  readFile :: Path | String -> String;
+  release :: String;
+  revisionWithDefault :: String -> String;
+  seq :: forall a b. a -> b -> b;
+  setFunctionArgs :: dynamic -> AttrsOf Bool -> dynamic;
+  showWarnings :: forall a. List String -> a -> a;
+  splitByAndCompare :: forall a. (a -> Bool) -> (a -> a -> Int) -> (a -> a -> Int) -> a -> a -> Int;
+  sub :: Int -> Int -> Int;
+  throwIf :: forall a. Bool -> String -> a -> a;
+  throwIfNot :: forall a. Bool -> String -> a -> a;
+  toBaseDigits :: Int -> Int -> List Int;
+  toFunction :: dynamic -> dynamic;
+  toHexString :: Int -> String;
+  version :: String;
+  versionSuffix :: String;
+  warn :: forall a. String -> a -> a;
+  warnIf :: forall a. Bool -> String -> a -> a;
+  warnIfNot :: forall a. Bool -> String -> a -> a;
+  xor :: Bool -> Bool -> Bool;
+  ...
+};
+
+# lib.fixedPoints: fix, extends, makeExtensible
+type NixpkgsFixedPointsLib = {
+  composeExtensions :: NixpkgsExtension -> NixpkgsExtension -> NixpkgsExtension;
+  composeManyExtensions :: List NixpkgsExtension -> NixpkgsExtension;
+  converge :: forall a. (a -> a) -> a -> a;
+  extends :: NixpkgsExtension -> (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsAttrs -> NixpkgsAttrs;
+  fix :: forall a. (a -> a) -> a;
+  fix' :: (dynamic -> NixpkgsAttrs) -> NixpkgsAttrs;
+  makeExtensible :: (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsExtensible;
+  makeExtensibleWithCustomName :: String -> (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsAttrs;
+  toExtension :: dynamic -> NixpkgsExtension;
+  ...
+};
+
+# lib.attrsets: attribute set helpers
+type NixpkgsAttrsetsLib = {
+  attrByPath :: forall a. List String -> a -> NixpkgsAttrs -> dynamic;
+  attrNames :: forall a. AttrsOf a -> List String;
+  attrsToList :: forall a. AttrsOf a -> List (NixpkgsNameValuePair a);
+  attrVals :: forall a. List String -> AttrsOf a -> List a;
+  attrValues :: forall a. AttrsOf a -> List a;
+  cartesianProduct :: forall a. AttrsOf (List a) -> List (AttrsOf a);
+  catAttrs :: String -> List NixpkgsAttrs -> List dynamic;
+  chooseDevOutputs :: List NixpkgsDerivationCore -> List NixpkgsDerivationCore;
+  collect :: (dynamic -> Bool) -> NixpkgsAttrs -> List dynamic;
+  concatMapAttrs :: forall a. (String -> a -> NixpkgsAttrs) -> AttrsOf a -> NixpkgsAttrs;
+  dontRecurseIntoAttrs :: forall r. { ...r } -> { ...r };
+  filterAttrs :: forall a. (String -> a -> Bool) -> AttrsOf a -> AttrsOf a;
+  filterAttrsRecursive :: (String -> dynamic -> Bool) -> NixpkgsAttrs -> NixpkgsAttrs;
+  foldAttrs :: forall a b. (a -> b -> b) -> b -> List (AttrsOf a) -> AttrsOf b;
+  foldlAttrs :: forall acc a. (acc -> String -> a -> acc) -> acc -> AttrsOf a -> acc;
+  genAttrs :: forall a. List String -> (String -> a) -> AttrsOf a;
+  genAttrs' :: forall a b. List a -> (a -> NixpkgsNameValuePair b) -> AttrsOf b;
+  getAttr :: String -> NixpkgsAttrs -> dynamic;
+  getAttrFromPath :: List String -> NixpkgsAttrs -> dynamic;
+  getAttrs :: forall a. List String -> AttrsOf a -> AttrsOf a;
+  getBin :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getDev :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getFirstOutput :: List String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getInclude :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getLib :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getMan :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getOutput :: String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getStatic :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  hasAttr :: String -> NixpkgsAttrs -> Bool;
+  hasAttrByPath :: List String -> NixpkgsAttrs -> Bool;
+  intersectAttrs :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  isAttrs :: unknown -> Bool;
+  isDerivation :: unknown -> Bool;
+  listToAttrs :: forall a. List (NixpkgsNameValuePair a) -> AttrsOf a;
+  longestValidPathPrefix :: List String -> dynamic -> List String;
+  mapAttrs :: forall a b. (String -> a -> b) -> AttrsOf a -> AttrsOf b;
+  mapAttrs' :: forall a b. (String -> a -> NixpkgsNameValuePair b) -> AttrsOf a -> AttrsOf b;
+  mapAttrsRecursive :: (List String -> dynamic -> dynamic) -> NixpkgsAttrs -> NixpkgsAttrs;
+  mapAttrsRecursiveCond :: (NixpkgsAttrs -> Bool) -> (List String -> dynamic -> dynamic) -> NixpkgsAttrs -> NixpkgsAttrs;
+  mapAttrsToList :: forall a b. (String -> a -> b) -> AttrsOf a -> List b;
+  mapAttrsToListRecursive :: forall b. (List String -> dynamic -> b) -> NixpkgsAttrs -> List b;
+  mapAttrsToListRecursiveCond :: forall b. (List String -> NixpkgsAttrs -> Bool) -> (List String -> dynamic -> b) -> NixpkgsAttrs -> List b;
+  mapCartesianProduct :: forall a b. (AttrsOf a -> b) -> AttrsOf (List a) -> List b;
+  matchAttrs :: NixpkgsAttrs -> NixpkgsAttrs -> Bool;
+  mergeAttrsList :: List NixpkgsAttrs -> NixpkgsAttrs;
+  nameValuePair :: forall a. String -> a -> NixpkgsNameValuePair a;
+  optionalAttrs :: forall r. Bool -> { ...r } -> { ...r };
+  overrideExisting :: forall r. { ...r } -> NixpkgsAttrs -> { ...r };
+  recurseIntoAttrs :: forall r. { ...r } -> { ...r };
+  recursiveUpdate :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  recursiveUpdateUntil :: (List String -> dynamic -> dynamic -> Bool) -> NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  removeAttrs :: NixpkgsAttrs -> List String -> NixpkgsAttrs;
+  setAttrByPath :: forall a. List String -> a -> NixpkgsAttrs;
+  showAttrPath :: List String -> String;
+  toDerivation :: Path | String -> NixpkgsDerivationCore;
+  unionOfDisjoint :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  updateManyAttrsByPath :: List { path :: List String; update :: dynamic -> dynamic; } -> NixpkgsAttrs -> NixpkgsAttrs;
+  zipAttrs :: forall a. List (AttrsOf a) -> AttrsOf (List a);
+  zipAttrsWith :: forall a b. (String -> List a -> b) -> List (AttrsOf a) -> AttrsOf b;
+  zipAttrsWithNames :: forall a b. List String -> (String -> List a -> b) -> List (AttrsOf a) -> AttrsOf b;
+  ...
+};
+
+# lib.lists: list helpers
+type NixpkgsListsLib = {
+  all :: forall a. (a -> Bool) -> List a -> Bool;
+  allUnique :: forall a. List a -> Bool;
+  any :: forall a. (a -> Bool) -> List a -> Bool;
+  commonPrefix :: forall a. List a -> List a -> List a;
+  compareLists :: forall a. (a -> a -> Int) -> List a -> List a -> Int;
+  concatAttrValues :: forall a. AttrsOf (List a) -> List a;
+  concatLists :: forall a. List (List a) -> List a;
+  concatMap :: forall a b. (a -> List b) -> List a -> List b;
+  count :: forall a. (a -> Bool) -> List a -> Int;
+  crossLists :: dynamic -> List (List dynamic) -> List dynamic;
+  drop :: forall a. Int -> List a -> List a;
+  dropEnd :: forall a. Int -> List a -> List a;
+  elem :: forall a. a -> List a -> Bool;
+  elemAt :: forall a. List a -> Int -> a;
+  filter :: forall a. (a -> Bool) -> List a -> List a;
+  findFirst :: forall a b. (a -> Bool) -> b -> List a -> a | b;
+  findFirstIndex :: forall a b. (a -> Bool) -> b -> List a -> Int | b;
+  findSingle :: forall a b c. (a -> Bool) -> b -> c -> List a -> a | b | c;
+  flatten :: unknown -> List dynamic;
+  fold :: forall a b. (a -> b -> b) -> b -> List a -> b;
+  foldl :: forall a b. (b -> a -> b) -> b -> List a -> b;
+  foldl' :: forall a b. (b -> a -> b) -> b -> List a -> b;
+  foldr :: forall a b. (a -> b -> b) -> b -> List a -> b;
+  forEach :: forall a b. List a -> (a -> b) -> List b;
+  genList :: forall a. (Int -> a) -> Int -> List a;
+  groupBy :: forall a. (a -> String) -> List a -> AttrsOf (List a);
+  groupBy' :: forall a b. (b -> a -> b) -> b -> (a -> String) -> List a -> AttrsOf b;
+  hasPrefix :: forall a. List a -> List a -> Bool;
+  head :: forall a. List a -> a;
+  ifilter0 :: forall a. (Int -> a -> Bool) -> List a -> List a;
+  imap0 :: forall a b. (Int -> a -> b) -> List a -> List b;
+  imap1 :: forall a b. (Int -> a -> b) -> List a -> List b;
+  init :: forall a. List a -> List a;
+  intersectLists :: forall a. List a -> List a -> List a;
+  isList :: unknown -> Bool;
+  last :: forall a. List a -> a;
+  length :: forall a. List a -> Int;
+  listDfs :: forall a. Bool -> (a -> a -> Bool) -> List a -> { visited :: List a; rest? :: List a; minimal? :: a; };
+  map :: forall a b. (a -> b) -> List a -> List b;
+  mutuallyExclusive :: forall a. List a -> List a -> Bool;
+  naturalSort :: List String -> List String;
+  optional :: forall a. Bool -> a -> List a;
+  optionals :: forall a. Bool -> List a -> List a;
+  partition :: forall a. (a -> Bool) -> List a -> { right :: List a; wrong :: List a; };
+  range :: Int -> Int -> List Int;
+  remove :: forall a. a -> List a -> List a;
+  removePrefix :: forall a. List a -> List a -> List a;
+  replaceElemAt :: forall a. List a -> Int -> a -> List a;
+  replicate :: forall a. Int -> a -> List a;
+  reverseList :: forall a. List a -> List a;
+  singleton :: forall a. a -> List a;
+  sort :: forall a. (a -> a -> Bool) -> List a -> List a;
+  sortOn :: forall a b. (a -> b) -> List a -> List a;
+  sublist :: forall a. Int -> Int -> List a -> List a;
+  subtractLists :: forall a. List a -> List a -> List a;
+  tail :: forall a. List a -> List a;
+  take :: forall a. Int -> List a -> List a;
+  takeEnd :: forall a. Int -> List a -> List a;
+  toList :: unknown -> List dynamic;
+  toposort :: forall a. (a -> a -> Bool) -> List a -> { result? :: List a; cycle? :: List a; loops? :: List a; };
+  unique :: forall a. List a -> List a;
+  uniqueStrings :: List String -> List String;
+  zipLists :: forall a b. List a -> List b -> List { fst :: a; snd :: b; };
+  zipListsWith :: forall a b c. (a -> b -> c) -> List a -> List b -> List c;
+  ...
+};
+
+# lib.strings: string helpers
 type NixpkgsStringsLib = {
+  addContextFrom :: String -> String -> String;
+  appendContext :: String -> NixpkgsAttrs -> String;
+  charToInt :: String -> Int;
+  cmakeBool :: String -> Bool -> String;
+  cmakeFeature :: String -> String -> String;
+  cmakeOptionType :: String -> String -> String -> String;
+  commonPrefixLength :: String -> String -> Int;
+  commonSuffixLength :: String -> String -> Int;
+  concatImapStrings :: forall a. (Int -> a -> String) -> List a -> String;
+  concatImapStringsSep :: forall a. String -> (Int -> a -> String) -> List a -> String;
+  concatLines :: List String -> String;
+  concatMapAttrsStringSep :: forall a. String -> (String -> a -> String) -> AttrsOf a -> String;
+  concatMapStrings :: forall a. (a -> String) -> List a -> String;
+  concatMapStringsSep :: forall a. String -> (a -> String) -> List a -> String;
+  concatStrings :: List String -> String;
   concatStringsSep :: String -> List String -> String;
+  enableFeature :: Bool -> String -> String;
+  enableFeatureAs :: Bool -> String -> String -> String;
+  escape :: List String -> String -> String;
+  escapeC :: List String -> String -> String;
+  escapeNixIdentifier :: String -> String;
+  escapeNixString :: String -> String;
+  escapeRegex :: String -> String;
+  escapeShellArg :: unknown -> String;
+  escapeShellArgs :: List unknown -> String;
+  escapeURL :: String -> String;
+  escapeXML :: String -> String;
+  fileContents :: Path | String -> String;
+  fixedWidthNumber :: Int -> Int -> String;
+  fixedWidthString :: Int -> String -> String -> String;
+  floatToString :: Float -> String;
+  fromJSON :: String -> dynamic;
+  getName :: String | NixpkgsDerivationCore -> String;
+  getVersion :: String | NixpkgsDerivationCore -> String;
+  hasInfix :: String -> String -> Bool;
   hasPrefix :: String -> String -> Bool;
   hasSuffix :: String -> String -> Bool;
+  intersperse :: forall a. a -> List a -> List a;
+  isConvertibleWithToString :: unknown -> Bool;
+  isStorePath :: unknown -> Bool;
+  isString :: unknown -> Bool;
+  isStringLike :: unknown -> Bool;
+  isValidPosixName :: String -> Bool;
+  join :: String -> List String -> String;
+  levenshtein :: String -> String -> Int;
+  levenshteinAtMost :: Int -> String -> String -> Bool;
+  lowerChars :: List String;
+  makeBinPath :: List NixpkgsDerivationCore -> String;
+  makeIncludePath :: List NixpkgsDerivationCore -> String;
+  makeLibraryPath :: List NixpkgsDerivationCore -> String;
+  makeSearchPath :: String -> List (String | Path | NixpkgsDerivationCore) -> String;
+  makeSearchPathOutput :: String -> String -> List NixpkgsDerivationCore -> String;
+  match :: String -> String -> List (String | Null) | Null;
+  mesonBool :: String -> Bool -> String;
+  mesonEnable :: String -> Bool -> String;
+  mesonOption :: String -> String -> String;
+  nameFromURL :: String -> String -> String;
+  normalizePath :: String -> String;
+  optionalString :: Bool -> String -> String;
   removePrefix :: String -> String -> String;
   removeSuffix :: String -> String -> String;
+  replaceString :: String -> String -> String -> String;
+  replaceStrings :: List String -> List String -> String -> String;
+  replicate :: Int -> String -> String;
+  sanitizeDerivationName :: String -> String;
+  split :: String -> String -> List (String | List (String | Null));
   splitString :: String -> String -> List String;
-  optionalString :: Bool -> String -> String;
+  splitStringBy :: (String -> String -> Bool) -> Bool -> String -> List String;
+  stringAsChars :: (String -> String) -> String -> String;
   stringLength :: String -> Int;
+  stringToCharacters :: String -> List String;
+  substring :: Int -> Int -> String -> String;
+  toCamelCase :: String -> String;
+  toInt :: String -> Int;
+  toIntBase10 :: String -> Int;
+  toJSON :: unknown -> String;
+  toLower :: String -> String;
+  toSentenceCase :: String -> String;
+  toShellVar :: String -> unknown -> String;
+  toShellVars :: NixpkgsAttrs -> String;
+  toString :: unknown -> String;
+  toUpper :: String -> String;
+  trim :: String -> String;
+  trimWith :: { start? :: Bool; end? :: Bool; } -> String -> String;
+  typeOf :: unknown -> String;
+  unsafeDiscardStringContext :: String -> String;
+  upperChars :: List String;
+  versionAtLeast :: String -> String -> Bool;
+  versionOlder :: String -> String -> Bool;
+  withFeature :: Bool -> String -> String;
+  withFeatureAs :: Bool -> String -> String -> String;
+  ...
 };
 
-type NixpkgsAttrsetsLib = {
-  attrNames :: dynamic -> List String;
-  attrValues :: dynamic -> List dynamic;
-  genAttrs :: List String -> (String -> dynamic) -> dynamic;
-  mapAttrs :: forall a b. NixpkgsNamedMapper a b -> dynamic -> dynamic;
-  mapAttrs' :: forall a b. NixpkgsNamedMapper a (NixpkgsNameValuePair b) -> dynamic -> dynamic;
-  optionalAttrs :: Bool -> dynamic -> dynamic;
-  recursiveUpdate :: dynamic -> dynamic -> dynamic;
-  nameValuePair :: forall a. String -> a -> NixpkgsNameValuePair a;
+# lib.stringsWithDeps: ordered activation snippets
+type NixpkgsStringsWithDepsLib = {
+  fullDepEntry :: String -> List String -> { text :: String; deps :: List String; };
+  noDepEntry :: String -> { text :: String; deps :: List String; };
+  packEntry :: List String -> String -> { text :: String; deps :: List String; };
+  stringAfter :: List String -> String -> { text :: String; deps :: List String; };
+  textClosureList :: NixpkgsAttrs -> List String -> List String;
+  textClosureMap :: (String -> String) -> NixpkgsAttrs -> List String -> String;
+  ...
 };
 
-type NixpkgsTrivialLib = {
-  id :: forall a. a -> a;
-  const :: forall a b. a -> b -> a;
-  flip :: dynamic;
-  pipe :: dynamic -> List dynamic -> dynamic;
-  warn :: String -> dynamic -> dynamic;
+# lib.customisation: callPackageWith, makeOverridable, makeScope
+type NixpkgsCustomisationLib = {
+  callPackagesWith :: NixpkgsAttrs -> dynamic -> NixpkgsAttrs -> dynamic;
+  callPackageWith :: NixpkgsAttrs -> dynamic -> NixpkgsAttrs -> dynamic;
+  extendDerivation :: Bool -> NixpkgsAttrs -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  extendMkDerivation :: NixpkgsExtendMkDerivationArgs -> dynamic;
+  hydraJob :: forall a. a -> a;
+  makeOverridable :: forall a b. (a -> b) -> a -> b;
+  makeScope :: (NixpkgsAttrs -> dynamic) -> (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsScope;
+  makeScopeWithSplicing :: dynamic -> dynamic;
+  makeScopeWithSplicing' :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsScope;
+  mapCrossIndex :: (dynamic -> dynamic) -> NixpkgsAttrs -> NixpkgsAttrs;
+  overrideDerivation :: NixpkgsDerivationCore -> (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsDerivationCore;
+  renameCrossIndexFrom :: String -> NixpkgsAttrs -> NixpkgsAttrs;
+  renameCrossIndexTo :: String -> NixpkgsAttrs -> NixpkgsAttrs;
+  ...
 };
 
+# lib.derivations
+type NixpkgsDerivationsLib = {
+  addDrvOutputDependencies :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  lazyDerivation :: { derivation :: NixpkgsDerivationCore; meta? :: NixpkgsMeta; passthru? :: NixpkgsAttrs; outputs? :: List String; } -> NixpkgsDerivationCore;
+  optionalDrvAttr :: forall a. Bool -> a -> a | Null;
+  unsafeDiscardOutputDependency :: String -> String;
+  warnOnInstantiate :: String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  ...
+};
+
+# lib.meta: priorities, names, getExe
+type NixpkgsMetaLib = {
+  addMetaAttrs :: NixpkgsMeta -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  appendToName :: String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  availableOn :: NixpkgsPlatform -> NixpkgsDerivationCore -> Bool;
+  cpeFullVersionWithVendor :: String -> String -> NixpkgsAttrs;
+  defaultPriority :: Int;
+  dontDistribute :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getExe :: NixpkgsDerivationCore -> String;
+  getExe' :: NixpkgsDerivationCore -> String -> String;
+  getLicenseFromSpdxId :: String -> NixpkgsLicense;
+  getLicenseFromSpdxIdOr :: forall a. String -> a -> NixpkgsLicense | a;
+  hiPrio :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  hiPrioSet :: NixpkgsAttrs -> NixpkgsAttrs;
+  licensesSpdx :: AttrsOf NixpkgsLicense;
+  lowPrio :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  lowPrioSet :: NixpkgsAttrs -> NixpkgsAttrs;
+  mapDerivationAttrset :: (NixpkgsDerivationCore -> NixpkgsDerivationCore) -> NixpkgsAttrs -> NixpkgsAttrs;
+  platformMatch :: NixpkgsPlatform -> String | NixpkgsAttrs -> Bool;
+  setName :: String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  setPrio :: Int -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  updateName :: (String -> String) -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  ...
+};
+
+# lib.versions: version string helpers
+type NixpkgsVersionsLib = {
+  compareVersions :: String -> String -> Int;
+  major :: String -> String;
+  majorMinor :: String -> String;
+  minor :: String -> String;
+  pad :: Int -> String -> String;
+  patch :: String -> String;
+  splitVersion :: String -> List String;
+  ...
+};
+
+# lib.modules: evalModules, mkIf, mkMerge, mkOverride, renames
 type NixpkgsModulesLib = {
-  mkIf :: Bool -> dynamic -> dynamic;
-  mkMerge :: List dynamic -> dynamic;
-  mkDefault :: dynamic -> dynamic;
-  mkForce :: dynamic -> dynamic;
-  mkEnableOption :: String -> dynamic;
-  types :: dynamic;
+  applyModuleArgs :: String -> dynamic -> NixpkgsAttrs -> NixpkgsAttrs;
+  applyModuleArgsIfFunction :: String -> dynamic -> NixpkgsAttrs -> NixpkgsAttrs;
+  collectModules :: dynamic;
+  defaultOrderPriority :: Int;
+  defaultOverridePriority :: Int;
+  dischargeProperties :: dynamic -> List dynamic;
+  doRename :: NixpkgsDoRenameArgs -> NixpkgsModuleFunction;
+  evalModules :: NixpkgsEvalModulesArgs -> NixpkgsEvalModulesResult;
+  evalOptionValue :: List String -> NixpkgsAttrs -> List dynamic -> NixpkgsAttrs;
+  filterOverrides :: List dynamic -> List dynamic;
+  filterOverrides' :: List dynamic -> NixpkgsAttrs;
+  fixMergeModules :: List dynamic -> NixpkgsAttrs -> NixpkgsAttrs;
+  fixupOptionType :: List String -> NixpkgsAttrs -> NixpkgsAttrs;
+  importApply :: Path -> NixpkgsAttrs -> dynamic;
+  importJSON :: Path -> NixpkgsAttrs;
+  importTOML :: Path -> NixpkgsAttrs;
+  mapDefinitionValue :: (dynamic -> dynamic) -> dynamic -> dynamic;
+  mergeAttrDefinitionsWithPrio :: NixpkgsAttrs -> NixpkgsAttrs;
+  mergeDefinitions :: List String -> NixpkgsOptionType dynamic -> List dynamic -> NixpkgsAttrs;
+  mergeModules :: List String -> List dynamic -> NixpkgsAttrs;
+  mergeModules' :: List String -> List dynamic -> List dynamic -> NixpkgsAttrs;
+  mergeOptionDecls :: List String -> List dynamic -> NixpkgsAttrs;
+  mkAfter :: forall a. a -> NixpkgsModuleOrder a;
+  mkAliasAndWrapDefinitions :: (dynamic -> dynamic) -> NixpkgsAttrs -> dynamic;
+  mkAliasAndWrapDefsWithPriority :: (dynamic -> dynamic) -> NixpkgsAttrs -> dynamic;
+  mkAliasDefinitions :: NixpkgsAttrs -> dynamic;
+  mkAliasIfDef :: NixpkgsAttrs -> dynamic -> dynamic;
+  mkAliasOptionModule :: List String -> List String -> NixpkgsModuleFunction;
+  mkAliasOptionModuleMD :: List String -> List String -> NixpkgsModuleFunction;
+  mkAssert :: forall a. Bool -> String -> a -> NixpkgsModuleIf a;
+  mkBefore :: forall a. a -> NixpkgsModuleOrder a;
+  mkChangedOptionModule :: List String -> List String -> (NixpkgsAttrs -> dynamic) -> NixpkgsModuleFunction;
+  mkDefault :: forall a. a -> NixpkgsModuleOverride a;
+  mkDefinition :: forall a. { file :: String | Path; value :: a; } -> NixpkgsModuleDefinition a;
+  mkDerivedConfig :: forall a b. NixpkgsAttrs -> (a -> b) -> NixpkgsModuleOverride b;
+  mkFixStrictness :: forall a. a -> a;
+  mkForce :: forall a. a -> NixpkgsModuleOverride a;
+  mkIf :: forall a. Bool -> a -> NixpkgsModuleIf a;
+  mkImageMediaOverride :: forall a. a -> NixpkgsModuleOverride a;
+  mkMerge :: forall a. List a -> NixpkgsModuleMerge a;
+  mkMergedOptionModule :: List (List String) -> List String -> (NixpkgsAttrs -> dynamic) -> NixpkgsModuleFunction;
+  mkOptionDefault :: forall a. a -> NixpkgsModuleOverride a;
+  mkOrder :: forall a. Int -> a -> NixpkgsModuleOrder a;
+  mkOverride :: forall a. Int -> a -> NixpkgsModuleOverride a;
+  mkRemovedOptionModule :: List String -> String -> NixpkgsModuleFunction;
+  mkRenamedOptionModule :: List String -> List String -> NixpkgsModuleFunction;
+  mkRenamedOptionModuleWith :: { from :: List String; to :: List String; sinceRelease :: Int; } -> NixpkgsModuleFunction;
+  mkVMOverride :: forall a. a -> NixpkgsModuleOverride a;
+  pushDownProperties :: dynamic -> List dynamic;
+  setDefaultModuleLocation :: String | Path -> dynamic -> NixpkgsAttrs;
+  sortProperties :: List dynamic -> List dynamic;
+  unifyModuleSyntax :: String | Path -> String -> dynamic -> NixpkgsAttrs;
+  ...
 };
 
-type NixpkgsSystemsLib = {
-  flakeExposed :: List NixpkgsSystem;
-  all :: List NixpkgsSystem;
+# lib.options: mkOption, mkEnableOption, mkPackageOption, literals
+type NixpkgsOptionsLib = {
+  getFiles :: List { file :: String | Path; ... } -> List (String | Path);
+  getValues :: forall a. List { value :: a; ... } -> List a;
+  isOption :: unknown -> Bool;
+  literalCode :: String -> String -> NixpkgsLiteral;
+  literalExpression :: String -> NixpkgsLiteral;
+  literalMD :: String -> NixpkgsLiteral;
+  mergeDefaultOption :: List String -> List NixpkgsOptionDefinition -> dynamic;
+  mergeEqualOption :: List String -> List NixpkgsOptionDefinition -> dynamic;
+  mergeOneOption :: List String -> List NixpkgsOptionDefinition -> dynamic;
+  mergeUniqueOption :: { message :: String; } -> List String -> List NixpkgsOptionDefinition -> dynamic;
+  mkEnableOption :: String -> NixpkgsOption Bool;
+  mkOption :: forall a. NixpkgsMkOptionArgs a -> NixpkgsOption a;
+  mkPackageOption :: NixpkgsAttrs -> String | List String -> NixpkgsMkPackageOptionArgs -> NixpkgsOption NixpkgsDerivation;
+  mkSinkUndeclaredOptions :: NixpkgsAttrs -> NixpkgsOption dynamic;
+  optionAttrSetToDocList :: NixpkgsAttrs -> List NixpkgsAttrs;
+  optionAttrSetToDocList' :: List String -> NixpkgsAttrs -> List NixpkgsAttrs;
+  prioritySuggestion :: String;
+  renderOptionValue :: unknown -> NixpkgsLiteral;
+  scrubOptionValue :: forall a. a -> a;
+  showDefs :: List NixpkgsOptionDefinition -> String;
+  showFiles :: List (String | Path) -> String;
+  showOption :: List String -> String;
+  showOptionWithDefLocs :: { loc :: List String; files :: List (String | Path); ... } -> String;
+  unknownModule :: String;
+  ...
 };
+
+# lib.types: option types
+type NixpkgsTypesLib = {
+  addCheck :: forall a. NixpkgsOptionType a -> (a -> Bool) -> NixpkgsOptionType a;
+  anything :: NixpkgsOptionType dynamic;
+  attrListOf :: forall a. NixpkgsOptionType a -> NixpkgsOptionType dynamic;
+  attrListWith :: forall a. { elemType :: NixpkgsOptionType a; asAttrs? :: Bool; mergeAttrValues? :: dynamic; } -> NixpkgsOptionType dynamic;
+  attrs :: NixpkgsOptionType NixpkgsAttrs;
+  attrsOf :: forall a. NixpkgsOptionType a -> NixpkgsOptionType (AttrsOf a);
+  attrsWith :: forall a. { elemType :: NixpkgsOptionType a; lazy? :: Bool; placeholder? :: String; } -> NixpkgsOptionType (AttrsOf a);
+  attrTag :: AttrsOf (NixpkgsOption dynamic) -> NixpkgsOptionType NixpkgsAttrs;
+  bool :: NixpkgsOptionType Bool;
+  boolByOr :: NixpkgsOptionType Bool;
+  coercedTo :: forall a b. NixpkgsOptionType a -> (a -> b) -> NixpkgsOptionType b -> NixpkgsOptionType b;
+  commas :: NixpkgsOptionType String;
+  defaultFunctor :: String -> NixpkgsAttrs;
+  defaultTypeMerge :: dynamic -> dynamic -> dynamic;
+  deferredModule :: NixpkgsOptionType dynamic;
+  deferredModuleWith :: { staticModules? :: List dynamic; } -> NixpkgsOptionType dynamic;
+  either :: forall a b. NixpkgsOptionType a -> NixpkgsOptionType b -> NixpkgsOptionType (a | b);
+  enum :: forall a. List a -> NixpkgsOptionType a;
+  envVar :: NixpkgsOptionType String;
+  externalPath :: NixpkgsOptionType (Path | String);
+  fileset :: NixpkgsOptionType NixpkgsFileset;
+  float :: NixpkgsOptionType Float;
+  functionTo :: forall a. NixpkgsOptionType a -> NixpkgsOptionType (dynamic -> a);
+  int :: NixpkgsOptionType Int;
+  ints :: NixpkgsIntOptionTypes;
+  isOptionType :: unknown -> Bool;
+  isType :: String -> unknown -> Bool;
+  json :: NixpkgsOptionType dynamic;
+  lazyAttrsOf :: forall a. NixpkgsOptionType a -> NixpkgsOptionType (AttrsOf a);
+  lines :: NixpkgsOptionType String;
+  listOf :: forall a. NixpkgsOptionType a -> NixpkgsOptionType (List a);
+  loaOf :: forall a. NixpkgsOptionType a -> NixpkgsOptionType (AttrsOf a);
+  luaInline :: NixpkgsOptionType NixpkgsAttrs;
+  mergeTypes :: NixpkgsOptionType dynamic -> NixpkgsOptionType dynamic -> NixpkgsOptionType dynamic;
+  mkOptionType :: forall a. NixpkgsMkOptionTypeArgs a -> NixpkgsOptionType a;
+  nonEmptyListOf :: forall a. NixpkgsOptionType a -> NixpkgsOptionType (List a);
+  nonEmptyStr :: NixpkgsOptionType String;
+  nullOr :: forall a. NixpkgsOptionType a -> NixpkgsOptionType (a | Null);
+  number :: NixpkgsOptionType Number;
+  numbers :: NixpkgsNumberOptionTypes;
+  oneOf :: List (NixpkgsOptionType dynamic) -> NixpkgsOptionType dynamic;
+  optionDeclaration :: NixpkgsOptionType dynamic;
+  optionType :: NixpkgsOptionType dynamic;
+  package :: NixpkgsOptionType NixpkgsDerivation;
+  passwdEntry :: forall a. NixpkgsOptionType a -> NixpkgsOptionType a;
+  path :: NixpkgsOptionType (Path | String);
+  pathInStore :: NixpkgsOptionType (Path | String);
+  pathWith :: { inStore? :: Bool | Null; absolute? :: Bool | Null; } -> NixpkgsOptionType (Path | String);
+  pkgs :: NixpkgsOptionType dynamic;
+  port :: NixpkgsOptionType Int;
+  raw :: NixpkgsOptionType dynamic;
+  separatedString :: String -> NixpkgsOptionType String;
+  serializableValueWith :: { typeName :: String; nullable? :: Bool; } -> NixpkgsOptionType dynamic;
+  setType :: forall r. String -> { ...r } -> { ...r };
+  shellPackage :: NixpkgsOptionType NixpkgsDerivation;
+  singleLineStr :: NixpkgsOptionType String;
+  str :: NixpkgsOptionType String;
+  string :: NixpkgsOptionType String;
+  strMatching :: String -> NixpkgsOptionType String;
+  submodule :: dynamic -> NixpkgsOptionType dynamic;
+  submoduleWith :: NixpkgsSubmoduleWithArgs -> NixpkgsOptionType dynamic;
+  toml :: NixpkgsOptionType dynamic;
+  uniq :: forall a. NixpkgsOptionType a -> NixpkgsOptionType a;
+  unique :: forall a. { message :: String; } -> NixpkgsOptionType a -> NixpkgsOptionType a;
+  unspecified :: NixpkgsOptionType dynamic;
+  ...
+};
+
+# lib.asserts
+type NixpkgsAssertsLib = {
+  assertEachOneOf :: forall a. String -> List a -> List a -> Bool;
+  assertMsg :: Bool -> String -> Bool;
+  assertOneOf :: forall a. String -> a -> List a -> Bool;
+  checkAssertWarn :: forall a. List { assertion :: Bool; message :: String; } -> List String -> a -> a;
+  ...
+};
+
+# lib.debug: tracing and runTests
+type NixpkgsDebugLib = {
+  addErrorContext :: forall a. String -> a -> a;
+  runTests :: NixpkgsAttrs -> List { name :: String; expected :: dynamic; result :: dynamic; };
+  testAllTrue :: List Bool -> { expr :: List Bool; expected :: List Bool; };
+  throwTestFailures :: { failures :: List dynamic; description? :: String; } -> dynamic;
+  trace :: forall a. unknown -> a -> a;
+  traceFnSeqN :: Int -> String -> dynamic -> dynamic -> dynamic;
+  traceIf :: forall a. Bool -> unknown -> a -> a;
+  traceSeq :: forall a. unknown -> a -> a;
+  traceSeqN :: forall a. Int -> unknown -> a -> a;
+  traceVal :: forall a. a -> a;
+  traceValFn :: forall a. (a -> dynamic) -> a -> a;
+  traceValSeq :: forall a. a -> a;
+  traceValSeqFn :: forall a. (a -> dynamic) -> a -> a;
+  traceValSeqN :: forall a. Int -> a -> a;
+  traceValSeqNFn :: forall a. (a -> dynamic) -> Int -> a -> a;
+  unsafeGetAttrPos :: String -> NixpkgsAttrs -> { file :: String; line :: Int; column :: Int; } | Null;
+  ...
+};
+
+# lib.filesystem
+type NixpkgsFilesystemLib = {
+  baseNameOf :: Path | String -> String;
+  dirOf :: Path | String -> Path | String;
+  hashFile :: String -> Path -> String;
+  haskellPathsInDir :: Path -> AttrsOf Path;
+  isPath :: unknown -> Bool;
+  listFilesRecursive :: Path -> List Path;
+  locateDominatingFile :: String -> Path -> { path :: Path; matches :: List String; } | Null;
+  packagesFromDirectoryRecursive :: { callPackage :: dynamic; directory :: Path; newScope? :: dynamic; recurseIntoDirectory? :: dynamic; } -> NixpkgsAttrs;
+  pathIsDirectory :: Path | String -> Bool;
+  pathIsRegularFile :: Path | String -> Bool;
+  pathType :: Path | String -> NixpkgsFileType;
+  readDir :: Path -> AttrsOf NixpkgsFileType;
+  readFileType :: Path -> NixpkgsFileType;
+  resolveDefaultNix :: Path | String -> Path | String;
+  ...
+};
+
+# lib.sources: cleanSource and filters
+type NixpkgsSourcesLib = {
+  canCleanSource :: unknown -> Bool;
+  cleanSource :: NixpkgsSourceLike -> NixpkgsCleanSource;
+  cleanSourceFilter :: String -> String -> Bool;
+  cleanSourceWith :: { src :: NixpkgsSourceLike; filter? :: String -> String -> Bool; name? :: String; } -> NixpkgsCleanSource;
+  commitIdFromGitRepo :: Path | String -> String;
+  filterSource :: (String -> String -> Bool) -> Path -> Path;
+  pathHasContext :: String -> Bool;
+  pathIsGitRepo :: Path | String -> Bool;
+  removeSlashSuffix :: String -> String;
+  repoRevToName :: String -> dynamic;
+  repoRevToNameFull :: String -> String -> String | Null -> String;
+  revOrTag :: String | Null -> String | Null -> String | Null;
+  shortRev :: String -> String;
+  sourceByGlobs :: NixpkgsSourceLike -> List String -> NixpkgsCleanSource;
+  sourceByRegex :: NixpkgsSourceLike -> List String -> NixpkgsCleanSource;
+  sourceFilesBySuffices :: NixpkgsSourceLike -> List String -> NixpkgsCleanSource;
+  trace :: NixpkgsSourceLike -> NixpkgsCleanSource;
+  urlToName :: String -> String;
+  ...
+};
+
+# lib.generators: toINI, toJSON, toYAML, toLua, ...
+type NixpkgsGeneratorsLib = {
+  mkDconfKeyValue :: String -> unknown -> String;
+  mkKeyValueDefault :: { mkValueString? :: dynamic -> String; } -> String -> String -> unknown -> String;
+  mkLuaInline :: String -> { _type :: "lua-inline"; expr :: String; };
+  mkValueStringDefault :: { ... } -> unknown -> String;
+  toDconfINI :: AttrsOf NixpkgsAttrs -> String;
+  toDhall :: { ... } -> unknown -> String;
+  toGitINI :: NixpkgsAttrs -> String;
+  toINI :: { mkSectionName? :: String -> String; mkKeyValue? :: String -> dynamic -> String; listsAsDuplicateKeys? :: Bool; } -> AttrsOf NixpkgsAttrs -> String;
+  toINIWithGlobalSection :: { mkSectionName? :: String -> String; mkKeyValue? :: String -> dynamic -> String; listsAsDuplicateKeys? :: Bool; } -> { globalSection :: NixpkgsAttrs; sections? :: AttrsOf NixpkgsAttrs; } -> String;
+  toJSON :: { ... } -> unknown -> String;
+  toKeyValue :: { mkKeyValue? :: String -> dynamic -> String; listsAsDuplicateKeys? :: Bool; indent? :: String; } -> NixpkgsAttrs -> String;
+  toLua :: { multiline? :: Bool; indent? :: String; asBindings? :: Bool; } -> unknown -> String;
+  toPlist :: { escape? :: Bool; } -> unknown -> String;
+  toPretty :: { allowPrettyValues? :: Bool; multiline? :: Bool; indent? :: String; } -> unknown -> String;
+  toYAML :: { ... } -> unknown -> String;
+  withRecursion :: forall a. { depthLimit :: Int; throwOnDepthLimit? :: Bool; } -> a -> a;
+  ...
+};
+
+# lib.cli: render attrsets as command lines
+type NixpkgsCliLib = {
+  mkValueString :: unknown -> String;
+  toCommandLine :: (String -> { option :: String; sep :: String | Null; explicitBool :: Bool; }) -> NixpkgsAttrs -> List String;
+  toCommandLineGNU :: { explicitBool? :: Bool; isLong? :: String -> Bool; formatArg? :: dynamic -> String; } -> NixpkgsAttrs -> List String;
+  toCommandLineShell :: (String -> { option :: String; sep :: String | Null; explicitBool :: Bool; }) -> NixpkgsAttrs -> String;
+  toCommandLineShellGNU :: { explicitBool? :: Bool; isLong? :: String -> Bool; formatArg? :: dynamic -> String; } -> NixpkgsAttrs -> String;
+  toGNUCommandLine :: { mkOptionName? :: String -> String; mkBool? :: String -> Bool -> List String; mkList? :: String -> List dynamic -> List String; mkOption? :: String -> dynamic -> List String; optionValueSeparator? :: String | Null; } -> NixpkgsAttrs -> List String;
+  toGNUCommandLineShell :: { mkOptionName? :: String -> String; mkBool? :: String -> Bool -> List String; mkList? :: String -> List dynamic -> List String; mkOption? :: String -> dynamic -> List String; optionValueSeparator? :: String | Null; } -> NixpkgsAttrs -> String;
+  ...
+};
+
+# lib.fileset: file set combinators
+type NixpkgsFilesetLib = {
+  difference :: NixpkgsFilesetLike -> NixpkgsFilesetLike -> NixpkgsFileset;
+  empty :: NixpkgsFileset;
+  fileFilter :: (NixpkgsFilesetFile -> Bool) -> Path -> NixpkgsFileset;
+  fromSource :: NixpkgsSourceLike -> NixpkgsFileset;
+  gitTracked :: Path -> NixpkgsFileset;
+  gitTrackedWith :: { recurseSubmodules? :: Bool; } -> Path -> NixpkgsFileset;
+  intersection :: NixpkgsFilesetLike -> NixpkgsFilesetLike -> NixpkgsFileset;
+  isFileset :: unknown -> Bool;
+  maybeMissing :: Path -> NixpkgsFileset;
+  toList :: NixpkgsFilesetLike -> List Path;
+  toSource :: { root :: Path; fileset :: NixpkgsFilesetLike; } -> NixpkgsCleanSource;
+  trace :: forall a. NixpkgsFilesetLike -> a -> a;
+  traceVal :: NixpkgsFilesetLike -> NixpkgsFilesetLike;
+  union :: NixpkgsFilesetLike -> NixpkgsFilesetLike -> NixpkgsFileset;
+  unions :: List NixpkgsFilesetLike -> NixpkgsFileset;
+  ...
+};
+
+# lib.path: path and subpath operations
+type NixpkgsPathLib = {
+  append :: Path -> String -> Path;
+  hasPrefix :: Path -> Path -> Bool;
+  hasStorePathPrefix :: Path -> Bool;
+  removePrefix :: Path -> Path -> String;
+  splitRoot :: Path -> { root :: Path; subpath :: String; };
+  subpath :: { isValid :: String -> Bool; join :: List String -> String; components :: String -> List String; normalise :: String -> String; };
+  ...
+};
+
+# lib.gvariant: GVariant values for dconf
+type NixpkgsGvariantLib = {
+  isGVariant :: unknown -> Bool;
+  mkArray :: List dynamic -> NixpkgsAttrs;
+  mkBoolean :: Bool -> NixpkgsAttrs;
+  mkDictionaryEntry :: dynamic -> dynamic -> NixpkgsAttrs;
+  mkDouble :: Float -> NixpkgsAttrs;
+  mkEmptyArray :: String -> NixpkgsAttrs;
+  mkInt16 :: Int -> NixpkgsAttrs;
+  mkInt32 :: Int -> NixpkgsAttrs;
+  mkInt64 :: Int -> NixpkgsAttrs;
+  mkJust :: unknown -> NixpkgsAttrs;
+  mkMaybe :: String -> dynamic -> NixpkgsAttrs;
+  mkNothing :: String -> NixpkgsAttrs;
+  mkObjectpath :: String -> NixpkgsAttrs;
+  mkString :: String -> NixpkgsAttrs;
+  mkTuple :: List dynamic -> NixpkgsAttrs;
+  mkUchar :: Int -> NixpkgsAttrs;
+  mkUint16 :: Int -> NixpkgsAttrs;
+  mkUint32 :: Int -> NixpkgsAttrs;
+  mkUint64 :: Int -> NixpkgsAttrs;
+  mkValue :: unknown -> NixpkgsAttrs;
+  mkVariant :: unknown -> NixpkgsAttrs;
+  type :: AttrsOf String;
+  ...
+};
+
+# lib.systems: platform descriptions
+type NixpkgsSystemsLib = {
+  architectures :: dynamic;
+  doubles :: NixpkgsSystemDoubles;
+  elaborate :: String | NixpkgsAttrs -> NixpkgsPlatform;
+  equals :: NixpkgsPlatform -> NixpkgsPlatform -> Bool;
+  examples :: AttrsOf NixpkgsAttrs;
+  flakeExposed :: List NixpkgsSystem;
+  inspect :: dynamic;
+  parse :: dynamic;
+  platforms :: dynamic;
+  systemToAttrs :: String -> NixpkgsAttrs;
+  ...
+};
+
+# lib.flakes
+type NixpkgsFlakesLib = {
+  flakeRefToString :: NixpkgsAttrs -> String;
+  parseFlakeRef :: String -> NixpkgsAttrs;
+  ...
+};
+
+# lib.misc: deprecated helpers (untyped)
+type NixpkgsMiscLib = {
+  checkFlag :: dynamic;
+  checkReqs :: dynamic;
+  closePropagation :: dynamic;
+  condConcat :: dynamic;
+  defaultMerge :: dynamic;
+  defaultMergeArg :: dynamic;
+  fakeHash :: String;
+  fakeSha256 :: String;
+  fakeSha512 :: String;
+  foldArgs :: dynamic;
+  getValue :: dynamic;
+  ifEnable :: dynamic;
+  imap :: dynamic;
+  innerClosePropagation :: dynamic;
+  innerModifySumArgs :: dynamic;
+  lazyGenericClosure :: dynamic;
+  maybeAttr :: dynamic;
+  maybeAttrNullable :: dynamic;
+  maybeEnv :: dynamic;
+  mergeAttrBy :: dynamic;
+  mergeAttrByFunc :: dynamic;
+  mergeAttrsByFuncDefaults :: dynamic;
+  mergeAttrsByFuncDefaultsClean :: dynamic;
+  mergeAttrsConcatenateValues :: dynamic;
+  mergeAttrsNoOverride :: dynamic;
+  mergeAttrsWithFunc :: dynamic;
+  modifySumArgs :: dynamic;
+  nixType :: dynamic;
+  nvs :: dynamic;
+  setAttr :: dynamic;
+  setAttrMerge :: dynamic;
+  uniqList :: dynamic;
+  uniqListExt :: dynamic;
+  ...
+};
+
+# --- nixpkgs `lib` ------------------------------------------------------------
 
 type NixpkgsLib = {
+  # Sub-libraries.
+  trivial :: NixpkgsTrivialLib;
+  fixedPoints :: NixpkgsFixedPointsLib;
+  attrsets :: NixpkgsAttrsetsLib;
   lists :: NixpkgsListsLib;
   strings :: NixpkgsStringsLib;
-  attrsets :: NixpkgsAttrsetsLib;
-  trivial :: NixpkgsTrivialLib;
+  stringsWithDeps :: NixpkgsStringsWithDepsLib;
+  customisation :: NixpkgsCustomisationLib;
+  derivations :: NixpkgsDerivationsLib;
+  meta :: NixpkgsMetaLib;
+  versions :: NixpkgsVersionsLib;
   modules :: NixpkgsModulesLib;
+  options :: NixpkgsOptionsLib;
+  types :: NixpkgsTypesLib;
+  asserts :: NixpkgsAssertsLib;
+  debug :: NixpkgsDebugLib;
+  filesystem :: NixpkgsFilesystemLib;
+  sources :: NixpkgsSourcesLib;
+  generators :: NixpkgsGeneratorsLib;
+  cli :: NixpkgsCliLib;
+  fileset :: NixpkgsFilesetLib;
+  path :: NixpkgsPathLib;
+  gvariant :: NixpkgsGvariantLib;
   systems :: NixpkgsSystemsLib;
-  mapAttrs :: forall a b. NixpkgsNamedMapper a b -> dynamic -> dynamic;
-  mapAttrs' :: forall a b. NixpkgsNamedMapper a (NixpkgsNameValuePair b) -> dynamic -> dynamic;
-  genAttrs :: List String -> (String -> dynamic) -> dynamic;
+  flakes :: NixpkgsFlakesLib;
+  misc :: NixpkgsMiscLib;
+  licenses :: AttrsOf NixpkgsLicense;
+  maintainers :: AttrsOf NixpkgsMaintainer;
+  teams :: AttrsOf NixpkgsTeam;
+  platforms :: NixpkgsSystemDoubles;
+  sourceTypes :: AttrsOf NixpkgsAttrs;
+  network :: dynamic;
+  kernel :: dynamic;
+  fetchers :: dynamic;
+  extend :: NixpkgsExtension -> dynamic;
+  nixosSystem :: NixosSystemArgs -> NixosConfiguration;
+  # Top-level re-exports (`lib.mapAttrs` == `lib.attrsets.mapAttrs`).
+  add :: Int -> Int -> Int;
+  addContextFrom :: String -> String -> String;
+  addDrvOutputDependencies :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  addErrorContext :: forall a. String -> a -> a;
+  addMetaAttrs :: NixpkgsMeta -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  all :: forall a. (a -> Bool) -> List a -> Bool;
+  allUnique :: forall a. List a -> Bool;
+  and :: Bool -> Bool -> Bool;
+  any :: forall a. (a -> Bool) -> List a -> Bool;
+  appendContext :: String -> NixpkgsAttrs -> String;
+  appendToName :: String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  applyModuleArgsIfFunction :: String -> dynamic -> NixpkgsAttrs -> NixpkgsAttrs;
+  assertMsg :: Bool -> String -> Bool;
+  assertOneOf :: forall a. String -> a -> List a -> Bool;
+  attrByPath :: forall a. List String -> a -> NixpkgsAttrs -> dynamic;
+  attrNames :: forall a. AttrsOf a -> List String;
+  attrsToList :: forall a. AttrsOf a -> List (NixpkgsNameValuePair a);
+  attrVals :: forall a. List String -> AttrsOf a -> List a;
+  attrValues :: forall a. AttrsOf a -> List a;
+  baseNameOf :: Path | String -> String;
+  bitAnd :: Int -> Int -> Int;
+  bitNot :: Int -> Int;
+  bitOr :: Int -> Int -> Int;
+  bitXor :: Int -> Int -> Int;
+  boolToString :: Bool -> String;
+  boolToYesNo :: Bool -> String;
+  callPackagesWith :: NixpkgsAttrs -> dynamic -> NixpkgsAttrs -> dynamic;
+  callPackageWith :: NixpkgsAttrs -> dynamic -> NixpkgsAttrs -> dynamic;
+  canCleanSource :: unknown -> Bool;
+  cartesianProduct :: forall a. AttrsOf (List a) -> List (AttrsOf a);
+  catAttrs :: String -> List NixpkgsAttrs -> List dynamic;
+  ceil :: Number -> Int;
+  checkFlag :: dynamic;
+  checkListOfEnum :: forall a b. String -> List a -> List a -> b -> b;
+  checkReqs :: dynamic;
+  chooseDevOutputs :: List NixpkgsDerivationCore -> List NixpkgsDerivationCore;
+  cleanSource :: NixpkgsSourceLike -> NixpkgsCleanSource;
+  cleanSourceFilter :: String -> String -> Bool;
+  cleanSourceWith :: { src :: NixpkgsSourceLike; filter? :: String -> String -> Bool; name? :: String; } -> NixpkgsCleanSource;
+  closePropagation :: dynamic;
+  cmakeBool :: String -> Bool -> String;
+  cmakeFeature :: String -> String -> String;
+  cmakeOptionType :: String -> String -> String -> String;
+  collect :: (dynamic -> Bool) -> NixpkgsAttrs -> List dynamic;
+  commitIdFromGitRepo :: Path | String -> String;
+  compare :: forall a. a -> a -> Int;
+  compareLists :: forall a. (a -> a -> Int) -> List a -> List a -> Int;
+  compareVersions :: String -> String -> Int;
+  composeExtensions :: NixpkgsExtension -> NixpkgsExtension -> NixpkgsExtension;
+  composeManyExtensions :: List NixpkgsExtension -> NixpkgsExtension;
+  concat :: forall a. List a -> List a -> List a;
+  concatAttrValues :: forall a. AttrsOf (List a) -> List a;
+  concatImapStrings :: forall a. (Int -> a -> String) -> List a -> String;
+  concatImapStringsSep :: forall a. String -> (Int -> a -> String) -> List a -> String;
+  concatLines :: List String -> String;
+  concatLists :: forall a. List (List a) -> List a;
+  concatMap :: forall a b. (a -> List b) -> List a -> List b;
+  concatMapAttrs :: forall a. (String -> a -> NixpkgsAttrs) -> AttrsOf a -> NixpkgsAttrs;
+  concatMapAttrsStringSep :: forall a. String -> (String -> a -> String) -> AttrsOf a -> String;
+  concatMapStrings :: forall a. (a -> String) -> List a -> String;
+  concatMapStringsSep :: forall a. String -> (a -> String) -> List a -> String;
+  concatStrings :: List String -> String;
+  concatStringsSep :: String -> List String -> String;
+  condConcat :: dynamic;
+  const :: forall a b. a -> b -> a;
+  converge :: forall a. (a -> a) -> a -> a;
+  convertHash :: { hash :: String; hashAlgo? :: String; toHashFormat :: String; } -> String;
+  count :: forall a. (a -> Bool) -> List a -> Int;
+  crossLists :: dynamic -> List (List dynamic) -> List dynamic;
+  deepSeq :: forall a b. a -> b -> b;
+  defaultFunctor :: String -> NixpkgsAttrs;
+  defaultMerge :: dynamic;
+  defaultMergeArg :: dynamic;
+  defaultTo :: forall a. a -> a | Null -> a;
+  defaultTypeMerge :: dynamic -> dynamic -> dynamic;
+  dirOf :: Path | String -> Path | String;
+  dischargeProperties :: dynamic -> List dynamic;
+  div :: Int -> Int -> Int;
+  dontDistribute :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  dontRecurseIntoAttrs :: forall r. { ...r } -> { ...r };
+  doRename :: NixpkgsDoRenameArgs -> NixpkgsModuleFunction;
+  drop :: forall a. Int -> List a -> List a;
+  dropEnd :: forall a. Int -> List a -> List a;
+  elem :: forall a. a -> List a -> Bool;
+  elemAt :: forall a. List a -> Int -> a;
+  enableFeature :: Bool -> String -> String;
+  enableFeatureAs :: Bool -> String -> String -> String;
+  escape :: List String -> String -> String;
+  escapeRegex :: String -> String;
+  escapeShellArg :: unknown -> String;
+  escapeShellArgs :: List unknown -> String;
+  escapeURL :: String -> String;
+  escapeXML :: String -> String;
+  evalModules :: NixpkgsEvalModulesArgs -> NixpkgsEvalModulesResult;
+  evalOptionValue :: List String -> NixpkgsAttrs -> List dynamic -> NixpkgsAttrs;
+  extendDerivation :: Bool -> NixpkgsAttrs -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  extendMkDerivation :: NixpkgsExtendMkDerivationArgs -> dynamic;
+  extends :: NixpkgsExtension -> (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsAttrs -> NixpkgsAttrs;
+  fakeHash :: String;
+  fakeSha256 :: String;
+  fakeSha512 :: String;
+  fileContents :: Path | String -> String;
+  filter :: forall a. (a -> Bool) -> List a -> List a;
+  filterAttrs :: forall a. (String -> a -> Bool) -> AttrsOf a -> AttrsOf a;
+  filterAttrsRecursive :: (String -> dynamic -> Bool) -> NixpkgsAttrs -> NixpkgsAttrs;
+  filterOverrides :: List dynamic -> List dynamic;
+  filterSource :: (String -> String -> Bool) -> Path -> Path;
+  findFirst :: forall a b. (a -> Bool) -> b -> List a -> a | b;
+  findSingle :: forall a b c. (a -> Bool) -> b -> c -> List a -> a | b | c;
+  fix :: forall a. (a -> a) -> a;
+  fix' :: (dynamic -> NixpkgsAttrs) -> NixpkgsAttrs;
+  fixedWidthNumber :: Int -> Int -> String;
+  fixedWidthString :: Int -> String -> String -> String;
+  fixMergeModules :: List dynamic -> NixpkgsAttrs -> NixpkgsAttrs;
+  fixupOptionType :: List String -> NixpkgsAttrs -> NixpkgsAttrs;
+  flakeRefToString :: NixpkgsAttrs -> String;
+  flatten :: unknown -> List dynamic;
+  flip :: forall a b c. (a -> b -> c) -> b -> a -> c;
+  floor :: Number -> Int;
+  fold :: forall a b. (a -> b -> b) -> b -> List a -> b;
+  foldArgs :: dynamic;
+  foldAttrs :: forall a b. (a -> b -> b) -> b -> List (AttrsOf a) -> AttrsOf b;
+  foldl :: forall a b. (b -> a -> b) -> b -> List a -> b;
+  foldl' :: forall a b. (b -> a -> b) -> b -> List a -> b;
+  foldlAttrs :: forall acc a. (acc -> String -> a -> acc) -> acc -> AttrsOf a -> acc;
+  foldr :: forall a b. (a -> b -> b) -> b -> List a -> b;
+  forEach :: forall a b. List a -> (a -> b) -> List b;
+  fromHexString :: String -> Int;
+  fromJSON :: String -> dynamic;
+  fromTOML :: String -> dynamic;
+  fullDepEntry :: String -> List String -> { text :: String; deps :: List String; };
+  functionArgs :: unknown -> AttrsOf Bool;
+  genAttrs :: forall a. List String -> (String -> a) -> AttrsOf a;
+  genAttrs' :: forall a b. List a -> (a -> NixpkgsNameValuePair b) -> AttrsOf b;
+  genericClosure :: dynamic -> List dynamic;
+  genList :: forall a. (Int -> a) -> Int -> List a;
+  getAttr :: String -> NixpkgsAttrs -> dynamic;
+  getAttrFromPath :: List String -> NixpkgsAttrs -> dynamic;
+  getAttrs :: forall a. List String -> AttrsOf a -> AttrsOf a;
+  getBin :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getContext :: String -> NixpkgsAttrs;
+  getDev :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getExe :: NixpkgsDerivationCore -> String;
+  getExe' :: NixpkgsDerivationCore -> String -> String;
+  getFiles :: List { file :: String | Path; ... } -> List (String | Path);
+  getFirstOutput :: List String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getInclude :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getLib :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getLicenseFromSpdxId :: String -> NixpkgsLicense;
+  getLicenseFromSpdxIdOr :: forall a. String -> a -> NixpkgsLicense | a;
+  getMan :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getName :: String | NixpkgsDerivationCore -> String;
+  getOutput :: String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getStatic :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  getValue :: dynamic;
+  getValues :: forall a. List { value :: a; ... } -> List a;
+  getVersion :: String | NixpkgsDerivationCore -> String;
+  groupBy :: forall a. (a -> String) -> List a -> AttrsOf (List a);
+  groupBy' :: forall a b. (b -> a -> b) -> b -> (a -> String) -> List a -> AttrsOf b;
+  hasAttr :: String -> NixpkgsAttrs -> Bool;
+  hasAttrByPath :: List String -> NixpkgsAttrs -> Bool;
+  hasContext :: String -> Bool;
+  hashFile :: String -> Path -> String;
+  hashString :: String -> String -> String;
+  hasInfix :: String -> String -> Bool;
+  hasPrefix :: String -> String -> Bool;
+  hasSuffix :: String -> String -> Bool;
+  head :: forall a. List a -> a;
+  hiPrio :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  hiPrioSet :: NixpkgsAttrs -> NixpkgsAttrs;
+  hydraJob :: forall a. a -> a;
+  id :: forall a. a -> a;
+  ifEnable :: dynamic;
+  ifilter0 :: forall a. (Int -> a -> Bool) -> List a -> List a;
+  imap :: dynamic;
+  imap0 :: forall a b. (Int -> a -> b) -> List a -> List b;
+  imap1 :: forall a b. (Int -> a -> b) -> List a -> List b;
+  importJSON :: Path -> dynamic;
+  importTOML :: Path -> dynamic;
+  info :: forall a. String -> a -> a;
+  init :: forall a. List a -> List a;
+  innerClosePropagation :: dynamic;
+  innerModifySumArgs :: dynamic;
+  inNixShell :: Bool;
+  inPureEvalMode :: Bool;
+  intersectAttrs :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  intersectLists :: forall a. List a -> List a -> List a;
+  intersperse :: forall a. a -> List a -> List a;
+  isAttrs :: unknown -> Bool;
+  isBool :: unknown -> Bool;
+  isDerivation :: unknown -> Bool;
+  isFloat :: unknown -> Bool;
+  isFunction :: unknown -> Bool;
+  isInOldestRelease :: Int -> Bool;
+  isInt :: unknown -> Bool;
+  isList :: unknown -> Bool;
+  isOption :: unknown -> Bool;
+  isOptionType :: unknown -> Bool;
+  isPath :: unknown -> Bool;
+  isStorePath :: unknown -> Bool;
+  isString :: unknown -> Bool;
+  isStringLike :: unknown -> Bool;
+  isType :: String -> unknown -> Bool;
+  isValidPosixName :: String -> Bool;
+  join :: String -> List String -> String;
+  last :: forall a. List a -> a;
+  lazyDerivation :: { derivation :: NixpkgsDerivationCore; meta? :: NixpkgsMeta; passthru? :: NixpkgsAttrs; outputs? :: List String; } -> NixpkgsDerivationCore;
+  lazyGenericClosure :: dynamic;
+  length :: forall a. List a -> Int;
+  lessThan :: forall a. a -> a -> Bool;
+  licensesSpdx :: AttrsOf NixpkgsLicense;
+  listDfs :: forall a. Bool -> (a -> a -> Bool) -> List a -> { visited :: List a; rest? :: List a; minimal? :: a; };
+  listToAttrs :: forall a. List (NixpkgsNameValuePair a) -> AttrsOf a;
+  literalExpression :: String -> NixpkgsLiteral;
+  literalMD :: String -> NixpkgsLiteral;
+  lowerChars :: List String;
+  lowPrio :: NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  lowPrioSet :: NixpkgsAttrs -> NixpkgsAttrs;
+  makeBinPath :: List NixpkgsDerivationCore -> String;
+  makeExtensible :: (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsExtensible;
+  makeExtensibleWithCustomName :: String -> (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsAttrs;
+  makeIncludePath :: List NixpkgsDerivationCore -> String;
+  makeLibraryPath :: List NixpkgsDerivationCore -> String;
+  makeOverridable :: forall a b. (a -> b) -> a -> b;
+  makeScope :: (NixpkgsAttrs -> dynamic) -> (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsScope;
+  makeScopeWithSplicing :: dynamic -> dynamic;
+  makeScopeWithSplicing' :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsScope;
+  makeSearchPath :: String -> List (String | Path | NixpkgsDerivationCore) -> String;
+  makeSearchPathOutput :: String -> String -> List NixpkgsDerivationCore -> String;
+  map :: forall a b. (a -> b) -> List a -> List b;
+  mapAttrs :: forall a b. (String -> a -> b) -> AttrsOf a -> AttrsOf b;
+  mapAttrs' :: forall a b. (String -> a -> NixpkgsNameValuePair b) -> AttrsOf a -> AttrsOf b;
+  mapAttrsRecursive :: (List String -> dynamic -> dynamic) -> NixpkgsAttrs -> NixpkgsAttrs;
+  mapAttrsRecursiveCond :: (NixpkgsAttrs -> Bool) -> (List String -> dynamic -> dynamic) -> NixpkgsAttrs -> NixpkgsAttrs;
+  mapAttrsToList :: forall a b. (String -> a -> b) -> AttrsOf a -> List b;
+  mapAttrsToListRecursive :: forall b. (List String -> dynamic -> b) -> NixpkgsAttrs -> List b;
+  mapAttrsToListRecursiveCond :: forall b. (List String -> NixpkgsAttrs -> Bool) -> (List String -> dynamic -> b) -> NixpkgsAttrs -> List b;
+  mapCartesianProduct :: forall a b. (AttrsOf a -> b) -> AttrsOf (List a) -> List b;
+  mapCrossIndex :: (dynamic -> dynamic) -> NixpkgsAttrs -> NixpkgsAttrs;
+  mapDerivationAttrset :: (NixpkgsDerivationCore -> NixpkgsDerivationCore) -> NixpkgsAttrs -> NixpkgsAttrs;
+  mapNullable :: forall a b. (a -> b) -> a | Null -> b | Null;
+  match :: String -> String -> List (String | Null) | Null;
+  matchAttrs :: NixpkgsAttrs -> NixpkgsAttrs -> Bool;
+  max :: forall a. a -> a -> a;
+  maybeAttr :: dynamic;
+  maybeAttrNullable :: dynamic;
+  maybeEnv :: dynamic;
+  mergeAttrBy :: dynamic;
+  mergeAttrByFunc :: dynamic;
+  mergeAttrs :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  mergeAttrsByFuncDefaults :: dynamic;
+  mergeAttrsByFuncDefaultsClean :: dynamic;
+  mergeAttrsConcatenateValues :: dynamic;
+  mergeAttrsList :: List NixpkgsAttrs -> NixpkgsAttrs;
+  mergeAttrsNoOverride :: dynamic;
+  mergeAttrsWithFunc :: dynamic;
+  mergeDefaultOption :: List String -> List NixpkgsOptionDefinition -> dynamic;
+  mergeDefinitions :: List String -> NixpkgsOptionType dynamic -> List dynamic -> NixpkgsAttrs;
+  mergeEqualOption :: List String -> List NixpkgsOptionDefinition -> dynamic;
+  mergeModules :: List String -> List dynamic -> NixpkgsAttrs;
+  mergeModules' :: List String -> List dynamic -> List dynamic -> NixpkgsAttrs;
+  mergeOneOption :: List String -> List NixpkgsOptionDefinition -> dynamic;
+  mergeOptionDecls :: List String -> List dynamic -> NixpkgsAttrs;
+  mergeUniqueOption :: { message :: String; } -> List String -> List NixpkgsOptionDefinition -> dynamic;
+  mesonBool :: String -> Bool -> String;
+  mesonEnable :: String -> Bool -> String;
+  mesonOption :: String -> String -> String;
+  min :: forall a. a -> a -> a;
+  mirrorFunctionArgs :: dynamic -> dynamic -> dynamic;
+  mkAfter :: forall a. a -> NixpkgsModuleOrder a;
+  mkAliasAndWrapDefinitions :: (dynamic -> dynamic) -> NixpkgsAttrs -> dynamic;
+  mkAliasDefinitions :: NixpkgsAttrs -> dynamic;
+  mkAliasOptionModule :: List String -> List String -> NixpkgsModuleFunction;
+  mkAliasOptionModuleMD :: List String -> List String -> NixpkgsModuleFunction;
+  mkAssert :: forall a. Bool -> String -> a -> NixpkgsModuleIf a;
+  mkBefore :: forall a. a -> NixpkgsModuleOrder a;
+  mkChangedOptionModule :: List String -> List String -> (NixpkgsAttrs -> dynamic) -> NixpkgsModuleFunction;
+  mkDefault :: forall a. a -> NixpkgsModuleOverride a;
+  mkDefinition :: forall a. { file :: String | Path; value :: a; } -> NixpkgsModuleDefinition a;
+  mkDerivedConfig :: forall a b. NixpkgsAttrs -> (a -> b) -> NixpkgsModuleOverride b;
+  mkEnableOption :: String -> NixpkgsOption Bool;
+  mkEUI64Suffix :: String -> String;
+  mkFixStrictness :: forall a. a -> a;
+  mkForce :: forall a. a -> NixpkgsModuleOverride a;
+  mkIf :: forall a. Bool -> a -> NixpkgsModuleIf a;
+  mkImageMediaOverride :: forall a. a -> NixpkgsModuleOverride a;
+  mkLuaInline :: String -> { _type :: "lua-inline"; expr :: String; };
+  mkMerge :: forall a. List a -> NixpkgsModuleMerge a;
+  mkMergedOptionModule :: List (List String) -> List String -> (NixpkgsAttrs -> dynamic) -> NixpkgsModuleFunction;
+  mkOption :: forall a. NixpkgsMkOptionArgs a -> NixpkgsOption a;
+  mkOptionDefault :: forall a. a -> NixpkgsModuleOverride a;
+  mkOptionType :: forall a. NixpkgsMkOptionTypeArgs a -> NixpkgsOptionType a;
+  mkOrder :: forall a. Int -> a -> NixpkgsModuleOrder a;
+  mkOverride :: forall a. Int -> a -> NixpkgsModuleOverride a;
+  mkPackageOption :: NixpkgsAttrs -> String | List String -> NixpkgsMkPackageOptionArgs -> NixpkgsOption NixpkgsDerivation;
+  mkRemovedOptionModule :: List String -> String -> NixpkgsModuleFunction;
+  mkRenamedOptionModule :: List String -> List String -> NixpkgsModuleFunction;
+  mkRenamedOptionModuleWith :: { from :: List String; to :: List String; sinceRelease :: Int; } -> NixpkgsModuleFunction;
+  mkSinkUndeclaredOptions :: NixpkgsAttrs -> NixpkgsOption dynamic;
+  mkVMOverride :: forall a. a -> NixpkgsModuleOverride a;
+  mod :: Int -> Int -> Int;
+  modifySumArgs :: dynamic;
+  mul :: Int -> Int -> Int;
+  mutuallyExclusive :: forall a. List a -> List a -> Bool;
+  nameFromURL :: String -> String -> String;
   nameValuePair :: forall a. String -> a -> NixpkgsNameValuePair a;
-  listToAttrs :: forall a. List (NixpkgsNameValuePair a) -> dynamic;
-  attrNames :: dynamic -> List String;
-  attrValues :: dynamic -> List dynamic;
-  filter :: forall a. NixpkgsPredicate a -> List a -> List a;
-  all :: forall a. NixpkgsPredicate a -> List a -> Bool;
-  any :: forall a. NixpkgsPredicate a -> List a -> Bool;
-  concatMap :: forall a b. NixpkgsMapper a (List b) -> List a -> List b;
-  foldl' :: forall a b. NixpkgsFolder a b -> a -> List b -> a;
+  naturalSort :: List String -> List String;
+  nixpkgsVersion :: String;
+  nixType :: dynamic;
+  noDepEntry :: String -> { text :: String; deps :: List String; };
+  nvs :: dynamic;
+  oldestSupportedReleaseIsAtLeast :: Int -> Bool;
   optional :: forall a. Bool -> a -> List a;
+  optionalAttrs :: forall r. Bool -> { ...r } -> { ...r };
+  optionalDrvAttr :: forall a. Bool -> a -> a | Null;
   optionals :: forall a. Bool -> List a -> List a;
-  optionalAttrs :: Bool -> dynamic -> dynamic;
-  mkIf :: Bool -> dynamic -> dynamic;
-  mkMerge :: List dynamic -> dynamic;
-  mkDefault :: dynamic -> dynamic;
-  mkForce :: dynamic -> dynamic;
+  optionalString :: Bool -> String -> String;
+  optionAttrSetToDocList :: NixpkgsAttrs -> List NixpkgsAttrs;
+  optionAttrSetToDocList' :: List String -> NixpkgsAttrs -> List NixpkgsAttrs;
+  "or" :: Bool -> Bool -> Bool;
+  overrideDerivation :: NixpkgsDerivationCore -> (NixpkgsAttrs -> NixpkgsAttrs) -> NixpkgsDerivationCore;
+  overrideExisting :: forall r. { ...r } -> NixpkgsAttrs -> { ...r };
+  packagesFromDirectoryRecursive :: { callPackage :: dynamic; directory :: Path; newScope? :: dynamic; recurseIntoDirectory? :: dynamic; } -> NixpkgsAttrs;
+  packEntry :: List String -> String -> { text :: String; deps :: List String; };
+  parseDrvName :: String -> { name :: String; version :: String; };
+  parseFlakeRef :: String -> NixpkgsAttrs;
+  partition :: forall a. (a -> Bool) -> List a -> { right :: List a; wrong :: List a; };
+  pathExists :: Path | String -> Bool;
+  pathHasContext :: String -> Bool;
+  pathIsDirectory :: Path | String -> Bool;
+  pathIsGitRepo :: Path | String -> Bool;
+  pathIsRegularFile :: Path | String -> Bool;
+  pathType :: Path | String -> NixpkgsFileType;
+  pipe :: forall a. a -> List dynamic -> dynamic;
+  placeholder :: String -> String;
+  pushDownProperties :: dynamic -> List dynamic;
+  range :: Int -> Int -> List Int;
+  readDir :: Path -> AttrsOf NixpkgsFileType;
+  readFile :: Path | String -> String;
+  readFileType :: Path -> NixpkgsFileType;
+  recurseIntoAttrs :: forall r. { ...r } -> { ...r };
+  recursiveUpdate :: NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  recursiveUpdateUntil :: (List String -> dynamic -> dynamic -> Bool) -> NixpkgsAttrs -> NixpkgsAttrs -> NixpkgsAttrs;
+  remove :: forall a. a -> List a -> List a;
+  removeAttrs :: NixpkgsAttrs -> List String -> NixpkgsAttrs;
+  removePrefix :: String -> String -> String;
+  removeSuffix :: String -> String -> String;
+  renameCrossIndexFrom :: String -> NixpkgsAttrs -> NixpkgsAttrs;
+  renameCrossIndexTo :: String -> NixpkgsAttrs -> NixpkgsAttrs;
+  replaceElemAt :: forall a. List a -> Int -> a -> List a;
+  replaceString :: String -> String -> String -> String;
+  replaceStrings :: List String -> List String -> String -> String;
+  replicate :: forall a. Int -> a -> List a;
+  repoRevToName :: String -> dynamic;
+  reverseList :: forall a. List a -> List a;
+  revOrTag :: String | Null -> String | Null -> String | Null;
+  runTests :: NixpkgsAttrs -> List { name :: String; expected :: dynamic; result :: dynamic; };
+  scrubOptionValue :: forall a. a -> a;
+  seq :: forall a b. a -> b -> b;
+  setAttr :: dynamic;
+  setAttrByPath :: forall a. List String -> a -> NixpkgsAttrs;
+  setAttrMerge :: dynamic;
+  setDefaultModuleLocation :: String | Path -> dynamic -> NixpkgsAttrs;
+  setFunctionArgs :: dynamic -> AttrsOf Bool -> dynamic;
+  setName :: String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  setPrio :: Int -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  setType :: forall r. String -> { ...r } -> { ...r };
+  showAttrPath :: List String -> String;
+  showFiles :: List (String | Path) -> String;
+  showOption :: List String -> String;
+  showOptionWithDefLocs :: { loc :: List String; files :: List (String | Path); ... } -> String;
+  showWarnings :: forall a. List String -> a -> a;
+  singleton :: forall a. a -> List a;
+  sort :: forall a. (a -> a -> Bool) -> List a -> List a;
+  sortOn :: forall a b. (a -> b) -> List a -> List a;
+  sortProperties :: List dynamic -> List dynamic;
+  sourceByRegex :: NixpkgsSourceLike -> List String -> NixpkgsCleanSource;
+  sourceFilesBySuffices :: NixpkgsSourceLike -> List String -> NixpkgsCleanSource;
+  split :: String -> String -> List (String | List (String | Null));
+  splitByAndCompare :: forall a. (a -> Bool) -> (a -> a -> Int) -> (a -> a -> Int) -> a -> a -> Int;
+  splitString :: String -> String -> List String;
+  splitStringBy :: (String -> String -> Bool) -> Bool -> String -> List String;
+  splitVersion :: String -> List String;
+  stringAfter :: List String -> String -> { text :: String; deps :: List String; };
+  stringAsChars :: (String -> String) -> String -> String;
+  stringLength :: String -> Int;
+  stringToCharacters :: String -> List String;
+  sub :: Int -> Int -> Int;
+  sublist :: forall a. Int -> Int -> List a -> List a;
+  substring :: Int -> Int -> String -> String;
+  subtractLists :: forall a. List a -> List a -> List a;
+  tail :: forall a. List a -> List a;
+  take :: forall a. Int -> List a -> List a;
+  takeEnd :: forall a. Int -> List a -> List a;
+  testAllTrue :: List Bool -> { expr :: List Bool; expected :: List Bool; };
+  textClosureList :: NixpkgsAttrs -> List String -> List String;
+  textClosureMap :: (String -> String) -> NixpkgsAttrs -> List String -> String;
+  throwIf :: forall a. Bool -> String -> a -> a;
+  throwIfNot :: forall a. Bool -> String -> a -> a;
+  toBaseDigits :: Int -> Int -> List Int;
+  toCamelCase :: String -> String;
+  toDerivation :: Path | String -> NixpkgsDerivationCore;
+  toExtension :: dynamic -> NixpkgsExtension;
+  toFile :: String -> String -> Path;
+  toFunction :: dynamic -> dynamic;
+  toHexString :: Int -> String;
+  toInt :: String -> Int;
+  toIntBase10 :: String -> Int;
+  toJSON :: unknown -> String;
+  toList :: unknown -> List dynamic;
+  toLower :: String -> String;
+  toposort :: forall a. (a -> a -> Bool) -> List a -> { result? :: List a; cycle? :: List a; loops? :: List a; };
+  toSentenceCase :: String -> String;
+  toShellVar :: String -> unknown -> String;
+  toShellVars :: NixpkgsAttrs -> String;
+  toString :: unknown -> String;
+  toUpper :: String -> String;
+  toXML :: unknown -> String;
+  trace :: forall a. unknown -> a -> a;
+  traceFnSeqN :: Int -> String -> dynamic -> dynamic -> dynamic;
+  traceIf :: forall a. Bool -> unknown -> a -> a;
+  traceSeq :: forall a. unknown -> a -> a;
+  traceSeqN :: forall a. Int -> unknown -> a -> a;
+  traceVal :: forall a. a -> a;
+  traceValFn :: forall a. (a -> dynamic) -> a -> a;
+  traceValSeq :: forall a. a -> a;
+  traceValSeqFn :: forall a. (a -> dynamic) -> a -> a;
+  traceValSeqN :: forall a. Int -> a -> a;
+  traceValSeqNFn :: forall a. (a -> dynamic) -> Int -> a -> a;
+  trim :: String -> String;
+  trimWith :: { start? :: Bool; end? :: Bool; } -> String -> String;
+  tryEval :: forall a. a -> { success :: Bool; value :: a | false; };
+  typeOf :: unknown -> String;
+  unifyModuleSyntax :: String | Path -> String -> dynamic -> NixpkgsAttrs;
+  uniqList :: dynamic;
+  uniqListExt :: dynamic;
+  unique :: forall a. List a -> List a;
+  uniqueStrings :: List String -> List String;
+  unknownModule :: String;
+  unsafeDiscardOutputDependency :: String -> String;
+  unsafeDiscardStringContext :: String -> String;
+  unsafeGetAttrPos :: String -> NixpkgsAttrs -> { file :: String; line :: Int; column :: Int; } | Null;
+  updateManyAttrsByPath :: List { path :: List String; update :: dynamic -> dynamic; } -> NixpkgsAttrs -> NixpkgsAttrs;
+  updateName :: (String -> String) -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  upperChars :: List String;
+  version :: String;
+  versionAtLeast :: String -> String -> Bool;
+  versionOlder :: String -> String -> Bool;
+  warn :: forall a. String -> a -> a;
+  warnIf :: forall a. Bool -> String -> a -> a;
+  warnIfNot :: forall a. Bool -> String -> a -> a;
+  warnOnInstantiate :: String -> NixpkgsDerivationCore -> NixpkgsDerivationCore;
+  withFeature :: Bool -> String -> String;
+  withFeatureAs :: Bool -> String -> String -> String;
+  xor :: Bool -> Bool -> Bool;
+  zipAttrs :: forall a. List (AttrsOf a) -> AttrsOf (List a);
+  zipAttrsWith :: forall a b. (String -> List a -> b) -> List (AttrsOf a) -> AttrsOf b;
+  zipAttrsWithNames :: forall a b. List String -> (String -> List a -> b) -> List (AttrsOf a) -> AttrsOf b;
+  zipLists :: forall a b. List a -> List b -> List { fst :: a; snd :: b; };
+  zipListsWith :: forall a b c. (a -> b -> c) -> List a -> List b -> List c;
+  ...
 };
