@@ -10,6 +10,7 @@ module Server
     asText,
     clearDiagnostics,
     clientCapabilities,
+    serverCapabilities,
     completionResult,
     contentLengthFromHeaders,
     contentChanges,
@@ -80,57 +81,85 @@ asInt :: Value -> Int
 asInt (Number n) = floor n
 asInt _ = 0
 
+-- | Server capabilities advertised in the @initialize@ response (push-model
+-- diagnostics).
 clientCapabilities :: Value
-clientCapabilities =
+clientCapabilities = serverCapabilities False
+
+-- | Server capabilities; with @pullDiagnostics@ the server also advertises
+-- @diagnosticProvider@ and clients pull diagnostics instead of receiving
+-- @publishDiagnostics@ notifications.
+serverCapabilities :: Bool -> Value
+serverCapabilities pullDiagnostics =
   object
     [ "capabilities"
         .= object
-          [ "positionEncoding" .= ("utf-16" :: Text),
-            "hoverProvider" .= True,
-            "completionProvider" .= object ["triggerCharacters" .= ["." :: Text]],
-            "signatureHelpProvider" .= object ["triggerCharacters" .= [" " :: Text, "("]],
-            "definitionProvider" .= True,
-            "declarationProvider" .= True,
-            "referencesProvider" .= True,
-            "renameProvider" .= True,
-            "documentSymbolProvider" .= True,
-            "workspaceSymbolProvider" .= True,
-            "workspace"
-              .= object
-                [ "didChangeWatchedFiles" .= object ["dynamicRegistration" .= False],
-                  "didChangeConfiguration" .= object ["dynamicRegistration" .= False]
-                ],
-            "codeActionProvider" .= True,
-            "documentHighlightProvider" .= True,
-            "documentFormattingProvider" .= True,
-            "documentLinkProvider" .= object ["resolveProvider" .= False],
-            "foldingRangeProvider" .= True,
-            "inlayHintProvider" .= object ["resolveProvider" .= False],
-            "semanticTokensProvider"
-              .= object
-                [ "legend"
-                    .= object
-                      [ "tokenTypes"
-                          .= [ "keyword" :: Text,
-                               "type",
-                               "function",
-                               "variable",
-                               "property",
-                               "string",
-                               "number",
-                               "operator"
-                             ],
-                        "tokenModifiers" .= ([] :: [Text])
-                      ],
-                  "full" .= True
-                ],
-            "textDocumentSync"
-              .= object
-                [ "openClose" .= True,
-                  "change" .= (2 :: Int),
-                  "save" .= object ["includeText" .= True]
-                ]
-          ]
+          ( [ "positionEncoding" .= ("utf-16" :: Text),
+              "hoverProvider" .= True,
+              "completionProvider"
+                .= object
+                  [ "triggerCharacters" .= ["." :: Text, "/"],
+                    "resolveProvider" .= True,
+                    "completionItem" .= object ["labelDetailsSupport" .= True]
+                  ],
+              "signatureHelpProvider"
+                .= object
+                  [ "triggerCharacters" .= [" " :: Text, "("],
+                    "retriggerCharacters" .= [" " :: Text]
+                  ],
+              "definitionProvider" .= True,
+              "declarationProvider" .= True,
+              "referencesProvider" .= True,
+              "renameProvider" .= object ["prepareProvider" .= True],
+              "documentSymbolProvider" .= True,
+              "workspaceSymbolProvider" .= True,
+              "workspace"
+                .= object
+                  [ "didChangeWatchedFiles" .= object ["dynamicRegistration" .= False],
+                    "didChangeConfiguration" .= object ["dynamicRegistration" .= False]
+                  ],
+              "codeActionProvider" .= object ["codeActionKinds" .= ["quickfix" :: Text, "refactor.rewrite"]],
+              "documentHighlightProvider" .= True,
+              "documentFormattingProvider" .= True,
+              "documentLinkProvider" .= object ["resolveProvider" .= False],
+              "foldingRangeProvider" .= True,
+              "selectionRangeProvider" .= True,
+              "inlayHintProvider" .= object ["resolveProvider" .= False],
+              "semanticTokensProvider"
+                .= object
+                  [ "legend"
+                      .= object
+                        [ "tokenTypes"
+                            .= [ "keyword" :: Text,
+                                 "type",
+                                 "function",
+                                 "variable",
+                                 "property",
+                                 "string",
+                                 "number",
+                                 "operator",
+                                 "parameter",
+                                 "typeParameter",
+                                 "comment",
+                                 "namespace",
+                                 "decorator"
+                               ],
+                          "tokenModifiers" .= ["declaration" :: Text, "readonly", "defaultLibrary", "deprecated"]
+                        ],
+                    "full" .= True,
+                    "range" .= True
+                  ],
+              "textDocumentSync"
+                .= object
+                  [ "openClose" .= True,
+                    "change" .= (2 :: Int),
+                    "save" .= object ["includeText" .= True]
+                  ]
+            ]
+              <> [ "diagnosticProvider" .= object ["interFileDependencies" .= True, "workspaceDiagnostics" .= False]
+                 | pullDiagnostics
+                 ]
+          )
     ]
 
 firstChange :: Maybe Value -> Maybe Value
@@ -433,15 +462,10 @@ semanticRange content err = do
         else findWordRange content needle
 
 firstQuoted :: Text -> Maybe Text
-firstQuoted text = do
-  (_, suffix) <- guardBreak (T.breakOn "\"" text)
-  let rest = T.drop 1 suffix
-      (quoted, trailing) = T.breakOn "\"" rest
-  if T.null trailing then Nothing else Just quoted
-  where
-    guardBreak pair@(_, suffix)
-      | T.null suffix = Nothing
-      | otherwise = Just pair
+firstQuoted text =
+  case [(T.length before, name) | q <- ["\"", "`"], before : name : _ : _ <- [T.splitOn q text]] of
+    [] -> Nothing
+    found -> Just (snd (minimum found))
 
 completionCandidates :: Analysis -> Text -> Int -> Int -> [(Text, Scheme)]
 completionCandidates analysis content lineNo charNo =

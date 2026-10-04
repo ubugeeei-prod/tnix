@@ -18,6 +18,8 @@ module SessionDocuments
     lookupDocumentText,
     documentsFromList,
     updateDocuments,
+    updateDocumentText,
+    storeDocumentAnalysis,
 
     -- * Loading
     effectiveCachedAnalysis,
@@ -193,12 +195,55 @@ loadDocumentAnalysis readDocument analyze docs file =
     Just cached ->
       case effectiveCachedAnalysis cached of
         Just result -> pure result
-        Nothing -> analyze file (cachedDocumentText cached)
+        Nothing -> do
+          fresh <- analyze file (cachedDocumentText cached)
+          pure $ case (fresh, cachedDocumentLastGoodAnalysis cached) of
+            (Left _, Just lastGood) -> Right lastGood
+            _ -> fresh
     Nothing -> do
       contentResult <- readDocument file
       case contentResult of
         Left err -> pure (Left err)
         Right content -> analyze file content
+
+-- | Apply a @didChange@ to the cached text without analysing it.
+--
+-- Used for debounced diagnostics: requests that arrive before the debounce
+-- fires analyse lazily (and fall back to the last good analysis), while the
+-- deferred publish stores the fresh result with 'storeDocumentAnalysis'.
+updateDocumentText :: Documents -> Value -> Either String (Documents, FilePath)
+updateDocumentText docs msg = do
+  let params = field "params" msg
+      textDocument = params >>= field "textDocument"
+      file = maybe "" (normalise . uriPath) (textDocument >>= field "uri" >>= asText)
+  base <- maybe (Left "cannot apply changes to a document that is not open") Right (lookupDocumentText file docs)
+  content <- applyContentChanges base params
+  let previous = lookupCachedDocument file docs
+      lastGood =
+        previous >>= \cached -> case cachedDocumentAnalysis cached of
+          Just (Right result) -> Just result
+          _ -> cachedDocumentLastGoodAnalysis cached
+  pure
+    ( Documents
+        ( Map.insert
+            file
+            CachedDocument
+              { cachedDocumentText = content,
+                cachedDocumentAnalysis = Nothing,
+                cachedDocumentLastGoodAnalysis = lastGood
+              }
+            (unDocuments docs)
+        ),
+      file
+    )
+
+-- | Record an analysis result for the given text, if the text is still
+-- current.
+storeDocumentAnalysis :: FilePath -> Text -> Either String Analysis -> Documents -> Documents
+storeDocumentAnalysis file content result docs =
+  case lookupDocumentText file docs of
+    Just current | current == content -> insertDocument file content (Just result) docs
+    _ -> docs
 
 -- | Load every file in the workspace alongside the discovered
 -- @builtins.d.tnix@ ambient declaration, reusing the cache where possible.

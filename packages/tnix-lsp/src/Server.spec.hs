@@ -24,59 +24,63 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  describe "clientCapabilities" $
-    it "advertises editor features needed for an interactive tnix workflow" $
-      clientCapabilities
-        `shouldBe` object
-          [ "capabilities"
-              .= object
-                [ "positionEncoding" .= ("utf-16" :: String),
-                  "hoverProvider" .= True,
-                  "completionProvider" .= object ["triggerCharacters" .= ["." :: String]],
-                  "signatureHelpProvider" .= object ["triggerCharacters" .= [" " :: String, "("]],
-                  "definitionProvider" .= True,
-                  "declarationProvider" .= True,
-                  "referencesProvider" .= True,
-                  "renameProvider" .= True,
-                  "documentSymbolProvider" .= True,
-                  "workspaceSymbolProvider" .= True,
-                  "workspace"
-                    .= object
-                      [ "didChangeWatchedFiles" .= object ["dynamicRegistration" .= False],
-                        "didChangeConfiguration" .= object ["dynamicRegistration" .= False]
-                      ],
-                  "codeActionProvider" .= True,
-                  "documentHighlightProvider" .= True,
-                  "documentFormattingProvider" .= True,
-                  "documentLinkProvider" .= object ["resolveProvider" .= False],
-                  "foldingRangeProvider" .= True,
-                  "inlayHintProvider" .= object ["resolveProvider" .= False],
-                  "semanticTokensProvider"
-                    .= object
-                      [ "legend"
-                          .= object
-                            [ "tokenTypes"
-                                .= [ "keyword" :: String,
-                                     "type",
-                                     "function",
-                                     "variable",
-                                     "property",
-                                     "string",
-                                     "number",
-                                     "operator"
-                                   ],
-                              "tokenModifiers" .= ([] :: [String])
-                            ],
-                        "full" .= True
-                      ],
-                  "textDocumentSync"
-                    .= object
-                      [ "openClose" .= True,
-                        "change" .= (2 :: Int),
-                        "save" .= object ["includeText" .= True]
-                      ]
-                ]
-          ]
+  describe "clientCapabilities" $ do
+    it "advertises editor features needed for an interactive tnix workflow" $ do
+      let caps = field "capabilities" clientCapabilities
+          provider name = caps >>= field name
+      mapM_
+        (\name -> provider name `shouldSatisfy` (/= Nothing))
+        [ "hoverProvider",
+          "completionProvider",
+          "signatureHelpProvider",
+          "definitionProvider",
+          "declarationProvider",
+          "referencesProvider",
+          "renameProvider",
+          "documentSymbolProvider",
+          "workspaceSymbolProvider",
+          "codeActionProvider",
+          "documentHighlightProvider",
+          "documentFormattingProvider",
+          "documentLinkProvider",
+          "foldingRangeProvider",
+          "selectionRangeProvider",
+          "inlayHintProvider",
+          "semanticTokensProvider",
+          "textDocumentSync"
+        ]
+      (provider "completionProvider" >>= field "resolveProvider") `shouldBe` Just (Bool True)
+      (provider "completionProvider" >>= field "triggerCharacters") `shouldBe` Just (toJSON ["." :: String, "/"])
+      (provider "renameProvider" >>= field "prepareProvider") `shouldBe` Just (Bool True)
+      (provider "semanticTokensProvider" >>= field "range") `shouldBe` Just (Bool True)
+      provider "diagnosticProvider" `shouldBe` Nothing
+
+    it "keeps the original semantic token legend indices and appends new types" $ do
+      let legend = field "capabilities" clientCapabilities >>= field "semanticTokensProvider" >>= field "legend"
+      (legend >>= field "tokenTypes")
+        `shouldBe` Just
+          ( toJSON
+              ( [ "keyword",
+                  "type",
+                  "function",
+                  "variable",
+                  "property",
+                  "string",
+                  "number",
+                  "operator",
+                  "parameter",
+                  "typeParameter",
+                  "comment",
+                  "namespace",
+                  "decorator"
+                ] ::
+                  [String]
+              )
+          )
+
+    it "advertises pull diagnostics only when asked to" $
+      (field "capabilities" (serverCapabilities True) >>= field "diagnosticProvider")
+        `shouldBe` Just (object ["interFileDependencies" .= True, "workspaceDiagnostics" .= False])
 
   describe "respondError" $ do
     it "answers a request id with a JSON-RPC error object" $

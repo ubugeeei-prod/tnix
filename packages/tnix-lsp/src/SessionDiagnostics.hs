@@ -37,7 +37,6 @@ import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Char (toLower)
 import Data.List (sortOn)
-import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Server (asInt, field, pathUri)
@@ -68,11 +67,10 @@ diagnosticRange diagnostic = do
 -- Used by the rename quick fix to figure out which symbol the diagnostic
 -- is talking about.
 diagnosticSymbolName :: Text -> Maybe Text
-diagnosticSymbolName message = do
-  (_, suffix) <- listToMaybe (Text.breakOnAll "\"" message)
-  let rest = Text.drop 1 suffix
-      (quoted, trailing) = Text.breakOn "\"" rest
-  if Text.null trailing then Nothing else Just quoted
+diagnosticSymbolName message =
+  case [(Text.length before, name) | q <- ["\"", "`"], before : name : _ : _ <- [Text.splitOn q message]] of
+    [] -> Nothing
+    found -> Just (snd (minimum found))
 
 -- | The two `tnix-ignore` / `tnix-expected` quick fixes for a diagnostic.
 --
