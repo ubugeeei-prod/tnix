@@ -7,7 +7,8 @@
   </a>
 </p>
 
-<p align="center"><strong>TypeScript-grade types for Nix. Zero runtime.</strong></p>
+<p align="center"><strong>Gradual types for Nix.</strong><br>
+Add types where they help, keep the rest dynamic, and ship plain <code>.nix</code> with zero runtime.</p>
 
 <p align="center">
   <a href="https://tynix.dev">Docs</a> ·

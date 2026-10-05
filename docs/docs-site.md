@@ -15,8 +15,9 @@ running as a Vite plugin, and is served by a Cloudflare Worker as static assets.
 | --- | --- |
 | `docs/*.md`, `docs/tutorial/`, `docs/reference/` | pages; the URL is the file path without `.md` |
 | `docs/public/` | copied verbatim to the site root: brand assets, `og-image.png`, `install.sh`, `_headers`, `_redirects` |
-| `docs/.vite/brand.ts` | palette, fonts, code theme and CSS layered on the Ox Content theme (see [Brand](./brand.md)) |
+| `docs/.vite/brand.ts` | palette, fonts, code tokens, CSS and JS layered on the Ox Content theme (see [Brand](./brand.md)) |
 | `docs/.vite/tynix-grammar.ts` | the TextMate grammar used to highlight `tynix` code fences |
+| `docs/.vite/highlight.ts` | the post-build pass that highlights `tynix` fences with that grammar and frames every code block with a title bar and copy button |
 | `vite.docs.config.ts` | site configuration: navigation, theme, highlighting, search, OG metadata |
 | `deploy/docs/` | the Cloudflare project: `cloudflare.config.ts` (Worker, domain) and `wrangler.config.ts` (assets directory) for the `cf` CLI |
 

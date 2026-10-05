@@ -14,14 +14,15 @@ Change both together.
 
 ## Positioning
 
-**TypeScript-grade types for Nix. Zero runtime.**
+**Gradual types for Nix.** Add types where they help, keep the rest dynamic,
+and ship plain `.nix` with zero runtime.
 
 tynix is for people who already write Nix and are tired of finding attribute
-typos at evaluation time. It gives them what TypeScript gave JavaScript: an
-optional, gradual, structural type layer with first-class editor support, which
-compiles away completely.
+typos at evaluation time. It takes the approach TypeScript took with
+JavaScript: an optional, gradual, structural type layer with first-class editor
+support, which compiles away completely.
 
-| | |
+| Aspect | Description |
 | --- | --- |
 | **Category** | gradual type system and toolchain for Nix |
 | **Audience** | Nix users maintaining flakes, packages, modules and shared libraries |
@@ -31,12 +32,15 @@ compiles away completely.
 
 ### Taglines
 
-- Primary: **TypeScript-grade types for Nix. Zero runtime.**
+- Headline: **Gradual types for Nix.**
+- Supporting line: *Add types where they help, keep the rest dynamic, and ship
+  plain `.nix` with zero runtime.*
 - Short: **Type your Nix. Ship plain Nix.**
-- Descriptive: *Write `.tynix`, check it, ship plain `.nix`.*
 
-Use the primary tagline on the home page, the OG image and package
-descriptions. The short one fits badges, social bios and slide footers.
+Use the headline with the supporting line on the home page, the README and the
+OG image, and the headline alone in package descriptions and page titles. The
+short one fits badges, social bios and slide footers. "TypeScript-like" is fine
+as a comparison in body copy that explains the approach; it is not a tagline.
 
 ## Voice and tone
 
@@ -122,52 +126,56 @@ Rules:
 
 ## Color
 
-The palette starts from the two Nix logo blues (`#5277C3`, `#7EBAE4`) and moves
-to a deeper, more saturated **Lambda Blue**, so tynix reads as related to Nix
-without impersonating it. Two accents carry meaning in code and UI: **Annotation
-Amber** marks type-only syntax (everything that is erased), and **Check Mint**
-marks values and success.
+The palette comes straight from the mark. **Nix blues** carry links, buttons
+and focus; **Haskell purples** appear in the mark, the hero glow and
+"important" callouts. **Annotation Amber** has one job: it marks type-only
+syntax, everything the compiler erases. Surfaces are cool neutrals around the
+mark's ink tile, never cream or pure black.
 
 ### Core
 
 <div class="tx-swatches">
-<div class="tx-swatch"><i style="background:#2F5BD8"></i><b>Lambda Blue 600</b><code>#2F5BD8</code></div>
-<div class="tx-swatch"><i style="background:#2449B8"></i><b>Lambda Blue 700</b><code>#2449B8</code></div>
-<div class="tx-swatch"><i style="background:#3B63E0"></i><b>Lambda Blue 500</b><code>#3B63E0</code></div>
-<div class="tx-swatch"><i style="background:#8DB4FF"></i><b>Lambda Blue 300</b><code>#8DB4FF</code></div>
+<div class="tx-swatch"><i style="background:#5277C3"></i><b>Nix Blue</b><code>#5277C3</code></div>
+<div class="tx-swatch"><i style="background:#3F65B5"></i><b>Nix Deep</b><code>#3F65B5</code></div>
+<div class="tx-swatch"><i style="background:#2F4F96"></i><b>Nix Deeper</b><code>#2F4F96</code></div>
 <div class="tx-swatch"><i style="background:#7EBAE4"></i><b>Snow Blue</b><code>#7EBAE4</code></div>
+<div class="tx-swatch"><i style="background:#5E5086"></i><b>Haskell Purple</b><code>#5E5086</code></div>
+<div class="tx-swatch"><i style="background:#8F4E8B"></i><b>Haskell Magenta</b><code>#8F4E8B</code></div>
+<div class="tx-swatch"><i style="background:#453A62"></i><b>Haskell Ink</b><code>#453A62</code></div>
 <div class="tx-swatch"><i style="background:#F2B441"></i><b>Annotation Amber</b><code>#F2B441</code></div>
-<div class="tx-swatch"><i style="background:#5FE0BC"></i><b>Check Mint</b><code>#5FE0BC</code></div>
-<div class="tx-swatch"><i style="background:#087A5F"></i><b>Check Mint 700</b><code>#087A5F</code></div>
-<div class="tx-swatch"><i style="background:#FF8A7A"></i><b>Coral</b><code>#FF8A7A</code></div>
+<div class="tx-swatch"><i style="background:#8A5A00"></i><b>Amber 700</b><code>#8A5A00</code></div>
 </div>
 
 ### Neutrals
 
 <div class="tx-swatches">
-<div class="tx-swatch"><i style="background:#0A0F1C"></i><b>Ink 950</b><code>#0A0F1C</code></div>
-<div class="tx-swatch"><i style="background:#0B1220"></i><b>Ink 900</b><code>#0B1220</code></div>
-<div class="tx-swatch"><i style="background:#111A2E"></i><b>Ink 850</b><code>#111A2E</code></div>
-<div class="tx-swatch"><i style="background:#22304D"></i><b>Ink 700</b><code>#22304D</code></div>
-<div class="tx-swatch"><i style="background:#4A5871"></i><b>Slate 600</b><code>#4A5871</code></div>
-<div class="tx-swatch"><i style="background:#A3B0C7"></i><b>Slate 300</b><code>#A3B0C7</code></div>
-<div class="tx-swatch"><i style="background:#DCE3EE"></i><b>Line</b><code>#DCE3EE</code></div>
-<div class="tx-swatch"><i style="background:#F1F5FB"></i><b>Mist</b><code>#F1F5FB</code></div>
-<div class="tx-swatch"><i style="background:#FBFCFE"></i><b>Paper</b><code>#FBFCFE</code></div>
+<div class="tx-swatch"><i style="background:#0A0E1A"></i><b>Ink 950</b><code>#0A0E1A</code></div>
+<div class="tx-swatch"><i style="background:#0E1424"></i><b>Ink 900 (tile)</b><code>#0E1424</code></div>
+<div class="tx-swatch"><i style="background:#131B2E"></i><b>Ink 850</b><code>#131B2E</code></div>
+<div class="tx-swatch"><i style="background:#27324B"></i><b>Ink 700</b><code>#27324B</code></div>
+<div class="tx-swatch"><i style="background:#505B74"></i><b>Slate 600</b><code>#505B74</code></div>
+<div class="tx-swatch"><i style="background:#9AA6BF"></i><b>Slate 300</b><code>#9AA6BF</code></div>
+<div class="tx-swatch"><i style="background:#DCE1EB"></i><b>Line</b><code>#DCE1EB</code></div>
+<div class="tx-swatch"><i style="background:#EDF0F6"></i><b>Mist</b><code>#EDF0F6</code></div>
+<div class="tx-swatch"><i style="background:#F7F8FB"></i><b>Paper</b><code>#F7F8FB</code></div>
 </div>
 
 ### Theme tokens
 
 | Token | Light | Dark |
 | --- | --- | --- |
-| `primary` | Lambda Blue 600 `#2F5BD8` | Lambda Blue 300 `#8DB4FF` |
-| `primaryHover` | Lambda Blue 700 `#2449B8` | `#B8D0FF` |
-| `background` | Paper `#FBFCFE` | Ink 950 `#0A0F1C` |
-| `backgroundAlt` | Mist `#F1F5FB` | Ink 850 `#111A2E` |
-| `text` | `#0E1525` | `#E6ECF7` |
-| `textMuted` | Slate 600 `#4A5871` | Slate 300 `#A3B0C7` |
-| `border` | Line `#DCE3EE` | Ink 700 `#22304D` |
-| `codeBackground` | Ink 900 `#0B1220` | Ink 900 `#0B1220` |
+| `primary` | Nix Deep `#3F65B5` | `#93B4EE` |
+| `primaryHover` | Nix Deeper `#2F4F96` | `#B9CEF5` |
+| `background` | Paper `#F7F8FB` | Ink 950 `#0A0E1A` |
+| `backgroundAlt` | Mist `#EDF0F6` | Ink 850 `#131B2E` |
+| `text` | `#141A2B` | `#E4E9F4` |
+| `textMuted` | Slate 600 `#505B74` | Slate 300 `#9AA6BF` |
+| `border` | Line `#DCE1EB` | Ink 700 `#27324B` |
+| `codeBackground` | Ink 900 `#0E1424` | Ink 900 `#0E1424` |
+
+The home page hero and the closing call to action sit on an Ink 900 band in
+both schemes, the same tile the app icon uses. Its primary button is Annotation
+Amber with Ink 950 text.
 
 ### Contrast
 
@@ -175,50 +183,59 @@ All text pairings meet WCAG 2.2 AA (4.5:1 for body text); most meet AAA.
 
 | Pair | Ratio |
 | --- | --- |
-| text `#0E1525` on Paper | 17.75:1 |
-| Slate 600 on Paper | 6.99:1 |
-| Lambda Blue 600 on Paper (links) | 5.67:1 |
-| white on Lambda Blue 600 (buttons) | 5.82:1 |
-| `#E6ECF7` on Ink 950 | 16.13:1 |
-| Slate 300 on Ink 950 | 8.74:1 |
-| Lambda Blue 300 on Ink 950 (links) | 9.20:1 |
-| Ink 950 on Lambda Blue 300 (dark-mode buttons) | 9.20:1 |
-| Annotation Amber on Ink 900 (code) | 10.15:1 |
-| Check Mint on Ink 900 (code) | 11.48:1 |
-| comment `#7F8DAA` on Ink 900 (code) | 5.61:1 |
+| text `#141A2B` on Paper | 16.31:1 |
+| Slate 600 on Paper | 6.40:1 |
+| Nix Deep on Paper (links) | 5.29:1 |
+| white on Nix Deep (buttons) | 5.61:1 |
+| Amber 700 on Paper | 5.58:1 |
+| `#E4E9F4` on Ink 950 | 15.83:1 |
+| Slate 300 on Ink 950 | 7.87:1 |
+| `#93B4EE` on Ink 950 (dark-mode links) | 9.17:1 |
+| Ink 950 on Annotation Amber (hero button) | 10.43:1 |
+| Annotation Amber on Ink 900 (code) | 9.95:1 |
+| comment `#7482A0` on Ink 900 (code) | 4.76:1 |
 
-Check Mint `#5FE0BC` and Annotation Amber are for dark surfaces. On light
-surfaces, use Check Mint 700 `#087A5F` and Amber 700 `#8A5A00` for text.
+Annotation Amber is for dark surfaces. On light surfaces, use Amber 700
+`#8A5A00` for text.
 
 ## Typography
 
 | Role | Typeface | Fallback stack |
 | --- | --- | --- |
-| UI and prose | [Geist](https://fonts.google.com/specimen/Geist) 400, 500, 600, 700, 800 | Inter, `system-ui`, -apple-system, Segoe UI, sans-serif |
-| Code | [Geist Mono](https://fonts.google.com/specimen/Geist+Mono) 400, 500, 600 | JetBrains Mono, `ui-monospace`, SF Mono, Menlo, Consolas, monospace |
+| Headings and the hero | [Bricolage Grotesque](https://fonts.google.com/specimen/Bricolage+Grotesque) 600 to 800 | IBM Plex Sans, `system-ui`, sans-serif |
+| UI and prose | [IBM Plex Sans](https://fonts.google.com/specimen/IBM+Plex+Sans) 400, 500, 600, italic 400 | `system-ui`, -apple-system, Segoe UI, sans-serif |
+| Code | [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) 400, 500, 600 | `ui-monospace`, SF Mono, Menlo, Consolas, monospace |
 
-Both are open source (SIL OFL) and served from Google Fonts on the docs site.
-Headings use weight 700 to 800 with slightly negative tracking (`-0.025em`);
-body text uses 400 at 16 px with a 1.7 line height. The wordmark is custom
-drawn and is not set in Geist.
+All three are open source (SIL OFL) and served from Google Fonts on the docs
+site. Bricolage Grotesque gives headings a little of the mark's cut-stroke
+character; it is set at 700 to 800 with tight tracking (`-0.025em` to
+`-0.05em` as size grows). Body text is IBM Plex Sans 400 at 16 px with a 1.7
+line height and a measure of about 46 rem. Code is JetBrains Mono at 13 px
+without ligatures, so `->` and `::` read exactly as typed. The wordmark is
+custom drawn and is not set in any of these.
 
 ## Code theme: tynix ink
 
-Code blocks are always dark (Ink 900) so the semantic colors work the same in
-both site themes. The theme, `tynix-ink`, follows one idea: **amber is for
-anything the compiler erases.**
+Code blocks are always Ink 900 so the semantic colors work the same in both
+site themes. The theme, `tynix ink`, follows one idea: **amber is for anything
+the compiler erases.** The other colors come from the mark: purples for
+keywords, blues for names and values.
 
 | Token | Color |
 | --- | --- |
 | type-only syntax: `::`, `type`, `declare`, `forall`, `extends`, `infer`, `as`, type names | Annotation Amber `#F2B441` |
 | gradual types: `dynamic`, `unknown`, `any` | Annotation Amber, italic |
-| keywords: `let`, `in`, `if`, `with`, `rec`, `inherit`, `import` | Lambda Blue 300 `#8DB4FF` |
-| strings and paths | Check Mint `#5FE0BC` |
-| numbers, `true`, `false`, `null` | Coral `#FF8A7A` |
-| attribute names | `#C9D7F2` |
-| comments | `#7F8DAA`, italic |
-| `# @tynix-ignore` / `# @tynix-expected` | Check Mint, bold |
-| plain text | `#DCE6F8` |
+| keywords: `let`, `in`, `if`, `with`, `rec`, `inherit`, `import` | `#C4ABF0` |
+| strings and paths | `#93D6B5` |
+| attribute names, numbers, `true`, `false`, `null` | `#93B8F2` |
+| lambda parameters | `#E6B3DD` |
+| comments | `#7482A0`, italic |
+| `# @tynix-ignore` / `# @tynix-expected` | Snow `#A9D3F0`, semibold |
+| operators and punctuation | `#8C97B2` |
+| plain text | `#D6DDEC` |
+
+The colors are Ox Content theme tokens (`--octc-syntax-*`), so blocks the
+built-in highlighter paints (nix, bash, json, yaml, ts) use the same palette.
 
 ```tynix
 type Package = { pname :: String; version :: String; };
@@ -231,14 +248,16 @@ in describe hello
 ```
 
 The TextMate grammar used for docs highlighting lives in
-[`docs/.vite/tynix-grammar.ts`](https://github.com/ubugeeei-prod/tynix/blob/main/docs/.vite/tynix-grammar.ts).
-Editors get semantic highlighting from the language server instead.
+[`docs/.vite/tynix-grammar.ts`](https://github.com/ubugeeei-prod/tynix/blob/main/docs/.vite/tynix-grammar.ts),
+and [`docs/.vite/highlight.ts`](https://github.com/ubugeeei-prod/tynix/blob/main/docs/.vite/highlight.ts)
+applies it after the site is built. Editors get semantic highlighting from the
+language server instead.
 
 ## Imagery and layout
 
 - Hexagons, the colon and thin connector lines are the recurring motifs. Use
   them sparingly as structure (backgrounds, diagrams), never as decoration on
   top of content.
-- Diagrams use the theme's surface colors with Lambda Blue for "process",
-  Amber for "type-level" and Mint for "output".
+- Diagrams use the theme's surface colors with Nix blue for "process",
+  Amber for "type-level" and Haskell purple for "output".
 - Prefer real code and real diagnostics over illustrations.

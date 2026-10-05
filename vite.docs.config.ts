@@ -2,8 +2,8 @@ import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import { defineTheme, oxContent } from "@ox-content/vite-plugin";
-import { codeTheme, fonts, headHtml, themeColors, themeCss } from "./docs/.vite/brand.ts";
-import { tynixGrammar } from "./docs/.vite/tynix-grammar.ts";
+import { codeTokens, fonts, headHtml, themeColors, themeCss, themeJs } from "./docs/.vite/brand.ts";
+import { processSite } from "./docs/.vite/highlight.ts";
 
 // Canonical public origin. Override with TYNIX_DOCS_SITE_URL for preview
 // deployments that should advertise their own URL in OG tags.
@@ -75,18 +75,22 @@ const theme = defineTheme({
   colors: themeColors.light,
   darkColors: themeColors.dark,
   fonts,
+  // Code colours are theme tokens: the native highlighter and the tynix pass
+  // in docs/.vite/highlight.ts both read `--octc-syntax-*`.
+  tokens: codeTokens,
+  darkTokens: codeTokens,
   layout: {
-    sidebarWidth: "272px",
-    maxContentWidth: "880px",
+    sidebarWidth: "264px",
+    maxContentWidth: "736px",
   },
   header: {
-    logo: "/brand/tynix-mark.svg",
-    logoWidth: 28,
-    logoHeight: 28,
+    logo: "/tynix-logo.svg",
+    logoWidth: 30,
+    logoHeight: 30,
     showSiteNameText: true,
   },
   footer: {
-    message: "TypeScript-grade types for Nix. Zero runtime.",
+    message: "Gradual types for Nix.",
     copyright: 'Released under the MIT license · <a href="https://github.com/ubugeeei-prod/tynix">GitHub</a>',
   },
   socialLinks: {
@@ -96,7 +100,27 @@ const theme = defineTheme({
     head: headHtml,
   },
   css: themeCss,
+  js: themeJs,
 });
+
+// Ox Content 3 highlights with a native tree-sitter engine that has no tynix
+// grammar and no hook to register one. Highlight ```tynix fences (and frame
+// every code block with a title bar and copy button) once the SSG step has
+// written the pages.
+function highlightCodeBlocks(): Plugin {
+  return {
+    name: "tynix-docs:highlight-code-blocks",
+    apply: "build",
+    closeBundle: {
+      order: "post",
+      sequential: true,
+      async handler() {
+        const pages = await processSite(resolve(outDir));
+        this.info(`highlighted code blocks in ${pages} pages`);
+      },
+    },
+  };
+}
 
 // Vite copies `docs/public` into the output directory while bundling the
 // placeholder entry; the SSG step then writes pages next to those files.
@@ -136,8 +160,6 @@ export default defineConfig({
       docs: false,
       embeds: false,
       highlight: true,
-      highlightTheme: codeTheme as never,
-      highlightLangs: ["nix", tynixGrammar] as never,
       codeAnnotations: { notation: "both" },
       search: true,
       ssg: {
@@ -150,5 +172,6 @@ export default defineConfig({
       },
     }),
     dropBuildEntry(),
+    highlightCodeBlocks(),
   ],
 });
