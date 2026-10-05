@@ -16,8 +16,12 @@
 
 Artifacts are built for:
 
-- Linux x64
-- macOS arm64
+- Linux x64 and Linux arm64 (fully static, musl)
+- macOS arm64 and macOS x64 (only system libraries)
+
+Users install them with `curl -fsSL https://tnix.dev/install.sh | sh`, which
+downloads from `https://tnix.dev/download/<tag>/<file>` (a Cloudflare Pages
+redirect to the GitHub release asset) and verifies the checksum.
 
 ## Release flow
 
@@ -25,7 +29,7 @@ Artifacts are built for:
 2. Run `nix flake check --accept-flake-config` locally to verify the published
    flake outputs, package tests, and dogfood/example fixtures.
 3. Update versioned files as needed.
-4. Create and push a semver tag such as `v0.2.1`.
+4. Create and push a semver tag such as `v1.0.0`.
 5. Wait for the `Release` GitHub Actions workflow to finish.
 6. Verify the generated release notes and uploaded assets on GitHub.
 7. If `VSCE_PAT` and/or `OVSX_PAT` are configured, confirm the new extension
@@ -36,22 +40,22 @@ Artifacts are built for:
 ```bash
 git checkout main
 git pull --ff-only origin main
-git tag v0.2.1
-git push origin v0.2.1
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 To validate a release archive checksum locally, keep the archive next to its
 `.sha256` file and run:
 
 ```bash
-node --experimental-strip-types ./scripts/package-release.ts verify-checksum tnix-v0.2.1-linux-x64.sha256
+node --experimental-strip-types ./scripts/package-release.ts verify-checksum tnix-v1.0.0-linux-x64.sha256
 ```
 
 To verify release artifact provenance, use GitHub's attestation verifier:
 
 ```bash
-gh attestation verify tnix-v0.2.1-linux-x64.tar.gz -R ubugeeei/tnix
-gh attestation verify tnix-v0.2.1-linux-x64.sha256 -R ubugeeei/tnix
+gh attestation verify tnix-v1.0.0-linux-x64.tar.gz -R ubugeeei-prod/tnix
+gh attestation verify tnix-v1.0.0-linux-x64.sha256 -R ubugeeei-prod/tnix
 ```
 
 ## Notes
