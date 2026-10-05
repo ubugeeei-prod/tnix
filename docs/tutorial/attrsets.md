@@ -5,14 +5,14 @@ description: Type Nix attribute sets as structural records, with width subtyping
 
 # 4. Attribute sets and structural typing
 
-Attribute sets are the backbone of Nix, and tnix types them **structurally**: a
+Attribute sets are the backbone of Nix, and tynix types them **structurally**: a
 record type lists the fields it needs, and any attribute set that has at least
 those fields, with compatible types, fits. There are no class names and no
 nominal declarations to line up.
 
 ## Record types and type aliases
 
-```tnix [describe.tnix]
+```tynix [describe.tynix]
 type Package = { pname :: String; version :: String; };
 
 let
@@ -34,7 +34,7 @@ in {
 ```
 
 ```bash
-tnix check describe.tnix
+tynix check describe.tynix
 ```
 
 ```text
@@ -78,7 +78,7 @@ A few things happened here:
 Leave out a required field and the call is rejected. The diagnostic points at
 the argument and names the field that is missing:
 
-```tnix [package-missing.tnix]
+```tynix [package-missing.tynix]
 type Package = { pname :: String; version :: String; };
 
 let
@@ -93,7 +93,7 @@ in describe { pname = "hello"; }
 Selecting a field that is not there is the same diagnostic, pointing at the
 selection:
 
-```tnix [typo.tnix]
+```tynix [typo.tynix]
 let
   hello = { pname = "hello"; version = "2.12.1"; };
 in hello.license
@@ -106,11 +106,11 @@ in hello.license
 ## Inferred record parameters
 
 You do not have to annotate a parameter before selecting from it. When a
-function selects fields from a value whose type is not known yet, tnix infers an
+function selects fields from a value whose type is not known yet, tynix infers an
 **open record**: "at least these fields, plus possibly others". This is *row
 polymorphism*:
 
-```tnix [rows.tnix]
+```tynix [rows.tynix]
 let
   describe = pkg: "${pkg.pname}-${pkg.version}";
   withSuffix = pkg: pkg // { suffix = "-dev"; };
@@ -161,7 +161,7 @@ field, so it is the way to read an attribute that may be absent.
 Nix's destructuring lambdas work in full, including default values and the `@`
 binder, and the checker infers a record type for the argument:
 
-```tnix [pattern.tnix]
+```tynix [pattern.tynix]
 let
   mk = { pname, version ? "0.1.0", doCheck ? null, ... }@args:
     "${pname}-${version}";
@@ -201,7 +201,7 @@ Pattern fields can carry an annotation, which is erased like every other type:
 
 ## `rec`, `inherit` and `with`
 
-```tnix [rec.tnix]
+```tynix [rec.tynix]
 let
   base = { a = 1; b = "two"; };
 in rec {
@@ -237,7 +237,7 @@ copies fields out of another attribute set, and nested attribute paths such as
 `meta.license = "MIT";` are merged into one `meta` record, exactly as Nix does.
 `with base;` brings the fields of a *known* record into scope. If the scope's
 type is not a known record (for example an untyped import), names in the body
-that tnix cannot resolve are treated as `dynamic` instead of being reported as
+that tynix cannot resolve are treated as `dynamic` instead of being reported as
 unbound.
 
 ## Unions of records
@@ -246,7 +246,7 @@ A union type `A | B` accepts values of either shape. Selecting a field from a
 union works only when **every** member has that field, and the result joins the
 members' field types:
 
-```tnix [source.tnix]
+```tynix [source.tynix]
 type Source =
   { kind :: "git"; url :: String; rev :: String; }
   | { kind :: "path"; url :: String; };
@@ -275,7 +275,7 @@ say so with a cast (step 5).
 `attrs.${key}` is checked when the key's type is a string literal or a union of
 string literals:
 
-```tnix [shells.tnix]
+```tynix [shells.tynix]
 let
   shells = {
     x86_64-linux = "bash";
@@ -305,7 +305,7 @@ Computed keys also work when *building* an attribute set. Because the names are
 not known statically, a set built only from computed keys is a dictionary,
 `AttrsOf T`:
 
-```tnix [computed.tnix]
+```tynix [computed.tynix]
 let
   forSystem = system: { ${system} = "bash"; };
   cfg = { port = 80; };

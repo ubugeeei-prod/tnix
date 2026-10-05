@@ -1,5 +1,5 @@
 {
-  // markdownlint configuration for tnix.
+  // markdownlint configuration for tynix.
   //
   // Tuned so the existing docs / README / CHANGELOG corpus passes today and
   // future contributions stay consistent. Adjust by widening or tightening

@@ -1,14 +1,14 @@
 ---
 title: "1. Install"
-description: Install the tnix CLI and the tnix-lsp language server with the installer script or Nix.
+description: Install the tynix CLI and the tynix-lsp language server with the installer script or Nix.
 ---
 
 # 1. Install
 
-tnix ships as two executables:
+tynix ships as two executables:
 
-- `tnix`, the CLI that checks, compiles and emits declarations, and
-- `tnix-lsp`, the language server your editor talks to.
+- `tynix`, the CLI that checks, compiles and emits declarations, and
+- `tynix-lsp`, the language server your editor talks to.
 
 Pick one of the installation methods below.
 
@@ -16,16 +16,16 @@ Pick one of the installation methods below.
 
 On Linux (x64, arm64) and macOS (arm64, x64), the quickest route is the
 installer script. It downloads the prebuilt release archive for your platform,
-verifies its SHA-256 checksum, and installs `tnix` and `tnix-lsp` into
-`~/.tnix/bin`:
+verifies its SHA-256 checksum, and installs `tynix` and `tynix-lsp` into
+`~/.tynix/bin`:
 
 ```bash
-curl -fsSL https://tnix.dev/install.sh | sh
+curl -fsSL https://tynix.dev/install.sh | sh
 ```
 
 > [!NOTE]
 > Prefer to read a script before piping it to a shell? Download it first with
-> `curl -fsSL https://tnix.dev/install.sh -o install.sh`, inspect it, then run
+> `curl -fsSL https://tynix.dev/install.sh -o install.sh`, inspect it, then run
 > `sh install.sh`. The [installation section of Getting Started](../getting-started.md#installation)
 > documents the options the script accepts.
 
@@ -34,40 +34,40 @@ curl -fsSL https://tnix.dev/install.sh | sh
 On any host with flakes enabled, install straight from the flake:
 
 ```bash
-nix profile install github:ubugeeei-prod/tnix
+nix profile install github:ubugeeei-prod/tynix
 ```
 
-The default package is `tnix-toolchain`, which contains both the `tnix` CLI
-and the `tnix-lsp` language server (you need the server in step 10). The
+The default package is `tynix-toolchain`, which contains both the `tynix` CLI
+and the `tynix-lsp` language server (you need the server in step 10). The
 binaries are also available on their own:
 
 ```bash
-nix profile install github:ubugeeei-prod/tnix#tnix
-nix profile install github:ubugeeei-prod/tnix#tnix-lsp
+nix profile install github:ubugeeei-prod/tynix#tynix
+nix profile install github:ubugeeei-prod/tynix#tynix-lsp
 ```
 
 To pin a release, add a tag to the flake reference, for example
-`github:ubugeeei-prod/tnix/v0.5.0`.
+`github:ubugeeei-prod/tynix/v0.5.0`.
 
 ## Option C: run without installing
 
 `nix run` is handy for a one-off check or for CI:
 
 ```bash
-nix run github:ubugeeei-prod/tnix -- --version
+nix run github:ubugeeei-prod/tynix -- --version
 ```
 
 ## Check the installation
 
 ```bash
-tnix --version
+tynix --version
 ```
 
 ```text
-tnix 0.5.0.0
+tynix 0.5.0.0
 ```
 
-`tnix --help` lists every command. You will meet most of them in this tutorial;
+`tynix --help` lists every command. You will meet most of them in this tutorial;
 the [CLI reference](../reference/cli.md) documents all of them.
 
 > [!TIP]
@@ -80,13 +80,13 @@ the [CLI reference](../reference/cli.md) documents all of them.
 Create a directory for the tutorial and make it a Git repository:
 
 ```bash
-mkdir tnix-tour && cd tnix-tour
+mkdir tynix-tour && cd tynix-tour
 git init
 ```
 
-The `git init` matters. tnix treats the nearest directory that contains `.git`,
-`flake.nix`, `tnix.config.tnix`, `cabal.project` or `pnpm-workspace.yaml` as the
-*workspace root*, and it discovers `.d.tnix` declaration files anywhere under
+The `git init` matters. tynix treats the nearest directory that contains `.git`,
+`flake.nix`, `tynix.config.tynix`, `cabal.project` or `pnpm-workspace.yaml` as the
+*workspace root*, and it discovers `.d.tynix` declaration files anywhere under
 that root. You will rely on that in step 6.
 
 <div class="tx-pager">

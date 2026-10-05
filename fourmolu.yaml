@@ -1,4 +1,4 @@
-# Fourmolu style configuration for tnix.
+# Fourmolu style configuration for tynix.
 #
 # These values reproduce the formatting the Haskell sources were originally
 # written in, so `fourmolu --mode check` (run in CI) and `fourmolu --mode

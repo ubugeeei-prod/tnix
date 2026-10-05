@@ -22,27 +22,27 @@ function asLocations(
 suite("navigation", () => {
   setup(async () => {
     await activateExtension();
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
   });
 
   test("go to definition resolves a location", async () => {
     const result = await execProvider<
       Array<vscode.Location | vscode.LocationLink>
-    >("vscode.executeDefinitionProvider", fixtureUri("sample.tnix"), position);
+    >("vscode.executeDefinitionProvider", fixtureUri("sample.tynix"), position);
     assert.ok(asLocations(result).length >= 1);
   });
 
   test("go to declaration resolves a location", async () => {
     const result = await execProvider<
       Array<vscode.Location | vscode.LocationLink>
-    >("vscode.executeDeclarationProvider", fixtureUri("sample.tnix"), position);
+    >("vscode.executeDeclarationProvider", fixtureUri("sample.tynix"), position);
     assert.ok(asLocations(result).length >= 1);
   });
 
   test("find references resolves locations", async () => {
     const result = await execProvider<vscode.Location[]>(
       "vscode.executeReferenceProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       position,
     );
     assert.ok(result.length >= 1);
@@ -52,7 +52,7 @@ suite("navigation", () => {
   test("document highlights resolve ranges", async () => {
     const result = await execProvider<vscode.DocumentHighlight[]>(
       "vscode.executeDocumentHighlights",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       position,
     );
     assert.ok(result.length >= 1);

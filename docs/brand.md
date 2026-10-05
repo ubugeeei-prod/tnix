@@ -1,22 +1,22 @@
 ---
 title: Brand
-description: The tnix brand system, covering positioning, voice, name usage, logo, color, typography and code theme.
+description: The tynix brand system, covering positioning, voice, name usage, logo, color, typography and code theme.
 ---
 
 # Brand
 
-This page is the source of truth for how tnix looks and sounds. The tokens on
+This page is the source of truth for how tynix looks and sounds. The tokens on
 this page are implemented in
-[`docs/.vite/brand.ts`](https://github.com/ubugeeei-prod/tnix/blob/main/docs/.vite/brand.ts),
+[`docs/.vite/brand.ts`](https://github.com/ubugeeei-prod/tynix/blob/main/docs/.vite/brand.ts),
 and the asset files live in
-[`docs/public/brand/`](https://github.com/ubugeeei-prod/tnix/tree/main/docs/public/brand).
+[`docs/public/brand/`](https://github.com/ubugeeei-prod/tynix/tree/main/docs/public/brand).
 Change both together.
 
 ## Positioning
 
 **TypeScript-grade types for Nix. Zero runtime.**
 
-tnix is for people who already write Nix and are tired of finding attribute
+tynix is for people who already write Nix and are tired of finding attribute
 typos at evaluation time. It gives them what TypeScript gave JavaScript: an
 optional, gradual, structural type layer with first-class editor support, which
 compiles away completely.
@@ -26,30 +26,30 @@ compiles away completely.
 | **Category** | gradual type system and toolchain for Nix |
 | **Audience** | Nix users maintaining flakes, packages, modules and shared libraries |
 | **Promise** | catch shape errors before evaluation, without changing what Nix runs |
-| **Proof points** | erasure-only compiler, structural records, `.d.tnix` declarations, LSP, stable diagnostic codes |
+| **Proof points** | erasure-only compiler, structural records, `.d.tynix` declarations, LSP, stable diagnostic codes |
 | **Not** | a new Nix, a runtime contract system, or a replacement for the module system's option types |
 
 ### Taglines
 
 - Primary: **TypeScript-grade types for Nix. Zero runtime.**
 - Short: **Type your Nix. Ship plain Nix.**
-- Descriptive: *Write `.tnix`, check it, ship plain `.nix`.*
+- Descriptive: *Write `.tynix`, check it, ship plain `.nix`.*
 
 Use the primary tagline on the home page, the OG image and package
 descriptions. The short one fits badges, social bios and slide footers.
 
 ## Voice and tone
 
-tnix speaks like a careful senior engineer reviewing your pull request:
+tynix speaks like a careful senior engineer reviewing your pull request:
 precise, calm, and on your side.
 
 - **Concrete over clever.** Show the code and the exact diagnostic. "Selecting
-  `pkg.pname` from an unannotated parameter fails with `TC0009`" beats "tnix
+  `pkg.pname` from an unannotated parameter fails with `TC0009`" beats "tynix
   catches tricky bugs".
 - **Honest about limits.** Say what is not supported yet and what to do
   instead. Mark upcoming features as upcoming.
-- **Respect Nix.** tnix adds to Nix; it does not fix it. Never frame Nix as
-  broken or tnix as a replacement.
+- **Respect Nix.** tynix adds to Nix; it does not fix it. Never frame Nix as
+  broken or tynix as a replacement.
 - **Short sentences, active voice, second person.** "Annotate the parameter",
   not "the parameter should be annotated by the user".
 - **No hype words.** Avoid "blazing", "magical", "revolutionary",
@@ -60,26 +60,26 @@ precise, calm, and on your side.
 
 ## Name usage
 
-- The name is always lowercase **`tnix`**, including at the start of a
-  sentence and in titles: "tnix checks records structurally."
-- Never `TNix`, `TNIX`, `T-Nix` or `Tnix`. Not abbreviated, not pluralized.
-- Pronounce it "tee-nix".
-- In running text, use plain `tnix`. Use code formatting (`` `tnix` ``) only
+- The name is always lowercase **`tynix`**, including at the start of a
+  sentence and in titles: "tynix checks records structurally."
+- Never `TyNix`, `TYNIX`, `Ty-Nix` or `Tynix`. Not abbreviated, not pluralized.
+- Pronounce it "tie-nix": **ty**ped **Nix**.
+- In running text, use plain `tynix`. Use code formatting (`` `tynix` ``) only
   when you mean the command or the binary.
-- File types are written with their dot: `.tnix`, `.d.tnix`, `.nix`.
+- File types are written with their dot: `.tynix`, `.d.tynix`, `.nix`.
 - Nix is capitalized when you mean the language or package manager, as the Nix
   project does.
 
 ## Logo
 
-The mark brings together the two languages tnix sits between:
+The mark brings together the two languages tynix sits between:
 
 - **Nix**: six lambdas interlock into a hexagonal ring, after the Nix lambda
   snowflake. They are woven, each lying over the next, so the ring has no
   start or end.
 - **Haskell**: every stroke is cut flat, like the slanted bars of the Haskell
   logo, and the arms alternate Nix blues with Haskell purples.
-- **tnix**: the ring holds `::`, the type annotation tnix shares with Haskell,
+- **tynix**: the ring holds `::`, the type annotation tynix shares with Haskell,
   drawn as two slanted bars in Annotation Amber, the color the docs use for
   erased type syntax.
 
@@ -87,26 +87,26 @@ The geometry lives in `scripts/generate-brand.ts`; edit it there and run
 `vp run generate:brand` to regenerate every SVG and PNG below.
 
 <div class="tx-logos">
-<figure class="on-light"><img src="/brand/tnix-logo.svg" alt="tnix logo, color, for light backgrounds"><figcaption>tnix-logo.svg</figcaption></figure>
-<figure class="on-dark"><img src="/brand/tnix-logo-dark.svg" alt="tnix logo, color, for dark backgrounds"><figcaption>tnix-logo-dark.svg</figcaption></figure>
-<figure class="on-light"><img src="/brand/tnix-logo-mono.svg" alt="tnix logo, single color ink"><figcaption>tnix-logo-mono.svg</figcaption></figure>
-<figure class="on-dark"><img src="/brand/tnix-logo-white.svg" alt="tnix logo, single color white"><figcaption>tnix-logo-white.svg</figcaption></figure>
-<figure class="on-light"><img src="/brand/tnix-mark.svg" alt="tnix mark, color"><figcaption>tnix-mark.svg</figcaption></figure>
-<figure class="on-dark"><img src="/brand/tnix-mark-dark.svg" alt="tnix mark, color, for dark backgrounds"><figcaption>tnix-mark-dark.svg</figcaption></figure>
-<figure class="on-dark"><img src="/brand/tnix-mark-white.svg" alt="tnix mark, white"><figcaption>tnix-mark-white.svg</figcaption></figure>
-<figure class="on-light"><img src="/brand/tnix-app-icon.svg" alt="tnix app icon"><figcaption>tnix-app-icon.svg</figcaption></figure>
+<figure class="on-light"><img src="/brand/tynix-logo.svg" alt="tynix logo, color, for light backgrounds"><figcaption>tynix-logo.svg</figcaption></figure>
+<figure class="on-dark"><img src="/brand/tynix-logo-dark.svg" alt="tynix logo, color, for dark backgrounds"><figcaption>tynix-logo-dark.svg</figcaption></figure>
+<figure class="on-light"><img src="/brand/tynix-logo-mono.svg" alt="tynix logo, single color ink"><figcaption>tynix-logo-mono.svg</figcaption></figure>
+<figure class="on-dark"><img src="/brand/tynix-logo-white.svg" alt="tynix logo, single color white"><figcaption>tynix-logo-white.svg</figcaption></figure>
+<figure class="on-light"><img src="/brand/tynix-mark.svg" alt="tynix mark, color"><figcaption>tynix-mark.svg</figcaption></figure>
+<figure class="on-dark"><img src="/brand/tynix-mark-dark.svg" alt="tynix mark, color, for dark backgrounds"><figcaption>tynix-mark-dark.svg</figcaption></figure>
+<figure class="on-dark"><img src="/brand/tynix-mark-white.svg" alt="tynix mark, white"><figcaption>tynix-mark-white.svg</figcaption></figure>
+<figure class="on-light"><img src="/brand/tynix-app-icon.svg" alt="tynix app icon"><figcaption>tynix-app-icon.svg</figcaption></figure>
 </div>
 
 | File | Use |
 | --- | --- |
-| `brand/tnix-logo.svg` | default lockup on light backgrounds |
-| `brand/tnix-logo-dark.svg` | lockup on dark backgrounds |
-| `brand/tnix-logo-mono.svg`, `brand/tnix-logo-white.svg` | one-color print, embossing, single-color UIs |
-| `brand/tnix-mark.svg`, `brand/tnix-mark-dark.svg` | the mark alone on light / dark backgrounds |
-| `brand/tnix-mark-mono.svg`, `brand/tnix-mark-white.svg` | one-color mark |
-| `brand/tnix-app-icon.svg` | the mark on its ink tile: app icons, the docs header, the favicon |
-| `brand/tnix-wordmark.svg` | the wordmark alone, where the mark already appears nearby |
-| `brand/tnix-mark-512.png` | raster app icon for places that do not accept SVG |
+| `brand/tynix-logo.svg` | default lockup on light backgrounds |
+| `brand/tynix-logo-dark.svg` | lockup on dark backgrounds |
+| `brand/tynix-logo-mono.svg`, `brand/tynix-logo-white.svg` | one-color print, embossing, single-color UIs |
+| `brand/tynix-mark.svg`, `brand/tynix-mark-dark.svg` | the mark alone on light / dark backgrounds |
+| `brand/tynix-mark-mono.svg`, `brand/tynix-mark-white.svg` | one-color mark |
+| `brand/tynix-app-icon.svg` | the mark on its ink tile: app icons, the docs header, the favicon |
+| `brand/tynix-wordmark.svg` | the wordmark alone, where the mark already appears nearby |
+| `brand/tynix-mark-512.png` | raster app icon for places that do not accept SVG |
 | `favicon.svg`, `apple-touch-icon.png` | browser and home-screen icons |
 | `og-image.png` (source `brand/og-image.svg`) | 1200 × 630 social preview |
 
@@ -123,7 +123,7 @@ Rules:
 ## Color
 
 The palette starts from the two Nix logo blues (`#5277C3`, `#7EBAE4`) and moves
-to a deeper, more saturated **Lambda Blue**, so tnix reads as related to Nix
+to a deeper, more saturated **Lambda Blue**, so tynix reads as related to Nix
 without impersonating it. Two accents carry meaning in code and UI: **Annotation
 Amber** marks type-only syntax (everything that is erased), and **Check Mint**
 marks values and success.
@@ -202,10 +202,10 @@ Headings use weight 700 to 800 with slightly negative tracking (`-0.025em`);
 body text uses 400 at 16 px with a 1.7 line height. The wordmark is custom
 drawn and is not set in Geist.
 
-## Code theme: tnix ink
+## Code theme: tynix ink
 
 Code blocks are always dark (Ink 900) so the semantic colors work the same in
-both site themes. The theme, `tnix-ink`, follows one idea: **amber is for
+both site themes. The theme, `tynix-ink`, follows one idea: **amber is for
 anything the compiler erases.**
 
 | Token | Color |
@@ -217,21 +217,21 @@ anything the compiler erases.**
 | numbers, `true`, `false`, `null` | Coral `#FF8A7A` |
 | attribute names | `#C9D7F2` |
 | comments | `#7F8DAA`, italic |
-| `# @tnix-ignore` / `# @tnix-expected` | Check Mint, bold |
+| `# @tynix-ignore` / `# @tynix-expected` | Check Mint, bold |
 | plain text | `#DCE6F8` |
 
-```tnix
+```tynix
 type Package = { pname :: String; version :: String; };
 
 let
-  # @tnix-ignore
+  # @tynix-ignore
   describe = (pkg :: Package): "${pkg.pname}-${pkg.version}";
   hello = { pname = "hello"; version = "2.12.1"; } as Package;
 in describe hello
 ```
 
 The TextMate grammar used for docs highlighting lives in
-[`docs/.vite/tnix-grammar.ts`](https://github.com/ubugeeei-prod/tnix/blob/main/docs/.vite/tnix-grammar.ts).
+[`docs/.vite/tynix-grammar.ts`](https://github.com/ubugeeei-prod/tynix/blob/main/docs/.vite/tynix-grammar.ts).
 Editors get semantic highlighting from the language server instead.
 
 ## Imagery and layout

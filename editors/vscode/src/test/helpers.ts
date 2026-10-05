@@ -1,13 +1,13 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
 
-export const EXTENSION_ID = "ubugeeei.tnix";
-export const STUB = "tnix-stub";
+export const EXTENSION_ID = "ubugeeei.tynix";
+export const STUB = "tynix-stub";
 
 /**
- * Activate the tnix extension and return its host record.
+ * Activate the tynix extension and return its host record.
  *
- * The fixture workspace points `tnix.server.path` at the stub LSP server, so by
+ * The fixture workspace points `tynix.server.path` at the stub LSP server, so by
  * the time `activate()` resolves the language client has connected.
  */
 export async function activateExtension(): Promise<vscode.Extension<unknown>> {

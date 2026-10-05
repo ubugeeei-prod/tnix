@@ -1,19 +1,19 @@
 name: Feature request
-description: Propose a new capability or improvement for tnix.
+description: Propose a new capability or improvement for tynix.
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the proposal. tnix intentionally complements Nix rather than replacing it,
+        Thanks for the proposal. tynix intentionally complements Nix rather than replacing it,
         so proposals that preserve `.nix` semantics and incremental adoption are easiest to accept.
   - type: dropdown
     id: area
     attributes:
       label: Area
       options:
-        - CLI (tnix)
-        - Language server (tnix-lsp)
+        - CLI (tynix)
+        - Language server (tynix-lsp)
         - Editor integrations
         - Type system / language surface
         - Tooling / CI / release
@@ -25,14 +25,14 @@ body:
     id: problem
     attributes:
       label: Problem
-      description: What are you trying to do that tnix makes hard or impossible today?
+      description: What are you trying to do that tynix makes hard or impossible today?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
       label: Proposed solution
-      description: What you'd like tnix to do. Include example `.tnix` syntax or CLI/LSP behavior where relevant.
+      description: What you'd like tynix to do. Include example `.tynix` syntax or CLI/LSP behavior where relevant.
     validations:
       required: true
   - type: textarea

@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security fixes target the latest released version of `tnix`. Older releases may
+Security fixes target the latest released version of `tynix`. Older releases may
 receive fixes when a safe patch is straightforward, but users should plan to
 upgrade to the latest release.
 
@@ -25,8 +25,8 @@ smallest safe reproduction you can share privately.
 
 The highest-priority reports are vulnerabilities that affect:
 
-- `tnix` CLI compilation or project build output paths.
-- `tnix-lsp` behavior when handling untrusted workspace files.
+- `tynix` CLI compilation or project build output paths.
+- `tynix-lsp` behavior when handling untrusted workspace files.
 - Release artifacts, checksums, or editor extension packaging.
 - Generated files that could overwrite data outside configured project roots.
 

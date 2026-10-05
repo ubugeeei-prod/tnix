@@ -15,22 +15,22 @@ suite("editing and sync", () => {
   });
 
   test("publishes diagnostics for multiple open documents", async () => {
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
     await openFixture("library.nix");
-    const tnixDiags = await waitFor(
-      () => vscode.languages.getDiagnostics(fixtureUri("sample.tnix")),
-      "sample.tnix diagnostics",
+    const tynixDiags = await waitFor(
+      () => vscode.languages.getDiagnostics(fixtureUri("sample.tynix")),
+      "sample.tynix diagnostics",
     );
     const nixDiags = await waitFor(
       () => vscode.languages.getDiagnostics(fixtureUri("library.nix")),
       "library.nix diagnostics",
     );
-    assert.ok(tnixDiags.length >= 1);
+    assert.ok(tynixDiags.length >= 1);
     assert.ok(nixDiags.length >= 1);
   });
 
   test("re-publishes diagnostics after an incremental edit", async () => {
-    const document = await openFixture("sample.tnix");
+    const document = await openFixture("sample.tynix");
     await waitFor(
       () => vscode.languages.getDiagnostics(document.uri),
       "initial diagnostics",
@@ -49,10 +49,10 @@ suite("editing and sync", () => {
   });
 
   test("offers completion when triggered by the '.' character", async () => {
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
     const list = await execProvider<vscode.CompletionList>(
       "vscode.executeCompletionItemProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       new vscode.Position(3, 3),
       ".",
     );

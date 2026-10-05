@@ -1,11 +1,11 @@
 ---
 title: Docs Site
-description: How the tnix.dev documentation site is built with Ox Content and deployed to Cloudflare with the cf CLI.
+description: How the tynix.dev documentation site is built with Ox Content and deployed to Cloudflare with the cf CLI.
 ---
 
 # Docs Site
 
-The documentation at [tnix.dev](https://tnix.dev) is generated from the
+The documentation at [tynix.dev](https://tynix.dev) is generated from the
 Markdown files in `docs/` by [Ox Content](https://github.com/ubugeeei/ox-content)
 running as a Vite plugin, and is served by a Cloudflare Worker as static assets.
 
@@ -16,7 +16,7 @@ running as a Vite plugin, and is served by a Cloudflare Worker as static assets.
 | `docs/*.md`, `docs/tutorial/`, `docs/reference/` | pages; the URL is the file path without `.md` |
 | `docs/public/` | copied verbatim to the site root: brand assets, `og-image.png`, `install.sh`, `_headers`, `_redirects` |
 | `docs/.vite/brand.ts` | palette, fonts, code theme and CSS layered on the Ox Content theme (see [Brand](./brand.md)) |
-| `docs/.vite/tnix-grammar.ts` | the TextMate grammar used to highlight `tnix` code fences |
+| `docs/.vite/tynix-grammar.ts` | the TextMate grammar used to highlight `tynix` code fences |
 | `vite.docs.config.ts` | site configuration: navigation, theme, highlighting, search, OG metadata |
 | `deploy/docs/` | the Cloudflare project: `cloudflare.config.ts` (Worker, domain) and `wrangler.config.ts` (assets directory) for the `cf` CLI |
 
@@ -32,8 +32,8 @@ Project groups.
   Ox Content rewrites them to site URLs, and the link checker can verify them.
   Link to repository files with full GitHub URLs, since they are not part of
   the site.
-- Use `tnix` as the fence language for `.tnix` and `.d.tnix` code, and add a
-  file name in brackets to give a block a title: ```` ```tnix [hello.tnix] ````.
+- Use `tynix` as the fence language for `.tynix` and `.d.tynix` code, and add a
+  file name in brackets to give a block a title: ```` ```tynix [hello.tynix] ````.
   `{2,4-5}` after the language highlights lines.
 - GitHub-style alerts (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`,
   `> [!IMPORTANT]`) render as callouts.
@@ -57,13 +57,13 @@ build time.
 
 ## Deploy
 
-tnix.dev is a Cloudflare Worker named `tnix` that serves `dist/docs` as static
+tynix.dev is a Cloudflare Worker named `tynix` that serves `dist/docs` as static
 assets. It is configured for the [Cloudflare CLI](https://github.com/cloudflare/cf)
 (`cf`) in `deploy/docs/`, a workspace package of its own because `cf` targets
 one application rather than the workspace root:
 
 - `cloudflare.config.ts` names the Worker, enables observability, and attaches
-  the `tnix.dev` custom domain (`cf deploy` creates its DNS record and
+  the `tynix.dev` custom domain (`cf deploy` creates its DNS record and
   certificate when the zone is in the same account).
 - `wrangler.config.ts` points the assets directory at `../../dist/docs`.
 
@@ -93,7 +93,7 @@ itself:
 
 The GitHub side only needs the Cloudflare GitHub App installed on the
 repository. Connect the Worker once, after its first `cf deploy`, from the
-dashboard (Workers & Pages, `tnix`, Settings, Builds, Connect) or with
+dashboard (Workers & Pages, `tynix`, Settings, Builds, Connect) or with
 `cf builds workers create` using the values above.
 
 The Docs workflow in `.github/workflows/docs.yml` runs the same
@@ -104,10 +104,10 @@ so a change that would break the Cloudflare build fails in review first.
 
 Workers static assets read two files from the site root:
 
-- [`docs/public/_headers`](https://github.com/ubugeeei-prod/tnix/blob/main/docs/public/_headers)
+- [`docs/public/_headers`](https://github.com/ubugeeei-prod/tynix/blob/main/docs/public/_headers)
   sets security headers for every response, serves `/install.sh` as
   `text/plain`, and gives fingerprinted assets a long cache lifetime.
-- [`docs/public/_redirects`](https://github.com/ubugeeei-prod/tnix/blob/main/docs/public/_redirects)
+- [`docs/public/_redirects`](https://github.com/ubugeeei-prod/tynix/blob/main/docs/public/_redirects)
   defines short links:
 
 | Path | Destination |
@@ -115,7 +115,7 @@ Workers static assets read two files from the site root:
 | `/gh` | the GitHub repository |
 | `/install` | `/install.sh` |
 | `/latest` | the latest GitHub release |
-| `/download/*` | `https://github.com/ubugeeei-prod/tnix/releases/download/:splat` |
+| `/download/*` | `https://github.com/ubugeeei-prod/tynix/releases/download/:splat` |
 | `/discussions`, `/issues` | the repository's discussions and issues |
 
 The installer script downloads release archives through `/download/...`, so
@@ -123,7 +123,7 @@ release asset URLs stay stable even if hosting changes.
 
 ### Social previews
 
-Every page advertises `https://tnix.dev/og-image.png` (rendered from
+Every page advertises `https://tynix.dev/og-image.png` (rendered from
 `docs/public/brand/og-image.svg`) as its Open Graph image. Re-render it after
 editing the SVG:
 
@@ -131,5 +131,5 @@ editing the SVG:
 rsvg-convert -w 1200 -h 630 docs/public/brand/og-image.svg -o docs/public/og-image.png
 ```
 
-Set `TNIX_DOCS_SITE_URL` when building for a different origin, such as a
+Set `TYNIX_DOCS_SITE_URL` when building for a different origin, such as a
 staging domain, so absolute URLs in the metadata point there.

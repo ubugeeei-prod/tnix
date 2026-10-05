@@ -1,6 +1,6 @@
 version: 2
 
-# Automated dependency update PRs across the ecosystems used by tnix.
+# Automated dependency update PRs across the ecosystems used by tynix.
 # Reviews are requested via CODEOWNERS, so reviewers are not duplicated here.
 #
 # The Haskell toolchain and nixpkgs are pinned by the Nix flake, which

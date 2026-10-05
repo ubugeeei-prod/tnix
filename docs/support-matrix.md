@@ -11,7 +11,7 @@ Platforms fall into one of three tiers:
 | --- | --- |
 | **Tier 1: officially supported** | CI gates every PR for this platform and tagged releases publish prebuilt archives. Bugs on Tier 1 platforms block a release. |
 | **Tier 2: best effort** | Builds from source through the Nix flake. Issues are accepted and triaged but not guaranteed to block a release. |
-| **Tier 3: unsupported** | tnix is not known to work and the project has no plans to support it today. Reports may be educational but will not be prioritized. |
+| **Tier 3: unsupported** | tynix is not known to work and the project has no plans to support it today. Reports may be educational but will not be prioritized. |
 
 | Platform | Tier | Notes |
 | --- | --- | --- |
@@ -19,8 +19,8 @@ Platforms fall into one of three tiers:
 | Linux arm64 (`aarch64-linux`) | Tier 1 | Fully static (musl) release archive per tag, built and smoke-tested on `ubuntu-24.04-arm` by the release workflow (PR CI does not cover this target yet). |
 | macOS arm64 (Apple silicon) | Tier 1 | Release archive per tag (links only `/usr/lib` and `/System`); CI runs the full matrix on `macos-latest`. |
 | macOS x64 (Intel) | Tier 1 | Release archive per tag (links only `/usr/lib` and `/System`), built and smoke-tested on `macos-15-intel` by the release workflow (PR CI does not cover this target yet). |
-| Other Nix-supported systems | Tier 2 | Build from source through the flake (`nix profile install github:ubugeeei-prod/tnix`). |
-| Windows | Tier 3 | The CLI and language server are not tested on Windows. Use [WSL2](https://learn.microsoft.com/windows/wsl/install) and install the Linux build with `curl -fsSL https://tnix.dev/install.sh \| sh`. |
+| Other Nix-supported systems | Tier 2 | Build from source through the flake (`nix profile install github:ubugeeei-prod/tynix`). |
+| Windows | Tier 3 | The CLI and language server are not tested on Windows. Use [WSL2](https://learn.microsoft.com/windows/wsl/install) and install the Linux build with `curl -fsSL https://tynix.dev/install.sh \| sh`. |
 
 Adding a new target to Tier 1 requires:
 
@@ -34,10 +34,10 @@ GitHub Releases publish prebuilt CLI/LSP archives for the Tier 1 targets,
 each with a `.sha256` checksum, a CycloneDX SBOM, and a build provenance
 attestation:
 
-- Linux x64: `tnix-<version>-linux-x64.tar.gz`
-- Linux arm64: `tnix-<version>-linux-arm64.tar.gz`
-- macOS arm64: `tnix-<version>-macos-arm64.tar.gz`
-- macOS x64: `tnix-<version>-macos-x64.tar.gz`
+- Linux x64: `tynix-<version>-linux-x64.tar.gz`
+- Linux arm64: `tynix-<version>-linux-arm64.tar.gz`
+- macOS arm64: `tynix-<version>-macos-arm64.tar.gz`
+- macOS x64: `tynix-<version>-macos-x64.tar.gz`
 
 The archives are built from the flake's `release-bundle` output on a native
 runner for each target. Linux binaries are statically linked against musl, so
@@ -47,8 +47,8 @@ system `libiconv` / `libffi`, so they need nothing outside `/usr/lib` and
 `/nix/store`, then installs every archive with `install.sh` on a runner
 without Nix and smoke-tests the CLI and language server before publishing.
 
-`https://tnix.dev/install.sh` (source: `docs/public/install.sh`) installs these
-archives; `https://tnix.dev/download/<tag>/<file>` redirects to the matching
+`https://tynix.dev/install.sh` (source: `docs/public/install.sh`) installs these
+archives; `https://tynix.dev/download/<tag>/<file>` redirects to the matching
 GitHub release asset.
 
 ## Runtime Support
@@ -56,7 +56,7 @@ GitHub release asset.
 | Surface | Supported range |
 | --- | --- |
 | Nix | Flake-enabled Nix capable of running `nix develop` and `nix flake check` |
-| CLI | Latest released `tnix` and `tnix-lsp` binaries |
+| CLI | Latest released `tynix` and `tynix-lsp` binaries |
 | VS Code | `^1.110.0`, matching `editors/vscode/package.json` |
 | Zed | Extension API `0.5.0`, matching `editors/zed/Cargo.toml` |
 | Neovim | Neovim with `vim.fs.root` and `vim.lsp.start` support |
@@ -100,10 +100,10 @@ packaging, and installation docs for that target.
 
 ## Binary Cache
 
-The release workflow can push build results to the Cachix cache `tnix`
-(https://tnix.cachix.org). It is enabled only when the repository secret
+The release workflow can push build results to the Cachix cache `tynix`
+(https://tynix.cachix.org). It is enabled only when the repository secret
 `CACHIX_AUTH_TOKEN` is set; without it, builds fall back to
 `cache.nixos.org` and compile the rest. The cold Linux static build includes
 the musl GHC cross compiler and can take a few hours, so a warm cache matters.
-Flake users can opt in with `cachix use tnix`; the flake does not set
+Flake users can opt in with `cachix use tynix`; the flake does not set
 `nixConfig` for it.

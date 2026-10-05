@@ -20,15 +20,15 @@ import {
 } from "./settings.js";
 
 const COMMANDS = {
-  restart: "tnix.restartServer",
-  showOutput: "tnix.showOutput",
-  showVersion: "tnix.showVersion",
-  runDoctor: "tnix.runDoctor",
-  installServer: "tnix.installServer",
-  showMenu: "tnix.showMenu",
+  restart: "tynix.restartServer",
+  showOutput: "tynix.showOutput",
+  showVersion: "tynix.showVersion",
+  runDoctor: "tynix.runDoctor",
+  installServer: "tynix.installServer",
+  showMenu: "tynix.showMenu",
 } as const;
 
-const SUPPRESS_INSTALL_PROMPT_KEY = "tnix.suppressInstallPrompt";
+const SUPPRESS_INSTALL_PROMPT_KEY = "tynix.suppressInstallPrompt";
 
 type Status = "starting" | "running" | "error" | "stopped" | "missing";
 
@@ -36,7 +36,7 @@ let client: LanguageClient | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
 let outputChannel: vscode.LogOutputChannel | undefined;
 let doctorChannel: vscode.OutputChannel | undefined;
-let currentCommand = "tnix-lsp";
+let currentCommand = "tynix-lsp";
 let currentArgs: string[] = [];
 let serverVersion: string | undefined;
 let settings: ExtensionSettings = {
@@ -45,9 +45,9 @@ let settings: ExtensionSettings = {
 };
 
 /**
- * Boot the tnix language client inside VS Code.
+ * Boot the tynix language client inside VS Code.
  *
- * The extension resolves `tnix-lsp` (explicit setting, Nix profiles, PATH),
+ * The extension resolves `tynix-lsp` (explicit setting, Nix profiles, PATH),
  * offers to install it when it is missing, and layers a few client-side
  * conveniences on top of the server: a status bar menu, version/doctor
  * commands, inlay-hint toggles, and diagnostic severity overrides.
@@ -56,14 +56,14 @@ export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   settings = readSettings();
-  outputChannel = vscode.window.createOutputChannel("tnix", { log: true });
-  doctorChannel = vscode.window.createOutputChannel("tnix doctor");
+  outputChannel = vscode.window.createOutputChannel("tynix", { log: true });
+  doctorChannel = vscode.window.createOutputChannel("tynix doctor");
   statusBarItem = vscode.window.createStatusBarItem(
-    "tnix.status",
+    "tynix.status",
     vscode.StatusBarAlignment.Right,
     100,
   );
-  statusBarItem.name = "tnix";
+  statusBarItem.name = "tynix";
   statusBarItem.command = COMMANDS.showMenu;
   context.subscriptions.push(outputChannel, doctorChannel, statusBarItem);
 
@@ -82,11 +82,11 @@ export async function activate(
     ),
     vscode.commands.registerCommand(COMMANDS.showMenu, showMenu),
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (!event.affectsConfiguration("tnix")) return;
+      if (!event.affectsConfiguration("tynix")) return;
       settings = readSettings();
       if (
-        event.affectsConfiguration("tnix.server") ||
-        event.affectsConfiguration("tnix.cli")
+        event.affectsConfiguration("tynix.server") ||
+        event.affectsConfiguration("tynix.cli")
       ) {
         await vscode.commands.executeCommand(COMMANDS.restart);
       }
@@ -107,7 +107,7 @@ export async function deactivate(): Promise<void> {
 }
 
 function readSettings(): ExtensionSettings {
-  const config = vscode.workspace.getConfiguration("tnix");
+  const config = vscode.workspace.getConfiguration("tynix");
   return {
     inlayHints: {
       enabled: config.get<boolean>("inlayHints.enabled", true),
@@ -127,7 +127,7 @@ async function startClient(
   context: vscode.ExtensionContext,
   options: { interactive: boolean },
 ): Promise<void> {
-  const config = vscode.workspace.getConfiguration("tnix");
+  const config = vscode.workspace.getConfiguration("tynix");
   const explicitPath = config.get<string>("server.path")?.trim() ?? "";
   const runtime = resolveRuntimeConfig(
     explicitPath,
@@ -142,7 +142,7 @@ async function startClient(
   if (explicitPath.length === 0 && !findExecutable(runtime.command)) {
     setStatus("missing");
     outputChannel?.warn(
-      "tnix-lsp was not found on PATH or in the usual Nix profiles.",
+      "tynix-lsp was not found on PATH or in the usual Nix profiles.",
     );
     const suppressed = context.globalState.get<boolean>(
       SUPPRESS_INSTALL_PROMPT_KEY,
@@ -171,7 +171,7 @@ async function startClient(
     outputChannel,
     initializationOptions: buildInitializationOptions(settings),
     synchronize: {
-      configurationSection: "tnix",
+      configurationSection: "tynix",
       fileEvents: vscode.workspace.createFileSystemWatcher(
         runtime.watchPattern,
       ),
@@ -209,8 +209,8 @@ async function startClient(
   };
 
   const created = new LanguageClient(
-    "tnix",
-    "tnix",
+    "tynix",
+    "tynix",
     serverOptions,
     clientOptions,
   );
@@ -232,7 +232,7 @@ async function startClient(
     const detail = formatError(error);
     setStatus("error");
     const action = await vscode.window.showErrorMessage(
-      `tnix-lsp failed to start using \`${describeCommand(runtime.command, runtime.args)}\`: ${detail}`,
+      `tynix-lsp failed to start using \`${describeCommand(runtime.command, runtime.args)}\`: ${detail}`,
       "Show Output",
       "Open Settings",
       "Restart Server",
@@ -242,7 +242,7 @@ async function startClient(
     } else if (action === "Open Settings") {
       await vscode.commands.executeCommand(
         "workbench.action.openSettings",
-        "tnix.server",
+        "tynix.server",
       );
     } else if (action === "Restart Server") {
       await vscode.commands.executeCommand(COMMANDS.restart);
@@ -272,8 +272,8 @@ async function offerInstall(
   const never = "Don't Show Again";
   const message =
     reason === "missing"
-      ? "tnix-lsp was not found. Install the tnix toolchain to enable type checking, hover and completion."
-      : "Install the tnix toolchain (tnix and tnix-lsp).";
+      ? "tynix-lsp was not found. Install the tynix toolchain to enable type checking, hover and completion."
+      : "Install the tynix toolchain (tynix and tynix-lsp).";
   const choices =
     reason === "missing"
       ? [installScript, installNix, setPath, never]
@@ -283,20 +283,20 @@ async function offerInstall(
     ...choices,
   );
   if (choice === installScript || choice === installNix) {
-    const terminal = vscode.window.createTerminal({ name: "tnix install" });
+    const terminal = vscode.window.createTerminal({ name: "tynix install" });
     terminal.show();
     terminal.sendText(
       choice === installScript ? INSTALL_SCRIPT_COMMAND : NIX_INSTALL_COMMAND,
     );
     const restart = await vscode.window.showInformationMessage(
-      "Restart the tnix language server once the installation finishes.",
+      "Restart the tynix language server once the installation finishes.",
       "Restart Server",
     );
     if (restart) await vscode.commands.executeCommand(COMMANDS.restart);
   } else if (choice === setPath) {
     await vscode.commands.executeCommand(
       "workbench.action.openSettings",
-      "tnix.server.path",
+      "tynix.server.path",
     );
   } else if (choice === never) {
     await context.globalState.update(SUPPRESS_INSTALL_PROMPT_KEY, true);
@@ -309,7 +309,7 @@ function workspaceCwd(): string | undefined {
 
 function cliCommand(): string {
   return resolveCliPath(
-    vscode.workspace.getConfiguration("tnix").get<string>("cli.path"),
+    vscode.workspace.getConfiguration("tynix").get<string>("cli.path"),
   );
 }
 
@@ -335,11 +335,11 @@ async function showVersion(): Promise<void> {
     probeVersion(cliCommand()),
   ]);
   const extensionVersion =
-    vscode.extensions.getExtension("ubugeeei.tnix")?.packageJSON.version ??
+    vscode.extensions.getExtension("ubugeeei.tynix")?.packageJSON.version ??
     "unknown";
   const parts = [
-    `tnix-lsp ${lsp ?? "(not found)"}`,
-    `tnix ${cli ?? "(not found)"}`,
+    `tynix-lsp ${lsp ?? "(not found)"}`,
+    `tynix ${cli ?? "(not found)"}`,
     `extension ${extensionVersion}`,
   ];
   const message = parts.join(" · ");
@@ -347,7 +347,7 @@ async function showVersion(): Promise<void> {
   if (!lsp || !cli) {
     const action = await vscode.window.showWarningMessage(
       message,
-      "Install tnix",
+      "Install tynix",
     );
     if (action) await vscode.commands.executeCommand(COMMANDS.installServer);
   } else {
@@ -380,16 +380,16 @@ async function runDoctor(): Promise<void> {
       resolve();
       if (error.code === "ENOENT") {
         const action = await vscode.window.showErrorMessage(
-          `The tnix CLI (\`${command}\`) was not found.`,
-          "Install tnix",
+          `The tynix CLI (\`${command}\`) was not found.`,
+          "Install tynix",
           "Set Path…",
         );
-        if (action === "Install tnix") {
+        if (action === "Install tynix") {
           await vscode.commands.executeCommand(COMMANDS.installServer);
         } else if (action === "Set Path…") {
           await vscode.commands.executeCommand(
             "workbench.action.openSettings",
-            "tnix.cli.path",
+            "tynix.cli.path",
           );
         }
       }
@@ -398,11 +398,11 @@ async function runDoctor(): Promise<void> {
       channel.appendLine(`\n[exit ${code ?? "?"}]`);
       if (code === 0) {
         void vscode.window.showInformationMessage(
-          "tnix doctor: all checks passed.",
+          "tynix doctor: all checks passed.",
         );
       } else if (code !== null) {
         void vscode.window.showWarningMessage(
-          "tnix doctor reported problems. See the “tnix doctor” output.",
+          "tynix doctor reported problems. See the “tynix doctor” output.",
         );
       }
       resolve();
@@ -420,7 +420,7 @@ async function showMenu(): Promise<void> {
     { label: "$(info) Show Version", command: COMMANDS.showVersion },
     { label: "$(checklist) Run Doctor", command: COMMANDS.runDoctor },
     {
-      label: "$(cloud-download) Install tnix…",
+      label: "$(cloud-download) Install tynix…",
       command: COMMANDS.installServer,
     },
     {
@@ -429,12 +429,12 @@ async function showMenu(): Promise<void> {
     },
   ];
   const picked = await vscode.window.showQuickPick(items, {
-    title: statusBarItem?.tooltip?.toString() ?? "tnix",
-    placeHolder: "tnix",
+    title: statusBarItem?.tooltip?.toString() ?? "tynix",
+    placeHolder: "tynix",
   });
   if (!picked) return;
   if (picked.command === "workbench.action.openSettings") {
-    await vscode.commands.executeCommand(picked.command, "@ext:ubugeeei.tnix");
+    await vscode.commands.executeCommand(picked.command, "@ext:ubugeeei.tynix");
   } else {
     await vscode.commands.executeCommand(picked.command);
   }
@@ -447,28 +447,28 @@ function setStatus(status: Status): void {
   statusBarItem.backgroundColor = undefined;
   switch (status) {
     case "starting":
-      statusBarItem.text = "$(sync~spin) tnix";
-      statusBarItem.tooltip = `Starting tnix-lsp (${command})`;
+      statusBarItem.text = "$(sync~spin) tynix";
+      statusBarItem.tooltip = `Starting tynix-lsp (${command})`;
       break;
     case "running":
-      statusBarItem.text = `$(check) tnix${version}`;
-      statusBarItem.tooltip = `tnix-lsp${version} running (${command}). Click for actions.`;
+      statusBarItem.text = `$(check) tynix${version}`;
+      statusBarItem.tooltip = `tynix-lsp${version} running (${command}). Click for actions.`;
       break;
     case "error":
-      statusBarItem.text = "$(error) tnix";
-      statusBarItem.tooltip = `tnix-lsp failed (${command}). Click for actions.`;
+      statusBarItem.text = "$(error) tynix";
+      statusBarItem.tooltip = `tynix-lsp failed (${command}). Click for actions.`;
       statusBarItem.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.errorBackground",
       );
       break;
     case "stopped":
-      statusBarItem.text = "$(circle-slash) tnix";
-      statusBarItem.tooltip = "tnix-lsp stopped. Click for actions.";
+      statusBarItem.text = "$(circle-slash) tynix";
+      statusBarItem.tooltip = "tynix-lsp stopped. Click for actions.";
       break;
     case "missing":
-      statusBarItem.text = "$(warning) tnix";
+      statusBarItem.text = "$(warning) tynix";
       statusBarItem.tooltip =
-        "tnix-lsp not found. Click to install or configure tnix.server.path.";
+        "tynix-lsp not found. Click to install or configure tynix.server.path.";
       statusBarItem.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.warningBackground",
       );

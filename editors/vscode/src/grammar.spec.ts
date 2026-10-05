@@ -59,7 +59,7 @@ test("generated grammar JSON is in sync with scripts/build-grammar.mjs", () => {
 
 test("grammar snapshots match test/grammar/__snapshots__", async () => {
   const { renderTokens } = await load<TokenizeModule>("tokenize.mjs");
-  const inputs = readdirSync(fixtures).filter((f) => /\.(tnix|nix)$/.test(f));
+  const inputs = readdirSync(fixtures).filter((f) => /\.(tynix|nix)$/.test(f));
   assert.ok(inputs.length > 0, "grammar fixtures should exist");
   mkdirSync(snapshots, { recursive: true });
   for (const input of inputs) {
@@ -79,14 +79,14 @@ test("grammar snapshots match test/grammar/__snapshots__", async () => {
   }
 });
 
-test("every repository .tnix/.d.tnix/.nix file tokenizes back to the top level", async () => {
+test("every repository .tynix/.d.tynix/.nix file tokenizes back to the top level", async () => {
   const { checkCorpus } = await load<CorpusModule>("check-corpus.mjs");
   const { files, failures } = await checkCorpus();
   assert.ok(files > 10, "corpus should contain the examples");
   assert.deepEqual(failures, []);
 });
 
-test("tnix declarations", async () => {
+test("tynix declarations", async () => {
   const alias = "type Box a = { value :: a; };";
   await assertScope(alias, "type", "storage.type.type");
   await assertScope(alias, "Box", "entity.name.type.alias");
@@ -128,17 +128,17 @@ test("casts and typed binders", async () => {
 
 test("diagnostic directives", async () => {
   await assertScope(
-    "# @tnix-ignore\nx",
-    "@tnix-ignore",
+    "# @tynix-ignore\nx",
+    "@tynix-ignore",
     "keyword.control.directive",
   );
   await assertScope(
-    "  # @tnix-expected",
-    "@tnix-expected",
+    "  # @tynix-expected",
+    "@tynix-expected",
     "keyword.control.directive",
   );
   // Only whole-line comments are directives.
-  const trailing = await scopesOf("x # @tnix-ignore", " @tnix-ignore");
+  const trailing = await scopesOf("x # @tynix-ignore", " @tynix-ignore");
   assert.ok(!trailing.some((s) => s.includes("directive")), trailing.join(" "));
 });
 

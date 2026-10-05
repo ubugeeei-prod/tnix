@@ -34,7 +34,7 @@ The keywords `dynamic`, `unknown` and `any` are types too; see
 
 ## Names in scope in expressions
 
-Every `.tnix` file starts with two names in scope:
+Every `.tynix` file starts with two names in scope:
 
 | Name | Default type | Becomes |
 | --- | --- | --- |
@@ -53,7 +53,7 @@ Everything else must be bound by `let`, a lambda, `rec`, or a `with` scope.
 
 `builtins` stays `dynamic` until a declaration says otherwise:
 
-```tnix [types/builtins.d.tnix]
+```tynix [types/builtins.d.tynix]
 declare "builtins" {
   head :: forall a. List a -> a;
   length :: forall a. List a -> Int;
@@ -62,7 +62,7 @@ declare "builtins" {
 };
 ```
 
-This is the starter file that `tnix init` writes. Once any declaration for
+This is the starter file that `tynix init` writes. Once any declaration for
 `"builtins"` is visible in the workspace, `builtins` is a **closed** record:
 members that are not declared are `TC0009` errors rather than `dynamic`. Either
 declare everything you use, or start from the full pack below.
@@ -72,7 +72,7 @@ any other target, it may be declared only once per workspace.
 
 ## The registry
 
-The repository's [`registry/`](https://github.com/ubugeeei-prod/tnix/tree/main/registry)
+The repository's [`registry/`](https://github.com/ubugeeei-prod/tynix/tree/main/registry)
 directory contains curated declaration packs, in the spirit of DefinitelyTyped.
 Copy the files you need into your project, or vendor the directory and list it
 in [`declarationPacks`](./config.md#declarationpacks).
@@ -84,9 +84,9 @@ root when loaded through `declarationPacks`.
 
 | File | Declares |
 | --- | --- |
-| [`builtins.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/builtins.d.tnix) | about 100 Nix builtins, from `abort` to `zipAttrsWith`, plus helper aliases such as `Predicate a` and `Fold b a` |
-| [`flake.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/flake.d.tnix) | a minimal `flake.nix` shape: `description`, `inputs`, and `outputs :: ResolvedFlakeInputs -> FlakeOutputs` |
-| [`tnix.config.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/tnix.config.d.tnix) | `TnixProjectConfig` for `tnix.config.tnix` |
+| [`builtins.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/workspace/builtins.d.tynix) | about 100 Nix builtins, from `abort` to `zipAttrsWith`, plus helper aliases such as `Predicate a` and `Fold b a` |
+| [`flake.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/workspace/flake.d.tynix) | a minimal `flake.nix` shape: `description`, `inputs`, and `outputs :: ResolvedFlakeInputs -> FlakeOutputs` |
+| [`tynix.config.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/workspace/tynix.config.d.tynix) | `TynixProjectConfig` for `tynix.config.tynix` |
 
 ### `registry/ecosystem/`
 
@@ -96,13 +96,13 @@ annotation or your own `declare` block. Load the whole directory:
 `nixpkgs-lib` is self-contained, and the other packs build on it (`nixpkgs-pkgs`
 on `nixpkgs-lib`, `nixos-modules` on both, the flake packs on all three).
 
-```tnix [tnix.config.tnix]
+```tynix [tynix.config.tynix]
 {
-  declarationPacks = [ ./vendor/tnix/registry/ecosystem ];
+  declarationPacks = [ ./vendor/tynix/registry/ecosystem ];
 }
 ```
 
-```tnix
+```tynix
 # Annotate the arguments nixpkgs passes in:
 { lib :: NixpkgsLib, stdenv :: NixpkgsStdenv, fetchFromGitHub :: NixpkgsFetchFromGitHub, ... }:
 stdenv.mkDerivation {
@@ -113,18 +113,18 @@ stdenv.mkDerivation {
 }
 ```
 
-```tnix
+```tynix
 # Or type a file you import:
 declare "./nix/flake-utils.nix" { default :: NixFlakeUtilsFlake; };
 ```
 
 | File | Main aliases |
 | --- | --- |
-| [`nixpkgs-lib.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/nixpkgs-lib.d.tnix) | `NixpkgsLib` and one alias per sub-library; `NixpkgsDerivation`, `NixpkgsDerivationCore`, `NixpkgsMeta`, `NixpkgsLicense`, `NixpkgsMaintainer`, `NixpkgsPlatform`, `NixpkgsSystem`, `NixpkgsSourceLike`, `NixpkgsFileset`; module-system values `NixpkgsOptionType a`, `NixpkgsMkOptionArgs a`, `NixpkgsOption a`, `NixpkgsModuleIf a`, `NixpkgsModuleOverride a`, ...; `NixosSystemArgs` / `NixosConfiguration` for `lib.nixosSystem` |
-| [`nixpkgs-pkgs.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/nixpkgs-pkgs.d.tnix) | `NixpkgsPkgs`, `NixpkgsStdenv`, `NixpkgsImport`, `NixpkgsImportArgs`, `NixpkgsConfig`; builder arguments `NixpkgsMkDerivationArgs`, `NixpkgsMkShellArgs`, `NixpkgsBuildGoModuleArgs`, `NixpkgsBuildRustPackageArgs`, `NixpkgsBuildNpmPackageArgs`, `NixpkgsBuildPythonPackageArgs`, `NixpkgsWriteShellApplicationArgs`, `NixpkgsSymlinkJoinArgs`, `NixpkgsBuildEnvArgs`; fetchers `NixpkgsFetchFromGitHub`, `NixpkgsFetchUrl`, `NixpkgsFetchZip`, `NixpkgsFetchGit`, `NixpkgsFetchFromGitLab`, `NixpkgsFetchPatch`; `NixpkgsRustPlatform`, `NixpkgsPythonPackages`, `NixpkgsPython`, `NixpkgsHaskellPackageSet`, `NixpkgsDockerTools`, `NixpkgsFormats`, `NixpkgsWriters` |
-| [`nixos-modules.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/nixos-modules.d.tnix) | `NixosModule`, `NixosModuleArgs`, `NixosModuleAttrs`, `NixosModuleFunction`, `NixosSystemdService`, `NixosUser` |
-| [`flake-ecosystem.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/flake-ecosystem.d.tnix) | `NixFlake`, `NixFlakeOutputs`, `NixFlakeInputSpec`, `NixFlakeApp`, `NixFlakeTemplate`, `NixFlakePerSystem a`, `NixFlakeSystemOutputs a`, `NixFlakeSourceInfo`; `NixpkgsFlake`, `NixFlakeUtilsFlake`, `FlakePartsFlake` / `FlakePartsLib` / `FlakePartsModule` / `FlakePartsPerSystemArgs`, `HomeManagerFlake` / `HomeManagerConfigurationArgs` / `HomeManagerDag`, `NixDarwinFlake` |
-| [`community-flakes.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/ecosystem/community-flakes.d.tnix) | `DevenvFlake`, `TreefmtNixFlake`, `PreCommitHooksFlake`, `CraneFlake` / `CraneLib` / `CraneBuildArgs`, `FenixFlake`, `DeployRsFlake`, `NixvimFlake`, `SopsNixFlake`, `AgenixFlake`, `DiskoFlake`, `ColmenaFlake` |
+| [`nixpkgs-lib.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/ecosystem/nixpkgs-lib.d.tynix) | `NixpkgsLib` and one alias per sub-library; `NixpkgsDerivation`, `NixpkgsDerivationCore`, `NixpkgsMeta`, `NixpkgsLicense`, `NixpkgsMaintainer`, `NixpkgsPlatform`, `NixpkgsSystem`, `NixpkgsSourceLike`, `NixpkgsFileset`; module-system values `NixpkgsOptionType a`, `NixpkgsMkOptionArgs a`, `NixpkgsOption a`, `NixpkgsModuleIf a`, `NixpkgsModuleOverride a`, ...; `NixosSystemArgs` / `NixosConfiguration` for `lib.nixosSystem` |
+| [`nixpkgs-pkgs.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/ecosystem/nixpkgs-pkgs.d.tynix) | `NixpkgsPkgs`, `NixpkgsStdenv`, `NixpkgsImport`, `NixpkgsImportArgs`, `NixpkgsConfig`; builder arguments `NixpkgsMkDerivationArgs`, `NixpkgsMkShellArgs`, `NixpkgsBuildGoModuleArgs`, `NixpkgsBuildRustPackageArgs`, `NixpkgsBuildNpmPackageArgs`, `NixpkgsBuildPythonPackageArgs`, `NixpkgsWriteShellApplicationArgs`, `NixpkgsSymlinkJoinArgs`, `NixpkgsBuildEnvArgs`; fetchers `NixpkgsFetchFromGitHub`, `NixpkgsFetchUrl`, `NixpkgsFetchZip`, `NixpkgsFetchGit`, `NixpkgsFetchFromGitLab`, `NixpkgsFetchPatch`; `NixpkgsRustPlatform`, `NixpkgsPythonPackages`, `NixpkgsPython`, `NixpkgsHaskellPackageSet`, `NixpkgsDockerTools`, `NixpkgsFormats`, `NixpkgsWriters` |
+| [`nixos-modules.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/ecosystem/nixos-modules.d.tynix) | `NixosModule`, `NixosModuleArgs`, `NixosModuleAttrs`, `NixosModuleFunction`, `NixosSystemdService`, `NixosUser` |
+| [`flake-ecosystem.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/ecosystem/flake-ecosystem.d.tynix) | `NixFlake`, `NixFlakeOutputs`, `NixFlakeInputSpec`, `NixFlakeApp`, `NixFlakeTemplate`, `NixFlakePerSystem a`, `NixFlakeSystemOutputs a`, `NixFlakeSourceInfo`; `NixpkgsFlake`, `NixFlakeUtilsFlake`, `FlakePartsFlake` / `FlakePartsLib` / `FlakePartsModule` / `FlakePartsPerSystemArgs`, `HomeManagerFlake` / `HomeManagerConfigurationArgs` / `HomeManagerDag`, `NixDarwinFlake` |
+| [`community-flakes.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/ecosystem/community-flakes.d.tynix) | `DevenvFlake`, `TreefmtNixFlake`, `PreCommitHooksFlake`, `CraneFlake` / `CraneLib` / `CraneBuildArgs`, `FenixFlake`, `DeployRsFlake`, `NixvimFlake`, `SopsNixFlake`, `AgenixFlake`, `DiskoFlake`, `ColmenaFlake` |
 
 #### What `NixpkgsLib` covers
 
@@ -189,7 +189,7 @@ top-level names). Signatures follow nixpkgs 26.11.
 
 ## Writing your own pack
 
-- Put aliases and `declare` blocks in `.d.tnix` files. A declaration file must
+- Put aliases and `declare` blocks in `.d.tynix` files. A declaration file must
   not contain an expression: one that does breaks analysis for the whole
   workspace with `TD0007`.
 - Prefix alias names with the library's name (`Nixpkgs...`, `HomeManager...`).

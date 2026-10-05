@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Tokenize every .tnix / .d.tnix / .nix file in the repository corpus and
+// Tokenize every .tynix / .d.tynix / .nix file in the repository corpus and
 // report files whose TextMate rule stack does not return to the top level at
 // end of file (a strong signal that a begin/end region leaked).
 //
 //   node scripts/check-corpus.mjs            # scan the default corpus
-//   node scripts/check-corpus.mjs a.tnix ... # scan specific files
+//   node scripts/check-corpus.mjs a.tynix ... # scan specific files
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -30,7 +30,7 @@ function walk(dir, files = []) {
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) walk(full, files);
-    else if (/\.(tnix|nix)$/.test(entry)) files.push(full);
+    else if (/\.(tynix|nix)$/.test(entry)) files.push(full);
   }
   return files;
 }
@@ -41,7 +41,7 @@ export function defaultCorpus() {
     "dogfood",
     "registry",
     "editors/vscode/test/grammar",
-    "editors/tree-sitter-tnix/examples",
+    "editors/tree-sitter-tynix/examples",
   ];
   const files = roots.flatMap((dir) => {
     try {
@@ -51,7 +51,7 @@ export function defaultCorpus() {
     }
   });
   for (const top of readdirSync(repoRoot)) {
-    if (/\.(tnix|nix)$/.test(top)) files.push(join(repoRoot, top));
+    if (/\.(tynix|nix)$/.test(top)) files.push(join(repoRoot, top));
   }
   return files.sort();
 }

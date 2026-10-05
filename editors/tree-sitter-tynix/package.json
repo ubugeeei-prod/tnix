@@ -1,0 +1,37 @@
+{
+  "name": "tree-sitter-tynix",
+  "version": "2.0.0",
+  "description": "tree-sitter grammar for tynix (Nix with a gradual type layer)",
+  "private": true,
+  "license": "MIT",
+  "keywords": [
+    "tree-sitter",
+    "nix",
+    "tynix",
+    "parser"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ubugeeei/tynix.git",
+    "directory": "editors/tree-sitter-tynix"
+  },
+  "scripts": {
+    "generate": "tree-sitter generate --no-bindings",
+    "test": "tree-sitter test",
+    "parse-corpus": "node scripts/parse-corpus.mjs",
+    "sync-queries": "node scripts/sync-queries.mjs",
+    "check-queries": "node scripts/sync-queries.mjs --check"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.tynix",
+      "file-types": [
+        "tynix"
+      ],
+      "injection-regex": "^tynix$",
+      "highlights": "queries/highlights.scm",
+      "injections": "queries/injections.scm",
+      "locals": "queries/locals.scm"
+    }
+  ]
+}

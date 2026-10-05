@@ -1,48 +1,48 @@
 #!/bin/sh
-# tnix installer
+# tynix installer
 #
-#   curl -fsSL https://tnix.dev/install.sh | sh
-#   curl -fsSL https://tnix.dev/install.sh | sh -s -- --version 0.5.0
-#   curl -fsSL https://tnix.dev/install.sh | sh -s -- --uninstall
+#   curl -fsSL https://tynix.dev/install.sh | sh
+#   curl -fsSL https://tynix.dev/install.sh | sh -s -- --version 0.5.0
+#   curl -fsSL https://tynix.dev/install.sh | sh -s -- --uninstall
 #
-# Installs the prebuilt `tnix` CLI and `tnix-lsp` language server from the
+# Installs the prebuilt `tynix` CLI and `tynix-lsp` language server from the
 # GitHub release archives. Every archive is verified against its published
 # SHA-256 checksum before anything is installed.
 #
 # Environment variables:
-#   TNIX_VERSION        Release to install, e.g. 0.5.0 or v0.5.0 (default: latest)
-#   TNIX_INSTALL_DIR    Directory for the binaries (default: $HOME/.tnix/bin)
-#   TNIX_DOWNLOAD_BASE  Base URL of the release assets; files are fetched from
-#                       <base>/<tag>/<file> (default: https://tnix.dev/download)
-#   TNIX_REPO           GitHub repository used to resolve the latest release
-#                       (default: ubugeeei-prod/tnix)
+#   TYNIX_VERSION        Release to install, e.g. 0.5.0 or v0.5.0 (default: latest)
+#   TYNIX_INSTALL_DIR    Directory for the binaries (default: $HOME/.tynix/bin)
+#   TYNIX_DOWNLOAD_BASE  Base URL of the release assets; files are fetched from
+#                       <base>/<tag>/<file> (default: https://tynix.dev/download)
+#   TYNIX_REPO           GitHub repository used to resolve the latest release
+#                       (default: ubugeeei-prod/tynix)
 #
 # Supported targets: linux-x64, linux-arm64, macos-arm64, macos-x64.
 # Everywhere else (and for NixOS users), install through the Nix flake:
-#   nix profile install github:ubugeeei-prod/tnix
+#   nix profile install github:ubugeeei-prod/tynix
 
 set -eu
 
-TNIX_REPO="${TNIX_REPO:-ubugeeei-prod/tnix}"
-TNIX_DOWNLOAD_BASE="${TNIX_DOWNLOAD_BASE:-https://tnix.dev/download}"
-TNIX_LATEST_URL="${TNIX_LATEST_URL:-https://tnix.dev/latest}"
-TNIX_VERSION="${TNIX_VERSION:-}"
-TNIX_INSTALL_DIR="${TNIX_INSTALL_DIR:-}"
-FLAKE_REF="github:ubugeeei-prod/tnix"
-BINARIES="tnix tnix-lsp"
+TYNIX_REPO="${TYNIX_REPO:-ubugeeei-prod/tynix}"
+TYNIX_DOWNLOAD_BASE="${TYNIX_DOWNLOAD_BASE:-https://tynix.dev/download}"
+TYNIX_LATEST_URL="${TYNIX_LATEST_URL:-https://tynix.dev/latest}"
+TYNIX_VERSION="${TYNIX_VERSION:-}"
+TYNIX_INSTALL_DIR="${TYNIX_INSTALL_DIR:-}"
+FLAKE_REF="github:ubugeeei-prod/tynix"
+BINARIES="tynix tynix-lsp"
 
 tmp_dir=""
 
 say() {
-  printf 'tnix-install: %s\n' "$*"
+  printf 'tynix-install: %s\n' "$*"
 }
 
 warn() {
-  printf 'tnix-install: warning: %s\n' "$*" >&2
+  printf 'tynix-install: warning: %s\n' "$*" >&2
 }
 
 die() {
-  printf 'tnix-install: error: %s\n' "$*" >&2
+  printf 'tynix-install: error: %s\n' "$*" >&2
   exit 1
 }
 
@@ -54,20 +54,20 @@ cleanup() {
 
 usage() {
   cat <<EOF
-tnix installer
+tynix installer
 
 Usage:
-  curl -fsSL https://tnix.dev/install.sh | sh
-  curl -fsSL https://tnix.dev/install.sh | sh -s -- [options]
+  curl -fsSL https://tynix.dev/install.sh | sh
+  curl -fsSL https://tynix.dev/install.sh | sh -s -- [options]
 
 Options:
   --version <version>   Install a specific release (e.g. 0.5.0); default: latest
-  --dir <path>          Install directory (default: \$HOME/.tnix/bin)
-  --uninstall           Remove tnix and tnix-lsp from the install directory
+  --dir <path>          Install directory (default: \$HOME/.tynix/bin)
+  --uninstall           Remove tynix and tynix-lsp from the install directory
   -h, --help            Show this help
 
 Environment:
-  TNIX_VERSION, TNIX_INSTALL_DIR, TNIX_DOWNLOAD_BASE, TNIX_REPO
+  TYNIX_VERSION, TYNIX_INSTALL_DIR, TYNIX_DOWNLOAD_BASE, TYNIX_REPO
 
 With Nix, prefer the flake instead:
   nix profile install $FLAKE_REF
@@ -81,18 +81,18 @@ has() {
 suggest_flake() {
   cat >&2 <<EOF
 
-Prebuilt tnix binaries are available for linux-x64, linux-arm64,
+Prebuilt tynix binaries are available for linux-x64, linux-arm64,
 macos-arm64 and macos-x64. On other platforms, build from source with Nix:
 
   nix profile install $FLAKE_REF
   # or run without installing:
-  nix run $FLAKE_REF -- check ./main.tnix
+  nix run $FLAKE_REF -- check ./main.tynix
 
 EOF
 }
 
 unsupported() {
-  printf 'tnix-install: error: %s\n' "$*" >&2
+  printf 'tynix-install: error: %s\n' "$*" >&2
   suggest_flake
   exit 1
 }
@@ -100,10 +100,10 @@ unsupported() {
 # --- platform detection ------------------------------------------------------
 
 detect_target() {
-  # TNIX_UNAME_S / TNIX_UNAME_M exist so the installer can be tested for
+  # TYNIX_UNAME_S / TYNIX_UNAME_M exist so the installer can be tested for
   # other platforms; they are not meant for normal use.
-  os="${TNIX_UNAME_S:-$(uname -s)}"
-  arch="${TNIX_UNAME_M:-$(uname -m)}"
+  os="${TYNIX_UNAME_S:-$(uname -s)}"
+  arch="${TYNIX_UNAME_M:-$(uname -m)}"
 
   case "$os" in
     Linux) os_part=linux ;;
@@ -122,7 +122,7 @@ detect_target() {
 
   # An x86_64 shell running under Rosetta 2 on Apple silicon should still get
   # the native arm64 build.
-  if [ "$os_part" = macos ] && [ "$arch_part" = x64 ] && [ -z "${TNIX_UNAME_M:-}" ]; then
+  if [ "$os_part" = macos ] && [ "$arch_part" = x64 ] && [ -z "${TYNIX_UNAME_M:-}" ]; then
     if [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = 1 ]; then
       arch_part=arm64
     fi
@@ -167,22 +167,22 @@ effective_url() {
 
 resolve_latest_tag() {
   tag=""
-  api="https://api.github.com/repos/$TNIX_REPO/releases/latest"
+  api="https://api.github.com/repos/$TYNIX_REPO/releases/latest"
   if json="$(download_stdout "$api" 2>/dev/null)"; then
     tag="$(printf '%s\n' "$json" | sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
   fi
 
   if [ -z "$tag" ]; then
-    # Rate-limited or blocked API: follow https://tnix.dev/latest, which
+    # Rate-limited or blocked API: follow https://tynix.dev/latest, which
     # redirects to .../releases/tag/<tag>.
-    if url="$(effective_url "$TNIX_LATEST_URL" 2>/dev/null)"; then
+    if url="$(effective_url "$TYNIX_LATEST_URL" 2>/dev/null)"; then
       case "$url" in
         */tag/*) tag="${url##*/tag/}" ;;
       esac
     fi
   fi
 
-  [ -n "$tag" ] || die "could not determine the latest tnix release; set TNIX_VERSION (e.g. TNIX_VERSION=0.5.0)"
+  [ -n "$tag" ] || die "could not determine the latest tynix release; set TYNIX_VERSION (e.g. TYNIX_VERSION=0.5.0)"
   printf '%s\n' "$tag"
 }
 
@@ -245,46 +245,46 @@ EOF
 do_uninstall() {
   removed=0
   for bin in $BINARIES; do
-    if [ -e "$TNIX_INSTALL_DIR/$bin" ] || [ -L "$TNIX_INSTALL_DIR/$bin" ]; then
-      rm -f "$TNIX_INSTALL_DIR/$bin"
-      say "removed $TNIX_INSTALL_DIR/$bin"
+    if [ -e "$TYNIX_INSTALL_DIR/$bin" ] || [ -L "$TYNIX_INSTALL_DIR/$bin" ]; then
+      rm -f "$TYNIX_INSTALL_DIR/$bin"
+      say "removed $TYNIX_INSTALL_DIR/$bin"
       removed=1
     fi
   done
 
-  # Clean up the default layout (~/.tnix/bin) if nothing else lives there.
-  if [ "$TNIX_INSTALL_DIR" = "$default_install_dir" ]; then
-    rmdir "$TNIX_INSTALL_DIR" 2>/dev/null || true
-    rmdir "$(dirname "$TNIX_INSTALL_DIR")" 2>/dev/null || true
+  # Clean up the default layout (~/.tynix/bin) if nothing else lives there.
+  if [ "$TYNIX_INSTALL_DIR" = "$default_install_dir" ]; then
+    rmdir "$TYNIX_INSTALL_DIR" 2>/dev/null || true
+    rmdir "$(dirname "$TYNIX_INSTALL_DIR")" 2>/dev/null || true
   fi
 
   if [ "$removed" = 0 ]; then
-    say "nothing to uninstall in $TNIX_INSTALL_DIR"
+    say "nothing to uninstall in $TYNIX_INSTALL_DIR"
   else
-    say "tnix has been uninstalled"
+    say "tynix has been uninstalled"
   fi
 }
 
 do_install() {
   target="$(detect_target)"
 
-  if [ -n "$TNIX_VERSION" ]; then
-    tag="$(normalize_tag "$TNIX_VERSION")"
+  if [ -n "$TYNIX_VERSION" ]; then
+    tag="$(normalize_tag "$TYNIX_VERSION")"
   else
     say "resolving the latest release"
     tag="$(normalize_tag "$(resolve_latest_tag)")"
   fi
 
-  archive="tnix-$tag-$target.tar.gz"
-  checksum="tnix-$tag-$target.sha256"
-  base="${TNIX_DOWNLOAD_BASE%/}/$tag"
+  archive="tynix-$tag-$target.tar.gz"
+  checksum="tynix-$tag-$target.sha256"
+  base="${TYNIX_DOWNLOAD_BASE%/}/$tag"
 
-  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/tnix-install.XXXXXX")" || die "cannot create a temporary directory"
+  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/tynix-install.XXXXXX")" || die "cannot create a temporary directory"
   trap cleanup EXIT
   trap 'cleanup; exit 130' INT
   trap 'cleanup; exit 143' TERM
 
-  say "installing tnix $tag ($target)"
+  say "installing tynix $tag ($target)"
   say "downloading $base/$archive"
   download "$base/$archive" "$tmp_dir/$archive" ||
     die "failed to download $base/$archive (does release $tag exist for $target?)"
@@ -312,29 +312,29 @@ do_install() {
   mkdir -p "$tmp_dir/extract"
   tar -xzf "$tmp_dir/$archive" -C "$tmp_dir/extract" || die "failed to extract $archive"
 
-  mkdir -p "$TNIX_INSTALL_DIR" || die "cannot create $TNIX_INSTALL_DIR"
+  mkdir -p "$TYNIX_INSTALL_DIR" || die "cannot create $TYNIX_INSTALL_DIR"
   for bin in $BINARIES; do
     src="$(find "$tmp_dir/extract" -type f -path "*/bin/$bin" | head -n 1)"
     [ -n "$src" ] || die "$archive does not contain bin/$bin"
-    # Install through a temporary name so a running tnix-lsp is replaced
+    # Install through a temporary name so a running tynix-lsp is replaced
     # atomically instead of being overwritten in place.
-    cp "$src" "$TNIX_INSTALL_DIR/.$bin.tmp.$$"
-    chmod 0755 "$TNIX_INSTALL_DIR/.$bin.tmp.$$"
-    mv -f "$TNIX_INSTALL_DIR/.$bin.tmp.$$" "$TNIX_INSTALL_DIR/$bin"
-    say "installed $TNIX_INSTALL_DIR/$bin"
+    cp "$src" "$TYNIX_INSTALL_DIR/.$bin.tmp.$$"
+    chmod 0755 "$TYNIX_INSTALL_DIR/.$bin.tmp.$$"
+    mv -f "$TYNIX_INSTALL_DIR/.$bin.tmp.$$" "$TYNIX_INSTALL_DIR/$bin"
+    say "installed $TYNIX_INSTALL_DIR/$bin"
   done
 
-  if version_output="$("$TNIX_INSTALL_DIR/tnix" --version 2>&1)"; then
+  if version_output="$("$TYNIX_INSTALL_DIR/tynix" --version 2>&1)"; then
     say "$version_output"
   else
-    warn "the installed tnix binary failed to run:"
+    warn "the installed tynix binary failed to run:"
     printf '%s\n' "$version_output" >&2
     suggest_flake
     exit 1
   fi
 
-  path_hint "$TNIX_INSTALL_DIR"
-  say "done. Run 'tnix --help' to get started."
+  path_hint "$TYNIX_INSTALL_DIR"
+  say "done. Run 'tynix --help' to get started."
 }
 
 main() {
@@ -344,16 +344,16 @@ main() {
       --uninstall) action=uninstall ;;
       --version)
         [ "$#" -ge 2 ] || die "--version requires a value"
-        TNIX_VERSION="$2"
+        TYNIX_VERSION="$2"
         shift
         ;;
-      --version=*) TNIX_VERSION="${1#--version=}" ;;
+      --version=*) TYNIX_VERSION="${1#--version=}" ;;
       --dir)
         [ "$#" -ge 2 ] || die "--dir requires a value"
-        TNIX_INSTALL_DIR="$2"
+        TYNIX_INSTALL_DIR="$2"
         shift
         ;;
-      --dir=*) TNIX_INSTALL_DIR="${1#--dir=}" ;;
+      --dir=*) TYNIX_INSTALL_DIR="${1#--dir=}" ;;
       -h | --help)
         usage
         exit 0
@@ -363,9 +363,9 @@ main() {
     shift
   done
 
-  [ -n "${HOME:-}" ] || [ -n "$TNIX_INSTALL_DIR" ] || die "HOME is not set; set TNIX_INSTALL_DIR"
-  default_install_dir="${HOME:-}/.tnix/bin"
-  TNIX_INSTALL_DIR="${TNIX_INSTALL_DIR:-$default_install_dir}"
+  [ -n "${HOME:-}" ] || [ -n "$TYNIX_INSTALL_DIR" ] || die "HOME is not set; set TYNIX_INSTALL_DIR"
+  default_install_dir="${HOME:-}/.tynix/bin"
+  TYNIX_INSTALL_DIR="${TYNIX_INSTALL_DIR:-$default_install_dir}"
 
   case "$action" in
     install) do_install ;;

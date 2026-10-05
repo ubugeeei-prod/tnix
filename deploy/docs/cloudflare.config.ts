@@ -1,4 +1,4 @@
-// The tnix.dev documentation site, deployed with the Cloudflare CLI (`cf`):
+// The tynix.dev documentation site, deployed with the Cloudflare CLI (`cf`):
 // a Worker serving the Ox Content build (the repository's dist/docs, see
 // wrangler.config.ts) as static assets. `_headers` and `_redirects` there
 // apply as-is. From the repository root:
@@ -12,7 +12,7 @@ import { defineConfig } from "cf/config";
 
 export default defineConfig(({ isPreview }) => ({
   worker: {
-    name: "tnix",
+    name: "tynix",
     compatibilityDate: "2026-10-01",
     observability: {
       enabled: true,
@@ -21,8 +21,8 @@ export default defineConfig(({ isPreview }) => ({
       htmlHandling: "auto-trailing-slash",
     },
     // `cf deploy` creates the DNS record and certificate for the custom
-    // domain when the tnix.dev zone is in the same Cloudflare account.
+    // domain when the tynix.dev zone is in the same Cloudflare account.
     // Preview uploads cannot carry domains, so only production attaches it.
-    ...(isPreview ? {} : { domains: ["tnix.dev"] }),
+    ...(isPreview ? {} : { domains: ["tynix.dev"] }),
   },
 }));

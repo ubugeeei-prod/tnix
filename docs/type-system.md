@@ -2,7 +2,7 @@
 
 ## Direction
 
-The `tnix` type system is a blend of Haskell and TypeScript. Its inference style is primarily Haskell-like, while its adoption model and tooling philosophy are TypeScript-like. The top priority is not maximal strictness. It is incremental adoption in existing Nix codebases.
+The `tynix` type system is a blend of Haskell and TypeScript. Its inference style is primarily Haskell-like, while its adoption model and tooling philosophy are TypeScript-like. The top priority is not maximal strictness. It is incremental adoption in existing Nix codebases.
 
 ## Core Features
 
@@ -23,7 +23,7 @@ does not subtype concrete types without an explicit annotation or narrowing.
 
 ### 4. Explicit casts with `as`
 
-`tnix` supports TypeScript-style `expr as Type` assertions. Casts are still
+`tynix` supports TypeScript-style `expr as Type` assertions. Casts are still
 checked: they succeed for ordinary widening, structural narrowing, and explicit
 crossings of gradual boundaries such as `any`, `unknown`, or `dynamic`.
 Concrete unrelated casts remain errors.
@@ -32,7 +32,7 @@ Concrete unrelated casts remain errors.
 
 Attribute sets are compared structurally rather than nominally.
 
-```tnix
+```tynix
 { name :: String; version :: String; } <: { name :: String; }
 ```
 
@@ -40,7 +40,7 @@ Function types are contravariant in arguments and covariant in results.
 
 Records can also be **open** and have **optional fields**:
 
-```tnix
+```tynix
 { name :: String; ... }
 { name :: String; version? :: String; }
 forall r. { ...r } -> { tag :: String; ...r }
@@ -56,13 +56,13 @@ fields fit `T`.
 
 Union types are included to support partial adoption.
 
-```tnix
+```tynix
 String | Int
 ```
 
 ### 7. Parametric polymorphism
 
-```tnix
+```tynix
 id :: forall a. a -> a;
 ```
 
@@ -75,7 +75,7 @@ for generic helpers.
 
 Type constructor application is treated as a first-class operation in the type language.
 
-```tnix
+```tynix
 type Functor f = {
   map :: forall a b. (a -> b) -> f a -> f b;
 };
@@ -85,7 +85,7 @@ type Functor f = {
 
 The language includes a TypeScript-style `extends ? :` form.
 
-```tnix
+```tynix
 type Element t = t extends List (infer a) ? a : t;
 ```
 
@@ -93,7 +93,7 @@ type Element t = t extends List (infer a) ? a : t;
 
 `infer` introduces pattern variables inside the right-hand side of conditional types.
 
-```tnix
+```tynix
 type ReturnOf f = f extends (infer a -> infer r) ? r : dynamic;
 ```
 
@@ -101,7 +101,7 @@ type ReturnOf f = f extends (infer a -> infer r) ? r : dynamic;
 
 Lists can be preserved more precisely as indexed containers:
 
-```tnix
+```tynix
 Vec 3 Int
 Matrix 2 4 Float
 Tensor [2 3 4] Number
@@ -114,7 +114,7 @@ evidence.
 
 Examples:
 
-```tnix
+```tynix
 [1 2]
 # => Vec 2 (1 | 2)
 
@@ -137,9 +137,9 @@ in xs
 
 ### 12. Numeric validation
 
-`tnix` supports a small numeric refinement surface:
+`tynix` supports a small numeric refinement surface:
 
-```tnix
+```tynix
 Nat
 Range 0 100 Int
 Range 0.0 1.0 Float
@@ -151,7 +151,7 @@ Nat) Int` can be checked directly against list literals of matching length.
 
 Examples:
 
-```tnix
+```tynix
 let ratio :: Range 0.0 1.0 Float;
     ratio = 0.5;
 in ratio
@@ -172,7 +172,7 @@ in xs
 
 Units are modeled as lightweight phantom wrappers over validated values:
 
-```tnix
+```tynix
 Unit "ms" (Range 0 5000 Nat)
 Unit "MiB" Int
 ```
@@ -182,7 +182,7 @@ with different units do not subtype each other accidentally.
 
 Examples:
 
-```tnix
+```tynix
 let timeout :: Unit "ms" (Range 0 5000 Nat);
     timeout = 2500;
 in timeout
@@ -198,7 +198,7 @@ in timeoutS
 
 ## Consistency and Partial Adoption
 
-`tnix` checks both subtyping and consistency.
+`tynix` checks both subtyping and consistency.
 
 - subtype
   - the strict static relation
@@ -236,7 +236,7 @@ Examples:
   values of unknown shape, are gradual: calling one yields `dynamic` rather than
   fixing its type from the first call site.
 
-```tnix
+```tynix
 let
   id = x: x;
   pair = { a = id 1; b = id "s"; };
@@ -250,20 +250,20 @@ algorithm.
 ### `builtins`
 
 Every Nix builtin is typed by a prelude embedded in the binary (the source is
-[`registry/workspace/builtins.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/builtins.d.tnix)).
+[`registry/workspace/builtins.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/workspace/builtins.d.tynix)).
 Both `builtins.map` and the global `map` are checked with no project setup. A
 workspace that declares `builtins` itself replaces the prelude.
 
 ### `import`
 
 `import ./foo.nix` is typed from a `declare "./foo.nix" { ... }` block, either
-inline in the importing file or in any `.d.tnix` file under the workspace root
-(conventionally `./foo.d.tnix` next to the module). If no declaration exists,
+inline in the importing file or in any `.d.tynix` file under the workspace root
+(conventionally `./foo.d.tynix` next to the module). If no declaration exists,
 the checker falls back to `dynamic`.
 
 Examples:
 
-```tnix
+```tynix
 declare "./lib.nix" { default :: { value :: Int; }; };
 
 {
@@ -285,7 +285,7 @@ root: {
 
 Attribute sets are modeled as `Record` types. Users should be able to annotate only the public surface they care about while still permitting additional fields.
 
-```tnix
+```tynix
 let
   pkg :: { name :: String; };
   pkg = { name = "a"; version = "1"; };
@@ -294,10 +294,10 @@ in pkg
 
 ## Type-class-like behavior
 
-tnix does not implement Haskell-style type class resolution yet. Capabilities
+tynix does not implement Haskell-style type class resolution yet. Capabilities
 are modeled as dictionary records:
 
-```tnix
+```tynix
 type Eq a = { eq :: a -> a -> Bool; };
 ```
 
@@ -312,9 +312,9 @@ Signatures may already carry a constraint context (`Functor f =>`,
   record mismatches name the missing or ill-typed field.
 - Surface `dynamic` fallbacks explicitly in hover and diagnostics.
 
-## `.d.tnix` emitter
+## `.d.tynix` emitter
 
-The emitter extracts only the public type surface from `.tnix`.
+The emitter extracts only the public type surface from `.tynix`.
 
 - If the root expression is an attribute set, its fields become the exported API.
 - Any other root value is emitted as a `default`-style export.
@@ -323,9 +323,9 @@ The emitter extracts only the public type surface from `.tnix`.
 - The `declare` target is the compiled `.nix` path, relative to the emitted
   declaration file.
 
-Example, for `user.tnix`:
+Example, for `user.tynix`:
 
-```tnix
+```tynix
 type User = { name :: String; };
 
 {
@@ -335,7 +335,7 @@ type User = { name :: String; };
 
 Generated declaration:
 
-```tnix
+```tynix
 type User  = {
   name :: String;
 };

@@ -4,7 +4,7 @@ Status legend: ✅ shipped · 🚧 in progress.
 
 Phases 0–4 shipped in the integrated `0.5.0` toolchain release. Phase 5 hardening
 is largely shipped; the remaining production-readiness work is tracked under the
-[**Production Ready (v1.0)**](https://github.com/ubugeeei-prod/tnix/milestone/1)
+[**Production Ready (v1.0)**](https://github.com/ubugeeei-prod/tynix/milestone/1)
 milestone.
 
 ## Phase 0: Spec First ✅
@@ -24,13 +24,13 @@ milestone.
 
 Deliverables:
 
-- `.tnix -> .nix`
-- `tnix check`
-- `tnix emit`
+- `.tynix -> .nix`
+- `tynix check`
+- `tynix emit`
 
 ## Phase 2: Ambient + Workspace ✅
 
-- `.d.tnix` parser
+- `.d.tynix` parser
 - workspace declaration discovery
 - `import` declaration resolution
 - declaration emitter stabilization
@@ -60,7 +60,7 @@ Deliverables:
 ## Toward v1.0: Production Ready 🚧
 
 Tracked under the
-[**Production Ready (v1.0)**](https://github.com/ubugeeei-prod/tnix/milestone/1)
+[**Production Ready (v1.0)**](https://github.com/ubugeeei-prod/tynix/milestone/1)
 milestone, organized as epics:
 
 - Nix-language parity ✅: attrset patterns with defaults and `@` binders,
@@ -79,8 +79,8 @@ milestone, organized as epics:
 - LSP features ✅: scope- and type-aware completion, rich diagnostics with
   related information, unused-binding and deprecation lints, code actions,
   signature help, navigation
-- Editor setup and distribution ✅: `tnix ide install`, `tnix doctor`, the
-  `tnix.dev` installer, flake packages, overlay and NixOS / nix-darwin / Home
+- Editor setup and distribution ✅: `tynix ide install`, `tynix doctor`, the
+  `tynix.dev` installer, flake packages, overlay and NixOS / nix-darwin / Home
   Manager modules
 - CLI output contract and exit codes ✅; watch mode 🚧
 - Release/cross-platform packaging and CI hardening (lint, security scan,
@@ -98,13 +98,13 @@ Planned after v1.0, roughly in priority order:
 - `config`-aware typing of NixOS, nix-darwin and Home Manager modules, with
   option declarations driving the type of `config`
 - implementing records whose fields carry their own `forall` (instances of
-  `Functor`-style dictionaries) in `.tnix`
+  `Functor`-style dictionaries) in `.tynix`
 - reporting more than one diagnostic per file
 - kind annotations
 
 ## Shipping Criteria
 
 - erased `.nix` preserves source semantics
-- existing `.nix` files can be typed with `.d.tnix` alone
+- existing `.nix` files can be typed with `.d.tynix` alone
 - hover and diagnostics are practically useful
 - the main type-puzzle examples are expressible

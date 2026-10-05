@@ -1,28 +1,28 @@
 ---
 title: CLI Reference
-description: Every tnix command and flag, exit codes, and the JSON report schema.
+description: Every tynix command and flag, exit codes, and the JSON report schema.
 ---
 
 # CLI Reference
 
 ```text
-tnix COMMAND [OPTIONS]
+tynix COMMAND [OPTIONS]
 ```
 
 | Command | Purpose |
 | --- | --- |
-| [`check`](#tnix-check) | type-check one file and print its types |
-| [`compile`](#tnix-compile) | check one file and emit `.nix` |
-| [`emit`](#tnix-emit) | check one file and emit a `.d.tnix` declaration |
-| [`init`](#tnix-init) | create `tnix.config.tnix` and starter files |
-| [`scaffold`](#tnix-scaffold) | create missing starter files from an existing config |
-| [`check-project`](#tnix-check-project) | type-check every project source |
-| [`build`](#tnix-build) | compile every project source and emit declarations |
-| [`emit-project`](#tnix-emit-project) | emit declarations for every project source |
-| [`version`](#tnix-version) | print the version |
-| [`lsp`](#tnix-lsp) | start the language server over stdio |
-| [`ide`](#tnix-ide) | install editor integrations, list supported editors |
-| [`doctor`](#tnix-doctor) | check the toolchain, project and editor setup |
+| [`check`](#tynix-check) | type-check one file and print its types |
+| [`compile`](#tynix-compile) | check one file and emit `.nix` |
+| [`emit`](#tynix-emit) | check one file and emit a `.d.tynix` declaration |
+| [`init`](#tynix-init) | create `tynix.config.tynix` and starter files |
+| [`scaffold`](#tynix-scaffold) | create missing starter files from an existing config |
+| [`check-project`](#tynix-check-project) | type-check every project source |
+| [`build`](#tynix-build) | compile every project source and emit declarations |
+| [`emit-project`](#tynix-emit-project) | emit declarations for every project source |
+| [`version`](#tynix-version) | print the version |
+| [`lsp`](#tynix-lsp) | start the language server over stdio |
+| [`ide`](#tynix-ide) | install editor integrations, list supported editors |
+| [`doctor`](#tynix-doctor) | check the toolchain, project and editor setup |
 
 Global options: `-h`, `--help` on any command, and `-v`, `--version` at the top
 level.
@@ -43,10 +43,10 @@ level.
 - **Declarations.** Every analysis loads the declaration world of the file's
   workspace; see [how declaration files are found](../tutorial/declarations.md#how-declaration-files-are-found).
 
-## `tnix check`
+## `tynix check`
 
 ```text
-tnix check FILE [-f|--format text|json]
+tynix check FILE [-f|--format text|json]
 ```
 
 Analyzes `FILE` and prints the inferred root type and the type of every
@@ -57,17 +57,17 @@ root: String
 greeting :: String
 ```
 
-A declaration-only file (`.d.tnix`) prints nothing when it checks. A failing
+A declaration-only file (`.d.tynix`) prints nothing when it checks. A failing
 check prints the diagnostic to standard error and exits `1`:
 
 ```text
 3:14: [TC0013] type mismatch: 42 vs String
 ```
 
-## `tnix compile`
+## `tynix compile`
 
 ```text
-tnix compile FILE [-o|--output OUTPUT] [--no-check]
+tynix compile FILE [-o|--output OUTPUT] [--no-check]
 ```
 
 Checks `FILE`, erases all type syntax and prints the resulting Nix, or writes
@@ -76,10 +76,10 @@ without output if the file does not check. `--no-check` skips type checking
 and only erases, like TypeScript's transpile-only mode: parse errors still
 fail, type errors do not. A declaration-only file cannot be compiled.
 
-## `tnix emit`
+## `tynix emit`
 
 ```text
-tnix emit FILE [-o|--output OUTPUT]
+tynix emit FILE [-o|--output OUTPUT]
 ```
 
 Checks `FILE` and prints a declaration file describing it, or writes it to
@@ -88,126 +88,126 @@ the declaration's location. Fails with `TD0008` for a declaration-only file.
 See [declaration emit](./type-system-internals.md#erasure-and-compilation) for
 how members are chosen.
 
-## `tnix init`
+## `tynix init`
 
 ```text
-tnix init [DIRECTORY] [--editor EDITOR]...
+tynix init [DIRECTORY] [--editor EDITOR]...
 ```
 
-Creates `DIRECTORY` if needed and writes a default `tnix.config.tnix`, then
-runs [`scaffold`](#tnix-scaffold). Fails if `tnix.config.tnix` already exists.
+Creates `DIRECTORY` if needed and writes a default `tynix.config.tynix`, then
+runs [`scaffold`](#tynix-scaffold). Fails if `tynix.config.tynix` already exists.
 The project name defaults to the directory name. Each `--editor` (repeatable)
-also runs [`tnix ide install EDITOR`](#tnix-ide) for the new project.
+also runs [`tynix ide install EDITOR`](#tynix-ide) for the new project.
 
-## `tnix scaffold`
+## `tynix scaffold`
 
 ```text
-tnix scaffold [DIRECTORY]
+tynix scaffold [DIRECTORY]
 ```
 
-Reads `DIRECTORY/tnix.config.tnix` and creates whichever of these files are
+Reads `DIRECTORY/tynix.config.tynix` and creates whichever of these files are
 missing, never overwriting existing ones:
 
-- `tnix.config.d.tnix`: types for the config file,
-- the `entry` file (by default `src/main.tnix`),
-- `declarationDir/builtins.d.tnix` when `builtins = true`.
+- `tynix.config.d.tynix`: types for the config file,
+- the `entry` file (by default `src/main.tynix`),
+- `declarationDir/builtins.d.tynix` when `builtins = true`.
 
 `builtins` is already typed by the prelude built into the binary. A scaffolded
-`builtins.d.tnix` replaces that prelude with its short starter list, so delete
+`builtins.d.tynix` replaces that prelude with its short starter list, so delete
 it (and set `builtins = false`) unless you want to restrict the builtins.
 
-## `tnix check-project`
+## `tynix check-project`
 
 ```text
-tnix check-project [DIRECTORY] [-f|--format text|json]
+tynix check-project [DIRECTORY] [-f|--format text|json]
 ```
 
-Loads `DIRECTORY/tnix.config.tnix`, discovers sources (see
+Loads `DIRECTORY/tynix.config.tynix`, discovers sources (see
 [source discovery](./config.md#source-discovery)), and checks every one, sharing
 one declaration cache. All files are checked even if some fail.
 
 ```text
-checked project hello-tnix
-root: /home/you/hello-tnix
-- ok src/main.tnix
+checked project hello-tynix
+root: /home/you/hello-tynix
+- ok src/main.tynix
   root: String
   greeting :: String
 ```
 
 Fails with `no project source files discovered` when discovery finds nothing,
-and with `missing tnix.config.tnix in DIRECTORY` without a config.
+and with `missing tynix.config.tynix in DIRECTORY` without a config.
 
-## `tnix build`
+## `tynix build`
 
 ```text
-tnix build [DIRECTORY] [-f|--format text|json]
+tynix build [DIRECTORY] [-f|--format text|json]
 ```
 
 For every discovered source, compiles it to `buildDir/<relative>.nix` and
-emits `generatedDeclarationDir/<relative>.d.tnix`, where `<relative>` is the
+emits `generatedDeclarationDir/<relative>.d.tynix`, where `<relative>` is the
 source's path relative to `sourceDir` (or to the project root for sources
 outside `sourceDir`). If **any** source fails, nothing is written.
 
-## `tnix emit-project`
+## `tynix emit-project`
 
 ```text
-tnix emit-project [DIRECTORY] [-f|--format text|json]
+tynix emit-project [DIRECTORY] [-f|--format text|json]
 ```
 
 Like `build`, but writes only the declaration files.
 
-## `tnix version`
+## `tynix version`
 
 ```text
-tnix version [-f|--format text|json]
+tynix version [-f|--format text|json]
 ```
 
-Prints `tnix <version>`. `tnix --version` prints the same text.
+Prints `tynix <version>`. `tynix --version` prints the same text.
 
-## `tnix lsp`
+## `tynix lsp`
 
 ```text
-tnix lsp [--log-file PATH]
+tynix lsp [--log-file PATH]
 ```
 
-Executes `tnix-lsp --stdio`, which must be on `PATH`. Editors usually start
-`tnix-lsp` directly; this subcommand exists so a single binary name can be
+Executes `tynix-lsp --stdio`, which must be on `PATH`. Editors usually start
+`tynix-lsp` directly; this subcommand exists so a single binary name can be
 configured everywhere. `--log-file` is forwarded to the server.
 
-## `tnix ide`
+## `tynix ide`
 
 ```text
-tnix ide install vscode|cursor|vscodium|zed|neovim|helix
+tynix ide install vscode|cursor|vscodium|zed|neovim|helix
                  [--project DIR | -g|--global] [-n|--dry-run]
                  [--no-extension] [--force] [--lsp-path PATH]
-tnix ide list
+tynix ide list
 ```
 
-`tnix ide install EDITOR` installs the tnix extension (where the editor has
-one) and merges the editor configuration that starts `tnix-lsp`: project
+`tynix ide install EDITOR` installs the tynix extension (where the editor has
+one) and merges the editor configuration that starts `tynix-lsp`: project
 settings under the current directory (or `--project DIR`) by default, user
 settings with `--global`. Settings are merged, never clobbered, and re-running
 the command is a no-op. `--dry-run` prints the planned commands and a diff
 without changing anything, `--no-extension` only writes configuration,
 `--force` rewrites files that cannot be merged safely after saving a `.bak`
-copy, and `--lsp-path` pins a `tnix-lsp` path (`""` pins nothing).
+copy, and `--lsp-path` pins a `tynix-lsp` path (`""` pins nothing).
 
-`tnix ide list` prints the supported editors and whether each one is detected.
+`tynix ide list` prints the supported editors and whether each one is detected.
 
 [Editor setup](../editors.md) documents what each editor gets.
 
-## `tnix doctor`
+## `tynix doctor`
 
 ```text
-tnix doctor [-f|--format text|json]
+tynix doctor [-f|--format text|json]
 ```
 
-Checks that `tnix` and `tnix-lsp` are on `PATH` and report the same version,
-that the current project's `tnix.config.tnix` loads, that each detected editor
-has the tnix integration, and that `nix` is available. Each check prints one
+Checks that `tynix` and `tynix-lsp` are on `PATH` and report the same version,
+that the current project's `tynix.config.tynix` loads, that each detected editor
+has the tynix integration, and that `nix` is available. Each check prints one
 line, with a suggested fix for each problem. Exits `1` if any check fails;
 warnings do not change the exit status. See
-[editor setup](../editors.md#tnix-doctor) for the list of checks and the JSON
+[editor setup](../editors.md#tynix-doctor) for the list of checks and the JSON
 report.
 
 ## JSON output
@@ -215,7 +215,7 @@ report.
 `--format json` is accepted by `check`, `check-project`, `build`,
 `emit-project`, `version` and `doctor`. Every report is one JSON object on one line with
 `schemaVersion` (currently `1`), `action`, and `success` or a `summary`.
-Rendered types are strings in tnix syntax and may contain newlines.
+Rendered types are strings in tynix syntax and may contain newlines.
 
 `check`:
 
@@ -223,7 +223,7 @@ Rendered types are strings in tnix syntax and may contain newlines.
 {
   "schemaVersion": 1,
   "action": "check",
-  "file": "hello.tnix",
+  "file": "hello.tynix",
   "success": true,
   "root": "String",
   "bindings": { "greeting": "String" },
@@ -241,13 +241,13 @@ On failure, `success` is `false`, `root` is `null`, `bindings` is empty and
 {
   "schemaVersion": 1,
   "action": "check-project",
-  "projectName": "hello-tnix",
-  "projectRoot": "/home/you/hello-tnix",
+  "projectName": "hello-tynix",
+  "projectRoot": "/home/you/hello-tynix",
   "summary": { "total": 1, "ok": 1, "failed": 0 },
   "files": [
     {
-      "source": "/home/you/hello-tnix/src/main.tnix",
-      "relative": "main.tnix",
+      "source": "/home/you/hello-tynix/src/main.tynix",
+      "relative": "main.tynix",
       "success": true,
       "root": "String",
       "bindings": { "greeting": "String" },

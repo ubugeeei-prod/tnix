@@ -4,15 +4,15 @@ export default defineConfig({
   run: {
     tasks: {
       "workspace:build": {
-        command: "vp run build:haskell && pnpm --filter tnix build && vp run build:zed && vp run docs:build",
+        command: "vp run build:haskell && pnpm --filter tynix build && vp run build:zed && vp run docs:build",
       },
       "workspace:check": {
-        command: "vp run check:versions && vp run check:prelude && vp run check:haskell && vp run test:haskell && vp run check:dogfood && vp run check:examples && pnpm --filter tnix check && pnpm --filter tnix test && vp run check:zed && vp run test:zed && vp run check:neovim",
+        command: "vp run check:versions && vp run check:prelude && vp run check:haskell && vp run test:haskell && vp run check:dogfood && vp run check:examples && pnpm --filter tynix check && pnpm --filter tynix test && vp run check:zed && vp run test:zed && vp run check:neovim",
       },
       "workspace:fmt": {
-        command: "vp run fmt:haskell && pnpm --filter tnix fmt",
+        command: "vp run fmt:haskell && pnpm --filter tynix fmt",
       },
-      // Publishes dist/docs to the `tnix` Cloudflare Pages project (tnix.dev).
+      // Publishes dist/docs to the `tynix` Cloudflare Pages project (tynix.dev).
       // Requires `wrangler login` or CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID.
       ide: {
         command: "node --experimental-strip-types ./scripts/install-ide.ts",
@@ -53,11 +53,11 @@ export default defineConfig({
         cache: false,
       },
       "check:dogfood": {
-        command: "cabal run tnix -- check ./dogfood/flake-surface.tnix",
+        command: "cabal run tynix -- check ./dogfood/flake-surface.tynix",
         cache: false,
       },
       "check:examples": {
-        command: "cabal run tnix -- check-project ./examples --format json",
+        command: "cabal run tynix -- check-project ./examples --format json",
         cache: false,
       },
       "build:zed": {

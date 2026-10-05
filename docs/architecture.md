@@ -6,17 +6,17 @@ Haskell is the core implementation language. Editor integrations stay thin and a
 
 ### Haskell packages
 
-- `tnix-core`
+- `tynix-core`
   - AST
   - parser
   - type checker
   - declaration emitter
-  - `.tnix -> .nix` compiler
-- `tnix-cli`
+  - `.tynix -> .nix` compiler
+- `tynix-cli`
   - `compile`
   - `check`
   - `emit`
-- `tnix-lsp`
+- `tynix-lsp`
   - diagnostics
   - hover
   - signature help
@@ -71,7 +71,7 @@ Haskell is the core implementation language. Editor integrations stay thin and a
 ## Compiler Pipeline
 
 1. parse
-   - parse `.tnix` and `.d.tnix` into ASTs
+   - parse `.tynix` and `.d.tynix` into ASTs
 2. collect declarations
    - type aliases
    - ambient declarations
@@ -82,12 +82,12 @@ Haskell is the core implementation language. Editor integrations stay thin and a
    - diagnostics
 4. emit
    - generate `.nix`
-   - generate `.d.tnix`
+   - generate `.d.tynix`
 
 ## LSP Responsibilities
 
-- parse and type-check the current `.tnix` buffer
-- index workspace `.d.tnix` files
+- parse and type-check the current `.tynix` buffer
+- index workspace `.d.tynix` files
 - resolve declarations for `import` targets
 - publish diagnostics
 - return inferred types and declaration origins in hover
@@ -105,8 +105,8 @@ Haskell is the core implementation language. Editor integrations stay thin and a
 
 ### Zed
 
-- a minimal extension whose main job is starting `tnix-lsp`
-- treat `.tnix` as a Nix-like language
+- a minimal extension whose main job is starting `tynix-lsp`
+- treat `.tynix` as a Nix-like language
 
 ### neovim
 
@@ -115,7 +115,7 @@ Haskell is the core implementation language. Editor integrations stay thin and a
 
 ## Test Strategy
 
-The most important tests live in `tnix-core`.
+The most important tests live in `tynix-core`.
 
 - parser golden tests
 - subtype and consistency tests
@@ -131,5 +131,5 @@ The LSP and editor integrations stay thin and mainly verify startup, protocol wi
 
 - prefer explainable errors
 - keep generated `.nix` readable
-- stabilize `.d.tnix` as an API contract format
+- stabilize `.d.tynix` as an API contract format
 - keep implementation files below 250 lines with clearly separated responsibilities

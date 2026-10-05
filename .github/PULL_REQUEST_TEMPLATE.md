@@ -1,5 +1,5 @@
 <!--
-Thanks for contributing to tnix! Keep PRs focused so each one can be reviewed
+Thanks for contributing to tynix! Keep PRs focused so each one can be reviewed
 and reverted on its own. See CONTRIBUTING.md for details.
 -->
 

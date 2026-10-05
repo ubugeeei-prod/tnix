@@ -1,4 +1,4 @@
 {
   add = a: b: a + b;
-  name = "tnix";
+  name = "tynix";
 }

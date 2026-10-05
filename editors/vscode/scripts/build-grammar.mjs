@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Generates the TextMate grammars shipped with the tnix VS Code extension.
+// Generates the TextMate grammars shipped with the tynix VS Code extension.
 //
 // The grammar is authored here as plain JavaScript so the shared regex
 // fragments (identifiers, attribute paths, keyword boundaries, ...) are written
@@ -9,7 +9,7 @@
 //   node scripts/build-grammar.mjs --check  # fail if the JSON is out of date
 //
 // Scope names follow the TextMate conventions VS Code themes already style
-// (TypeScript / Haskell flavoured), so stock themes colour tnix sensibly.
+// (TypeScript / Haskell flavoured), so stock themes colour tynix sensibly.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -88,14 +88,14 @@ const GLOBAL_BUILTINS = [
 // Grammar
 // ---------------------------------------------------------------------------
 
-const scope = (name) => `${name}.tnix`;
+const scope = (name) => `${name}.tynix`;
 
 const grammar = {
   $schema:
     "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  name: "tnix",
-  scopeName: "source.tnix",
-  fileTypes: ["tnix", "d.tnix", "nix"],
+  name: "tynix",
+  scopeName: "source.tynix",
+  fileTypes: ["tynix", "d.tynix", "nix"],
   patterns: [{ include: "#declaration" }, { include: "#expression" }],
   repository: {
     // ----------------------------------------------------------- comments
@@ -129,8 +129,8 @@ const grammar = {
     },
     directive: {
       comment:
-        "`# @tnix-ignore` / `# @tnix-expected` suppress the next checker failure.",
-      match: String.raw`^\s*(#)\s*(@tnix-(?:ignore|expected))${R}(.*)$`,
+        "`# @tynix-ignore` / `# @tynix-expected` suppress the next checker failure.",
+      match: String.raw`^\s*(#)\s*(@tynix-(?:ignore|expected))${R}(.*)$`,
       name: scope("comment.line.number-sign.directive"),
       captures: {
         1: { name: scope("punctuation.definition.comment") },
@@ -377,7 +377,7 @@ const grammar = {
       endCaptures: {
         0: { name: scope("punctuation.section.embedded.end") },
       },
-      contentName: "source.tnix",
+      contentName: "source.tynix",
       patterns: [{ include: "#expression" }],
     },
 
@@ -709,14 +709,14 @@ const grammar = {
 const markdownInjection = {
   $schema:
     "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  scopeName: "markdown.tnix.codeblock",
+  scopeName: "markdown.tynix.codeblock",
   fileTypes: [],
   injectionSelector: "L:text.html.markdown",
-  patterns: [{ include: "#tnix-code-block" }],
+  patterns: [{ include: "#tynix-code-block" }],
   repository: {
-    "tnix-code-block": {
+    "tynix-code-block": {
       name: "markup.fenced_code.block.markdown",
-      begin: String.raw`(^|\G)(\s*)(\`{3,}|~{3,})\s*(?i:(tnix)((\s+|:|,|\{|\?)[^\`~]*)?$)`,
+      begin: String.raw`(^|\G)(\s*)(\`{3,}|~{3,})\s*(?i:(tynix)((\s+|:|,|\{|\?)[^\`~]*)?$)`,
       beginCaptures: {
         3: { name: "punctuation.definition.markdown" },
         4: { name: "fenced_code.block.language.markdown" },
@@ -728,8 +728,8 @@ const markdownInjection = {
         {
           begin: String.raw`(^|\G)(\s*)(.*)`,
           while: String.raw`(^|\G)(?!\s*([\`~]{3,})\s*$)`,
-          contentName: "meta.embedded.block.tnix",
-          patterns: [{ include: "source.tnix" }],
+          contentName: "meta.embedded.block.tynix",
+          patterns: [{ include: "source.tynix" }],
         },
       ],
     },
@@ -737,8 +737,8 @@ const markdownInjection = {
 };
 
 const outputs = [
-  ["syntaxes/tnix.tmLanguage.json", grammar],
-  ["syntaxes/tnix-markdown-injection.tmLanguage.json", markdownInjection],
+  ["syntaxes/tynix.tmLanguage.json", grammar],
+  ["syntaxes/tynix-markdown-injection.tmLanguage.json", markdownInjection],
 ];
 
 const check = process.argv.includes("--check");

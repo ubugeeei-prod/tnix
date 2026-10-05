@@ -201,13 +201,13 @@ jobs:
         run: nix develop --accept-flake-config --command cabal update
 
       - name: Check dogfood fixtures
-        run: nix develop --accept-flake-config --command cabal run tnix -- check ./dogfood/flake-surface.tnix
+        run: nix develop --accept-flake-config --command cabal run tynix -- check ./dogfood/flake-surface.tynix
 
       - name: Check example projects
-        run: nix develop --accept-flake-config --command cabal run tnix -- check-project ./examples --format json
+        run: nix develop --accept-flake-config --command cabal run tynix -- check-project ./examples --format json
 
       - name: Check Nix syntax parity against nixpkgs
-        run: nix develop --accept-flake-config --command bash -c 'sh scripts/check-nix-parity.sh "$(cabal list-bin tnix)" 25 1000'
+        run: nix develop --accept-flake-config --command bash -c 'sh scripts/check-nix-parity.sh "$(cabal list-bin tynix)" 25 1000'
 
   vscode:
     name: VS Code Extension
@@ -259,15 +259,15 @@ jobs:
         run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
 
       - name: Typecheck VS Code extension
-        run: nix develop --accept-flake-config --command pnpm --filter tnix check
+        run: nix develop --accept-flake-config --command pnpm --filter tynix check
 
       - name: Test VS Code extension
-        run: nix develop --accept-flake-config --command pnpm --filter tnix test
+        run: nix develop --accept-flake-config --command pnpm --filter tynix test
 
       - name: Package VS Code extension
         run: |
-          nix develop --accept-flake-config --command pnpm --filter tnix build
-          nix develop --accept-flake-config --command pnpm --filter tnix exec vsce package --no-dependencies --out /tmp/tnix-ci.vsix
+          nix develop --accept-flake-config --command pnpm --filter tynix build
+          nix develop --accept-flake-config --command pnpm --filter tynix exec vsce package --no-dependencies --out /tmp/tynix-ci.vsix
 
   vscode-integration:
     name: VS Code Integration
@@ -302,7 +302,7 @@ jobs:
             libasound2t64 libxshmfence1 libsecret-1-0 libdbus-1-3
 
       - name: Run VS Code integration tests
-        run: xvfb-run -a pnpm --filter tnix test:integration
+        run: xvfb-run -a pnpm --filter tynix test:integration
 
   zed:
     name: Zed Extension
@@ -425,15 +425,15 @@ jobs:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run grammar corpus tests
-        working-directory: editors/tree-sitter-tnix
+        working-directory: editors/tree-sitter-tynix
         run: nix develop --accept-flake-config --command tree-sitter test
 
       - name: Parse the repository corpus without errors
-        working-directory: editors/tree-sitter-tnix
+        working-directory: editors/tree-sitter-tynix
         run: nix develop --accept-flake-config --command node scripts/parse-corpus.mjs
 
       - name: Check editor queries are in sync and compile
-        working-directory: editors/tree-sitter-tnix
+        working-directory: editors/tree-sitter-tynix
         run: nix develop --accept-flake-config --command node scripts/sync-queries.mjs --check
 
   lint:
@@ -486,7 +486,7 @@ jobs:
         run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
 
       - name: Check VS Code extension formatting
-        run: nix develop --accept-flake-config --command pnpm --filter tnix fmt
+        run: nix develop --accept-flake-config --command pnpm --filter tynix fmt
 
       - name: Mount Cargo git cache
         if: ${{ startsWith(vars.CI_RUNNER || 'ubuntu-latest', 'blacksmith-') }}

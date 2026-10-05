@@ -1,0 +1,1115 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "tynix",
+  "scopeName": "source.tynix",
+  "fileTypes": [
+    "tynix",
+    "d.tynix",
+    "nix"
+  ],
+  "patterns": [
+    {
+      "include": "#declaration"
+    },
+    {
+      "include": "#expression"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "include": "#directive"
+        },
+        {
+          "name": "comment.block.documentation.tynix",
+          "begin": "/\\*\\*(?!/)",
+          "end": "\\*/",
+          "captures": {
+            "0": {
+              "name": "punctuation.definition.comment.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comment-annotations"
+            }
+          ]
+        },
+        {
+          "name": "comment.block.tynix",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "captures": {
+            "0": {
+              "name": "punctuation.definition.comment.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comment-annotations"
+            }
+          ]
+        },
+        {
+          "name": "comment.line.number-sign.tynix",
+          "begin": "#",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.tynix"
+            }
+          },
+          "end": "$",
+          "patterns": [
+            {
+              "include": "#comment-annotations"
+            }
+          ]
+        }
+      ]
+    },
+    "directive": {
+      "comment": "`# @tynix-ignore` / `# @tynix-expected` suppress the next checker failure.",
+      "match": "^\\s*(#)\\s*(@tynix-(?:ignore|expected))(?![A-Za-z0-9_'\\-])(.*)$",
+      "name": "comment.line.number-sign.directive.tynix",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.comment.tynix"
+        },
+        "2": {
+          "name": "keyword.control.directive.tynix"
+        }
+      }
+    },
+    "comment-annotations": {
+      "patterns": [
+        {
+          "match": "\\b(TODO|FIXME|XXX|HACK|NOTE|BUG)\\b",
+          "name": "keyword.other.todo.tynix"
+        }
+      ]
+    },
+    "declaration": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#type-alias"
+        },
+        {
+          "include": "#declare"
+        }
+      ]
+    },
+    "type-alias": {
+      "comment": "type Name params = Type;",
+      "name": "meta.type-alias.tynix",
+      "begin": "(?<![A-Za-z0-9_'\\-.])(type)\\s+([A-Za-z_][A-Za-z0-9_'\\-]*)((?:\\s+[A-Za-z_][A-Za-z0-9_'\\-]*)*)\\s*(=)(?![=>])",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.type.type.tynix"
+        },
+        "2": {
+          "name": "entity.name.type.alias.tynix"
+        },
+        "3": {
+          "patterns": [
+            {
+              "match": "[A-Za-z_][A-Za-z0-9_'\\-]*",
+              "name": "entity.name.type.parameter.tynix"
+            }
+          ]
+        },
+        "4": {
+          "name": "keyword.operator.assignment.tynix"
+        }
+      },
+      "end": ";",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.terminator.statement.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#type"
+        }
+      ]
+    },
+    "declare": {
+      "comment": "declare \"./file.nix\" { name :: Type; };",
+      "name": "meta.declare.tynix",
+      "begin": "(?<![A-Za-z0-9_'\\-.])(declare)(?![A-Za-z0-9_'\\-])(?=\\s*(?:\"|~?\\.{0,2}/|<|$))",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.modifier.declare.tynix"
+        }
+      },
+      "end": ";",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.terminator.statement.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#string-double"
+        },
+        {
+          "include": "#path"
+        },
+        {
+          "name": "meta.declare.body.tynix",
+          "begin": "\\{",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.braces.begin.tynix"
+            }
+          },
+          "end": "\\}",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.braces.end.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#signature"
+            }
+          ]
+        }
+      ]
+    },
+    "signature": {
+      "comment": "name :: Type;  (let items, attribute sets, declare bodies)",
+      "name": "meta.signature.tynix",
+      "begin": "(?<![A-Za-z0-9_'\\-.])(?:([A-Za-z_][A-Za-z0-9_'\\-]*)|(\"(?:[^\"\\\\]|\\\\.)*\"))\\s*(::)(?!:)",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.function.tynix"
+        },
+        "2": {
+          "name": "string.quoted.double.tynix"
+        },
+        "3": {
+          "name": "keyword.operator.type.annotation.tynix"
+        }
+      },
+      "end": ";",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.terminator.signature.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#type"
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#signature"
+        },
+        {
+          "include": "#binding-function"
+        },
+        {
+          "include": "#binding"
+        },
+        {
+          "include": "#string-indented"
+        },
+        {
+          "include": "#string-double"
+        },
+        {
+          "include": "#declaration"
+        },
+        {
+          "include": "#typed-binder"
+        },
+        {
+          "include": "#inherit"
+        },
+        {
+          "include": "#with-assert"
+        },
+        {
+          "include": "#cast"
+        },
+        {
+          "include": "#type-annotation"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#uri"
+        },
+        {
+          "include": "#path"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#constants"
+        },
+        {
+          "include": "#builtins"
+        },
+        {
+          "include": "#lambda-head"
+        },
+        {
+          "include": "#braces"
+        },
+        {
+          "include": "#brackets"
+        },
+        {
+          "include": "#parens"
+        },
+        {
+          "include": "#select"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#identifier"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(if|then|else)(?![A-Za-z0-9_'\\-])",
+          "name": "keyword.control.conditional.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(assert)(?![A-Za-z0-9_'\\-])",
+          "name": "keyword.control.assert.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(import)(?![A-Za-z0-9_'\\-])",
+          "name": "keyword.control.import.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(let)(?![A-Za-z0-9_'\\-])",
+          "name": "keyword.other.let.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(in)(?![A-Za-z0-9_'\\-])",
+          "name": "keyword.other.in.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(with)(?![A-Za-z0-9_'\\-])",
+          "name": "keyword.other.with.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(rec)(?![A-Za-z0-9_'\\-])",
+          "name": "storage.modifier.rec.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(or)(?![A-Za-z0-9_'\\-])",
+          "name": "keyword.operator.or.tynix"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(true)(?![A-Za-z0-9_'\\-])",
+          "name": "constant.language.boolean.true.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(false)(?![A-Za-z0-9_'\\-])",
+          "name": "constant.language.boolean.false.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(null)(?![A-Za-z0-9_'\\-])",
+          "name": "constant.language.null.tynix"
+        }
+      ]
+    },
+    "number": {
+      "patterns": [
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(?:\\d+\\.\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?(?![A-Za-z0-9_'.])",
+          "name": "constant.numeric.float.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])\\d+(?![A-Za-z0-9_'.])",
+          "name": "constant.numeric.integer.tynix"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(builtins)(?:\\s*(\\.)\\s*([A-Za-z_][A-Za-z0-9_'\\-]*))?(?![A-Za-z0-9_'\\-])",
+          "captures": {
+            "1": {
+              "name": "variable.language.builtins.tynix"
+            },
+            "2": {
+              "name": "punctuation.accessor.tynix"
+            },
+            "3": {
+              "name": "support.function.builtin.tynix"
+            }
+          }
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(abort|baseNameOf|break|derivation|derivationStrict|dirOf|fetchGit|fetchMercurial|fetchTarball|fetchTree|fromTOML|isNull|map|placeholder|removeAttrs|scopedImport|throw|toString)(?![A-Za-z0-9_'\\-])",
+          "name": "support.function.builtin.tynix"
+        }
+      ]
+    },
+    "identifier": {
+      "match": "(?<![A-Za-z0-9_'\\-.])[A-Za-z_][A-Za-z0-9_'\\-]*",
+      "name": "variable.other.readwrite.tynix"
+    },
+    "select": {
+      "patterns": [
+        {
+          "match": "(\\.)\\s*([A-Za-z_][A-Za-z0-9_'\\-]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.accessor.tynix"
+            },
+            "2": {
+              "name": "variable.other.property.tynix"
+            }
+          }
+        },
+        {
+          "match": "\\.(?=\\s*(?:\"|\\$\\{))",
+          "name": "punctuation.accessor.tynix"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "->",
+          "name": "keyword.operator.logical.implication.tynix"
+        },
+        {
+          "match": "\\|>|<\\|",
+          "name": "keyword.operator.pipe.tynix"
+        },
+        {
+          "match": "//",
+          "name": "keyword.operator.update.tynix"
+        },
+        {
+          "match": "\\+\\+",
+          "name": "keyword.operator.concat.tynix"
+        },
+        {
+          "match": "==|!=",
+          "name": "keyword.operator.comparison.tynix"
+        },
+        {
+          "match": "<=|>=|<|>",
+          "name": "keyword.operator.relational.tynix"
+        },
+        {
+          "match": "&&|\\|\\|",
+          "name": "keyword.operator.logical.tynix"
+        },
+        {
+          "match": "!",
+          "name": "keyword.operator.logical.not.tynix"
+        },
+        {
+          "match": "\\+|-|\\*|/",
+          "name": "keyword.operator.arithmetic.tynix"
+        },
+        {
+          "match": "\\?",
+          "name": "keyword.operator.has-attr.tynix"
+        },
+        {
+          "match": "=",
+          "name": "keyword.operator.assignment.tynix"
+        },
+        {
+          "match": "@",
+          "name": "keyword.operator.at.tynix"
+        },
+        {
+          "match": ":",
+          "name": "storage.type.function.arrow.tynix"
+        },
+        {
+          "match": ";",
+          "name": "punctuation.terminator.tynix"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.comma.tynix"
+        },
+        {
+          "match": "\\.",
+          "name": "punctuation.accessor.tynix"
+        }
+      ]
+    },
+    "string-double": {
+      "name": "string.quoted.double.tynix",
+      "begin": "\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.tynix"
+        }
+      },
+      "end": "\"",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "match": "\\\\.",
+          "name": "constant.character.escape.tynix"
+        },
+        {
+          "include": "#interpolation"
+        }
+      ]
+    },
+    "string-indented": {
+      "name": "string.quoted.other.indented.tynix",
+      "begin": "''",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.tynix"
+        }
+      },
+      "end": "''(?!['$\\\\])",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "match": "''(?:\\$|'|\\\\.)",
+          "name": "constant.character.escape.tynix"
+        },
+        {
+          "include": "#interpolation"
+        }
+      ]
+    },
+    "interpolation": {
+      "name": "meta.embedded.interpolation.tynix",
+      "begin": "\\$\\{",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.embedded.begin.tynix"
+        }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.embedded.end.tynix"
+        }
+      },
+      "contentName": "source.tynix",
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "uri": {
+      "match": "(?<![A-Za-z0-9_'\\-.])[A-Za-z][A-Za-z0-9+\\-.]*:(?!:)[A-Za-z0-9%/?:@&=+$,\\-_.!~*']+",
+      "name": "string.unquoted.uri.tynix"
+    },
+    "path": {
+      "patterns": [
+        {
+          "comment": "<nixpkgs> search path",
+          "match": "<[A-Za-z0-9._+\\-]+(?:/[A-Za-z0-9._+\\-]+)*>",
+          "name": "string.unquoted.spath.tynix"
+        },
+        {
+          "comment": "./foo/${bar}/baz — a path with interpolation",
+          "name": "string.unquoted.path.tynix",
+          "begin": "(?<![A-Za-z0-9._+\\-/'])(?:~|[A-Za-z0-9._+\\-]*)(?:/[A-Za-z0-9._+\\-]+)*/[A-Za-z0-9._+\\-]*(?=\\$\\{)",
+          "end": "(?![A-Za-z0-9._+\\-]|/|\\$\\{)",
+          "patterns": [
+            {
+              "include": "#interpolation"
+            },
+            {
+              "match": "(?:[A-Za-z0-9._+\\-]|/)+"
+            }
+          ]
+        },
+        {
+          "match": "(?<![A-Za-z0-9._+\\-/'])(?:~|[A-Za-z0-9._+\\-]*)(?:/[A-Za-z0-9._+\\-]+)+/?",
+          "name": "string.unquoted.path.tynix"
+        }
+      ]
+    },
+    "binding-function": {
+      "comment": "name = <lambda>; the key is highlighted as a function name.",
+      "name": "meta.binding.tynix",
+      "begin": "(?=(?<![A-Za-z0-9_'\\-.])(?:[A-Za-z_][A-Za-z0-9_'\\-]*|\"(?:[^\"\\\\]|\\\\.)*\"|\\$\\{(?:[^{}]|\\{[^{}]*\\})*\\})(?:\\s*\\.\\s*(?:[A-Za-z_][A-Za-z0-9_'\\-]*|\"(?:[^\"\\\\]|\\\\.)*\"|\\$\\{(?:[^{}]|\\{[^{}]*\\})*\\}))*\\s*=(?![=>])\\s*(?:[A-Za-z_][A-Za-z0-9_'\\-]*\\s*(?:@\\s*\\{|:(?![:A-Za-z0-9%/?@&=+$,_.!~*'\\-]))|\\{[^{}]*\\}\\s*(?:@\\s*[A-Za-z_][A-Za-z0-9_'\\-]*\\s*)?:(?![:A-Za-z0-9%/?@&=+$,_.!~*'\\-])|\\(\\s*[A-Za-z_][A-Za-z0-9_'\\-]*\\s*::))",
+      "end": ";",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.terminator.binding.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "\\G",
+          "end": "=",
+          "endCaptures": {
+            "0": {
+              "name": "keyword.operator.assignment.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#string-double"
+            },
+            {
+              "include": "#interpolation"
+            },
+            {
+              "match": "[A-Za-z_][A-Za-z0-9_'\\-]*",
+              "name": "entity.name.function.tynix"
+            },
+            {
+              "match": "\\.",
+              "name": "punctuation.accessor.tynix"
+            }
+          ]
+        },
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "binding": {
+      "comment": "a.b.\"c\".${d} = value;",
+      "name": "meta.binding.tynix",
+      "begin": "(?=(?<![A-Za-z0-9_'\\-.])(?:[A-Za-z_][A-Za-z0-9_'\\-]*|\"(?:[^\"\\\\]|\\\\.)*\"|\\$\\{(?:[^{}]|\\{[^{}]*\\})*\\})(?:\\s*\\.\\s*(?:[A-Za-z_][A-Za-z0-9_'\\-]*|\"(?:[^\"\\\\]|\\\\.)*\"|\\$\\{(?:[^{}]|\\{[^{}]*\\})*\\}))*\\s*=(?![=>]))",
+      "end": ";",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.terminator.binding.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "\\G",
+          "end": "=",
+          "endCaptures": {
+            "0": {
+              "name": "keyword.operator.assignment.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#string-double"
+            },
+            {
+              "include": "#interpolation"
+            },
+            {
+              "match": "[A-Za-z_][A-Za-z0-9_'\\-]*",
+              "name": "entity.other.attribute-name.tynix"
+            },
+            {
+              "match": "\\.",
+              "name": "punctuation.accessor.tynix"
+            }
+          ]
+        },
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "with-assert": {
+      "comment": "`with e;` / `assert e;` own their `;` so it does not end an enclosing binding.",
+      "patterns": [
+        {
+          "name": "meta.with.tynix",
+          "begin": "(?<![A-Za-z0-9_'\\-.])(with)(?![A-Za-z0-9_'\\-])",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.other.with.tynix"
+            }
+          },
+          "end": ";",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.terminator.with.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "name": "meta.assert.tynix",
+          "begin": "(?<![A-Za-z0-9_'\\-.])(assert)(?![A-Za-z0-9_'\\-])",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.assert.tynix"
+            }
+          },
+          "end": ";",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.terminator.assert.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "inherit": {
+      "name": "meta.inherit.tynix",
+      "begin": "(?<![A-Za-z0-9_'\\-.])(inherit)(?![A-Za-z0-9_'\\-])",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.inherit.tynix"
+        }
+      },
+      "end": ";",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.terminator.inherit.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#parens"
+        },
+        {
+          "include": "#string-double"
+        },
+        {
+          "match": "[A-Za-z_][A-Za-z0-9_'\\-]*",
+          "name": "entity.other.attribute-name.tynix"
+        }
+      ]
+    },
+    "braces": {
+      "comment": "Attribute sets and lambda formals `{ a, b ? 1, ... }@args` share one rule.",
+      "name": "meta.braces.tynix",
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.braces.begin.tynix"
+        }
+      },
+      "end": "(\\})(?:\\s*(@)\\s*([A-Za-z_][A-Za-z0-9_'\\-]*))?",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.section.braces.end.tynix"
+        },
+        "2": {
+          "name": "keyword.operator.at.tynix"
+        },
+        "3": {
+          "name": "variable.parameter.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#formal"
+        },
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "formal": {
+      "patterns": [
+        {
+          "comment": "an item of a lambda formals list",
+          "match": "(?:(?<=[{,])|^)\\s*(?!(?:inherit|let|in|if|then|else|with|assert|rec|or|import|true|false|null)(?![A-Za-z0-9_'\\-]))([A-Za-z_][A-Za-z0-9_'\\-]*)(?:\\s*(\\?)|(?=\\s*(?:,|\\}|$)))",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.tynix"
+            },
+            "2": {
+              "name": "keyword.operator.default.tynix"
+            }
+          }
+        },
+        {
+          "match": "\\.\\.\\.",
+          "name": "keyword.operator.ellipsis.tynix"
+        }
+      ]
+    },
+    "lambda-head": {
+      "patterns": [
+        {
+          "comment": "args@{ ... }",
+          "match": "(?<![A-Za-z0-9_'\\-.])([A-Za-z_][A-Za-z0-9_'\\-]*)\\s*(@)(?=\\s*\\{)",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.tynix"
+            },
+            "2": {
+              "name": "keyword.operator.at.tynix"
+            }
+          }
+        },
+        {
+          "comment": "x: body",
+          "match": "(?<![A-Za-z0-9_'\\-.])([A-Za-z_][A-Za-z0-9_'\\-]*)\\s*(:(?![:A-Za-z0-9%/?@&=+$,_.!~*'\\-]))",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.tynix"
+            },
+            "2": {
+              "name": "storage.type.function.arrow.tynix"
+            }
+          }
+        }
+      ]
+    },
+    "typed-binder": {
+      "comment": "(x :: Type): body",
+      "name": "meta.parameter.typed.tynix",
+      "begin": "(\\()\\s*([A-Za-z_][A-Za-z0-9_'\\-]*)\\s*(::)(?!:)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.section.parens.begin.tynix"
+        },
+        "2": {
+          "name": "variable.parameter.tynix"
+        },
+        "3": {
+          "name": "keyword.operator.type.annotation.tynix"
+        }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.end.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#type"
+        }
+      ]
+    },
+    "brackets": {
+      "name": "meta.list.tynix",
+      "begin": "\\[",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.brackets.begin.tynix"
+        }
+      },
+      "end": "\\]",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.brackets.end.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "parens": {
+      "begin": "\\(",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.begin.tynix"
+        }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.end.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "cast": {
+      "comment": "expr as Type",
+      "name": "meta.cast.tynix",
+      "begin": "(?<![A-Za-z0-9_'\\-.])(as)(?![A-Za-z0-9_'\\-])",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.as.tynix"
+        }
+      },
+      "end": "(?=[;,)\\]}<>+*]|-(?!>)|(?<![A-Za-z0-9_'\\-.])(?:then|else|in|as|or)(?![A-Za-z0-9_'\\-])|==|!=|&&|\\|\\||//|\\|>|$)",
+      "patterns": [
+        {
+          "include": "#type"
+        }
+      ]
+    },
+    "type-annotation": {
+      "comment": "expr :: Type (documentation style annotation)",
+      "name": "meta.type.annotation.tynix",
+      "begin": "::(?!:)",
+      "beginCaptures": {
+        "0": {
+          "name": "keyword.operator.type.annotation.tynix"
+        }
+      },
+      "end": "(?=[;,)\\]}])|$",
+      "patterns": [
+        {
+          "include": "#type"
+        }
+      ]
+    },
+    "type": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "comment": "forall a b. T",
+          "match": "(?<![A-Za-z0-9_'\\-.])(forall)(?![A-Za-z0-9_'\\-])((?:\\s*[A-Za-z_][A-Za-z0-9_'\\-]*)*)\\s*(\\.)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.forall.tynix"
+            },
+            "2": {
+              "patterns": [
+                {
+                  "match": "[A-Za-z_][A-Za-z0-9_'\\-]*",
+                  "name": "entity.name.type.parameter.tynix"
+                }
+              ]
+            },
+            "3": {
+              "name": "punctuation.separator.forall.tynix"
+            }
+          }
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(infer)(?![A-Za-z0-9_'\\-])\\s*([A-Za-z_][A-Za-z0-9_'\\-]*)?",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.expression.infer.tynix"
+            },
+            "2": {
+              "name": "entity.name.type.parameter.tynix"
+            }
+          }
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(extends)(?![A-Za-z0-9_'\\-])",
+          "name": "storage.modifier.extends.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(any|dynamic|unknown)(?![A-Za-z0-9_'\\-])",
+          "name": "support.type.primitive.gradual.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(String|Int|Float|Number|Nat|Bool|Path|Null)(?![A-Za-z0-9_'\\-])",
+          "name": "support.type.primitive.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])(List|Vec|Matrix|Tensor|Range|Unit|Tuple)(?![A-Za-z0-9_'\\-])",
+          "name": "support.type.builtin.tynix"
+        },
+        {
+          "include": "#constants"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#string-double"
+        },
+        {
+          "match": "%1",
+          "name": "storage.modifier.linear.tynix"
+        },
+        {
+          "match": "->",
+          "name": "storage.type.function.arrow.tynix"
+        },
+        {
+          "match": "=>",
+          "name": "keyword.operator.type.constraint.tynix"
+        },
+        {
+          "match": "\\|",
+          "name": "keyword.operator.type.union.tynix"
+        },
+        {
+          "match": "\\?|:(?!:)",
+          "name": "keyword.operator.ternary.tynix"
+        },
+        {
+          "name": "meta.type.record.tynix",
+          "begin": "\\{",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.braces.begin.tynix"
+            }
+          },
+          "end": "\\}",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.braces.end.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#type-field"
+            },
+            {
+              "comment": "open row: `...` or `...r`",
+              "match": "(\\.\\.\\.)([A-Za-z_][A-Za-z0-9_'\\-]*)?",
+              "captures": {
+                "1": {
+                  "name": "punctuation.separator.rest.tynix"
+                },
+                "2": {
+                  "name": "entity.name.type.parameter.tynix"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "meta.type.list.tynix",
+          "begin": "\\[",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.brackets.begin.tynix"
+            }
+          },
+          "end": "\\]",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.brackets.end.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#type"
+            }
+          ]
+        },
+        {
+          "name": "meta.type.paren.tynix",
+          "begin": "\\(",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.parens.begin.tynix"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.parens.end.tynix"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#type"
+            }
+          ]
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])[A-Z][A-Za-z0-9_'\\-]*",
+          "name": "entity.name.type.tynix"
+        },
+        {
+          "match": "(?<![A-Za-z0-9_'\\-.])[A-Za-z_][A-Za-z0-9_'\\-]*",
+          "name": "entity.name.type.parameter.tynix"
+        },
+        {
+          "match": "\\.",
+          "name": "punctuation.accessor.tynix"
+        }
+      ]
+    },
+    "type-field": {
+      "name": "meta.type.field.tynix",
+      "begin": "(?:([A-Za-z_][A-Za-z0-9_'\\-]*)|(\"(?:[^\"\\\\]|\\\\.)*\"))\\s*(\\?)?\\s*(::)(?!:)",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.other.attribute-name.tynix"
+        },
+        "2": {
+          "name": "string.quoted.double.tynix"
+        },
+        "3": {
+          "name": "keyword.operator.optional.tynix"
+        },
+        "4": {
+          "name": "keyword.operator.type.annotation.tynix"
+        }
+      },
+      "end": ";",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.terminator.field.tynix"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#type"
+        }
+      ]
+    }
+  }
+}

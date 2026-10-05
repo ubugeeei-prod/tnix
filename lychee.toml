@@ -10,7 +10,7 @@ include_verbatim = false
 # option takes one of "none", "anchor-only", "text-only", or "full".
 include_fragments = "none"
 
-# Root-relative links in docs pages (e.g. `/brand/tnix-logo.svg`) refer to
+# Root-relative links in docs pages (e.g. `/brand/tynix-logo.svg`) refer to
 # files that the docs site serves from docs/public.
 root_dir = "docs/public"
 

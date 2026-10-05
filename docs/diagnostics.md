@@ -1,6 +1,6 @@
 # Diagnostic Codes
 
-Every user-visible error produced by `tnix` is tagged with a stable code so
+Every user-visible error produced by `tynix` is tagged with a stable code so
 editors, CI logs, and this documentation can refer to the same diagnostic
 without depending on the exact wording. Messages have the shape:
 
@@ -29,9 +29,9 @@ here and stop emitting it — never reuse the number.
 
 ## Parser (`TPxxxx`)
 
-### `TP0001` — dangling tnix diagnostic directive
+### `TP0001` — dangling tynix diagnostic directive
 
-A `# @tnix-ignore` or `# @tnix-expected` directive appears as the very last
+A `# @tynix-ignore` or `# @tynix-expected` directive appears as the very last
 non-blank line of the file. Directives attach to the next root expression or
 `let` binding, so a trailing directive has nothing to label.
 
@@ -39,7 +39,7 @@ non-blank line of the file. Directives attach to the next root expression or
 
 ### `TP0002` — multiple directives target the same next line
 
-Two consecutive `# @tnix-*` directives sit between code lines. Only one
+Two consecutive `# @tynix-*` directives sit between code lines. Only one
 directive can be attached to any single target.
 
 **Fix:** keep one directive or split them across separate targets.
@@ -109,9 +109,9 @@ A `let` group contains the same `name = expr;` binding more than once.
 
 A `let` group declared `name :: T;` but never bound `name`.
 
-### `TC0006` — unused `@tnix-expected` directive
+### `TC0006` — unused `@tynix-expected` directive
 
-A `# @tnix-expected` directive was attached to a binding whose body did not
+A `# @tynix-expected` directive was attached to a binding whose body did not
 produce a checker failure.
 
 **Fix:** remove the directive, or change the body so the expected failure
@@ -241,7 +241,7 @@ and select from it.
 
 ### `TD0001` — failed to read
 
-`tnix` could not open a file. The message includes the OS-level
+`tynix` could not open a file. The message includes the OS-level
 `displayException` so the underlying cause (missing path, permission
 denied, etc.) is preserved.
 
@@ -255,7 +255,7 @@ A single `declare` block has two entries for the same attribute name.
 
 ### `TD0004` — config decode error
 
-`tnix.config.tnix` failed to parse or did not evaluate to an attribute
+`tynix.config.tynix` failed to parse or did not evaluate to an attribute
 set.
 
 ### `TD0005` — config bad list
@@ -265,21 +265,21 @@ A list-valued config field (e.g. `declarationPacks`) was not a list.
 ### `TD0006` — config bad item
 
 An entry inside a list-valued config field was not a path-like value, or
-pointed at a file that does not exist / is not a `.d.tnix` file.
+pointed at a file that does not exist / is not a `.d.tynix` file.
 
 ### `TD0007` — compiling a declaration-only file
 
-`tnix compile`/`tnix.compile` was asked to lower a `.d.tnix` file.
+`tynix compile`/`tynix.compile` was asked to lower a `.d.tynix` file.
 Declaration-only files have no executable root expression.
 
 ### `TD0008` — emitting from a declaration-only file
 
-`tnix emit`/`tnix.emit` was asked to emit declarations from a file that
+`tynix emit`/`tynix.emit` was asked to emit declarations from a file that
 has no root expression.
 
 ## Language Server Lints (`TLxxxx`)
 
-These diagnostics come from `tnix-lsp` only; `tnix check` and
+These diagnostics come from `tynix-lsp` only; `tynix check` and
 `check-project` never report them, and they never fail a build. They are
 computed from the source text, so they keep working while the file has type
 errors. Their codes are owned by the language server, not by
@@ -299,13 +299,13 @@ purpose. Code actions do either.
 it) contains `@deprecated`, optionally followed by a reason that is appended to
 the message, as in `` `hello` is deprecated: use `greet` instead ``:
 
-```tnix
+```tynix
 let
   # Old spelling.
   # @deprecated use `greet` instead
   hello = name: "hello ${name}";
   greet = name: "hello ${name}";
-in hello "tnix"
+in hello "tynix"
 ```
 
 **Fix:** switch to the replacement named in the reason.
@@ -313,7 +313,7 @@ in hello "tnix"
 ## Listing Codes Programmatically
 
 The canonical list lives in
-[`packages/tnix-core/src/Diagnostics.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Diagnostics.hs).
+[`packages/tynix-core/src/Diagnostics.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Diagnostics.hs).
 The `DiagnosticCode` data type is exposed alongside `diagnosticCodeText` and
 `withCode`, so downstream tooling can pattern match on stable variants
 rather than parsing the prefix back out of the message.

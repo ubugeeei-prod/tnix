@@ -11,20 +11,20 @@ export type RuntimeConfig = {
 };
 
 /**
- * Common Nix profile locations for a tnix binary (`tnix-lsp` or `tnix`).
+ * Common Nix profile locations for a tynix binary (`tynix-lsp` or `tynix`).
  */
 export function defaultBinaryCandidates(
   binary: string,
   homePath: string = homedir(),
 ): string[] {
   return defaultServerPathCandidates(homePath).map((candidate) =>
-    candidate.replace(/tnix-lsp$/, binary),
+    candidate.replace(/tynix-lsp$/, binary),
   );
 }
 
 /**
- * Resolve the `tnix` CLI used by commands such as "Run Doctor": an explicit
- * setting wins, then common Nix profile locations, then `tnix` on PATH.
+ * Resolve the `tynix` CLI used by commands such as "Run Doctor": an explicit
+ * setting wins, then common Nix profile locations, then `tynix` on PATH.
  */
 export function resolveCliPath(
   configured?: string,
@@ -34,9 +34,9 @@ export function resolveCliPath(
   const trimmed = configured?.trim();
   if (trimmed && trimmed.length > 0) return trimmed;
   return (
-    defaultBinaryCandidates("tnix", homePath).find((candidate) =>
+    defaultBinaryCandidates("tynix", homePath).find((candidate) =>
       exists(candidate),
-    ) ?? "tnix"
+    ) ?? "tynix"
   );
 }
 
@@ -44,7 +44,7 @@ export function defaultServerPathCandidates(
   homePath: string = homedir(),
 ): string[] {
   return [
-    join(homePath, ".nix-profile", "bin", "tnix-lsp"),
+    join(homePath, ".nix-profile", "bin", "tynix-lsp"),
     join(
       homePath,
       ".local",
@@ -53,7 +53,7 @@ export function defaultServerPathCandidates(
       "profiles",
       "profile",
       "bin",
-      "tnix-lsp",
+      "tynix-lsp",
     ),
     join(
       homePath,
@@ -64,9 +64,9 @@ export function defaultServerPathCandidates(
       "home-manager",
       "home-path",
       "bin",
-      "tnix-lsp",
+      "tynix-lsp",
     ),
-    "/run/current-system/sw/bin/tnix-lsp",
+    "/run/current-system/sw/bin/tynix-lsp",
   ];
 }
 
@@ -83,7 +83,7 @@ export function resolveDefaultServerPath(
   homePath: string = homedir(),
   exists: (path: string) => boolean = existsSync,
 ): string {
-  return resolveInstalledServerPath(homePath, exists) ?? "tnix-lsp";
+  return resolveInstalledServerPath(homePath, exists) ?? "tynix-lsp";
 }
 
 /**
@@ -126,7 +126,7 @@ export function resolveWorkspaceCwd(
  * Resolve the effective working directory for the language server.
  *
  * An explicit setting wins, otherwise we fall back to the first workspace
- * folder so `tnix-lsp` can discover ambient declarations from the project root.
+ * folder so `tynix-lsp` can discover ambient declarations from the project root.
  */
 export function resolveServerCwd(
   configuredCwd?: string,
@@ -151,7 +151,7 @@ export function resolveRuntimeConfig(
     command: normalizeServerPath(serverPath),
     args: normalizeServerArgs(serverArgs),
     cwd: resolveServerCwd(configuredCwd, workspacePaths),
-    documentSelector: [{ language: "tnix" }, { language: "nix" }],
-    watchPattern: "**/*.{nix,tnix}",
+    documentSelector: [{ language: "tynix" }, { language: "nix" }],
+    watchPattern: "**/*.{nix,tynix}",
   };
 }

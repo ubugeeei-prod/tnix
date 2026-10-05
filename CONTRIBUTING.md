@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping make `tnix` sturdier. The project is still small, so the best
+Thanks for helping make `tynix` sturdier. The project is still small, so the best
 contributions are focused, reproducible, and easy to review.
 
 ## Development Environment
@@ -26,7 +26,7 @@ For narrower loops:
 
 ```bash
 vp run test:haskell
-pnpm --filter tnix test
+pnpm --filter tynix test
 vp run test:zed
 vp run check:neovim
 ```
@@ -44,9 +44,9 @@ vp run check:neovim
 
 Bug fixes should include a regression test near the affected surface:
 
-- Haskell parser/checker/compiler behavior lives under `packages/tnix-core/src`.
-- CLI project behavior lives under `packages/tnix-cli/src/Cli.spec.hs`.
-- LSP behavior lives under `packages/tnix-lsp/src`.
+- Haskell parser/checker/compiler behavior lives under `packages/tynix-core/src`.
+- CLI project behavior lives under `packages/tynix-cli/src/Cli.spec.hs`.
+- LSP behavior lives under `packages/tynix-lsp/src`.
 - VS Code runtime behavior lives under `editors/vscode/src`.
 - Zed and Neovim integration checks live under `editors/zed` and
   `editors/neovim`.

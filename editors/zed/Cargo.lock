@@ -532,8 +532,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "tnix-zed"
-version = "1.0.0"
+name = "tynix-zed"
+version = "2.0.0"
 dependencies = [
  "zed_extension_api",
 ]

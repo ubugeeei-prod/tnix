@@ -1,29 +1,29 @@
-# tnix for Neovim
+# tynix for Neovim
 
-A Neovim plugin for tnix:
+A Neovim plugin for tynix:
 
-- `tnix` filetype for `.tnix` and `.d.tnix` (`ftdetect/`), with an
+- `tynix` filetype for `.tynix` and `.d.tynix` (`ftdetect/`), with an
   `ftplugin` (`commentstring = "# %s"`, 2-space indent, `-`/`'` in keywords)
-- `tnix-lsp` setup through `vim.lsp.config` / `vim.lsp.enable` on Neovim 0.11+,
+- `tynix-lsp` setup through `vim.lsp.config` / `vim.lsp.enable` on Neovim 0.11+,
   falling back to `vim.lsp.start` on 0.10 (and best-effort on older releases)
 - tree-sitter highlighting, folds, indents, injections, locals, and
-  textobjects via [`tree-sitter-tnix`](../tree-sitter-tnix)
-- `:checkhealth tnix`
+  textobjects via [`tree-sitter-tynix`](../tree-sitter-tynix)
+- `:checkhealth tynix`
 
 ## Requirements
 
 - Neovim 0.10+ (0.11+ recommended).
-- The `tnix-lsp` binary on your `PATH`:
+- The `tynix-lsp` binary on your `PATH`:
 
   ```bash
-  curl -fsSL https://tnix.dev/install.sh | sh
+  curl -fsSL https://tynix.dev/install.sh | sh
   # or
-  nix profile install github:ubugeeei/tnix#tnix-lsp
-  tnix-lsp --version
+  nix profile install github:ubugeeei/tynix#tynix-lsp
+  tynix-lsp --version
   ```
 
 - Optional: [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter)
-  to install the parser with `:TSInstall tnix`.
+  to install the parser with `:TSInstall tynix`.
 
 ## Install
 
@@ -33,10 +33,10 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  "ubugeeei/tnix",
+  "ubugeeei/tynix",
   config = function(plugin)
     vim.opt.rtp:append(plugin.dir .. "/editors/neovim")
-    require("tnix").setup()
+    require("tynix").setup()
   end,
 }
 ```
@@ -44,33 +44,33 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 Or manually:
 
 ```lua
-vim.opt.runtimepath:append("/path/to/tnix/editors/neovim")
-require("tnix").setup()
+vim.opt.runtimepath:append("/path/to/tynix/editors/neovim")
+require("tynix").setup()
 ```
 
 ## Tree-sitter
 
-`setup()` registers the `tnix` parser with nvim-treesitter (both the `master`
-and `main` branches) and starts tree-sitter highlighting for `tnix` buffers
-once the parser is installed. Queries ship in this plugin's `queries/tnix/`.
+`setup()` registers the `tynix` parser with nvim-treesitter (both the `master`
+and `main` branches) and starts tree-sitter highlighting for `tynix` buffers
+once the parser is installed. Queries ship in this plugin's `queries/tynix/`.
 
 ```vim
-:TSInstall tnix
+:TSInstall tynix
 ```
 
 Without nvim-treesitter, compile the parser yourself and point the plugin at
 it:
 
 ```bash
-cd /path/to/tnix/editors/tree-sitter-tnix
-cc -shared -fPIC -O2 -I src src/parser.c src/scanner.c -o tnix.so
+cd /path/to/tynix/editors/tree-sitter-tynix
+cc -shared -fPIC -O2 -I src src/parser.c src/scanner.c -o tynix.so
 ```
 
 ```lua
-require("tnix").setup({ treesitter = { parser_path = "/path/to/tnix.so" } })
+require("tynix").setup({ treesitter = { parser_path = "/path/to/tynix.so" } })
 ```
 
-Use `require("tnix").setup_treesitter()` to register only the parser, or
+Use `require("tynix").setup_treesitter()` to register only the parser, or
 `setup({ treesitter = false })` to skip it.
 
 ## Configuration
@@ -78,30 +78,30 @@ Use `require("tnix").setup_treesitter()` to register only the parser, or
 `setup` accepts an options table:
 
 ```lua
-require("tnix").setup({
-  -- Filetypes the server attaches to. Defaults to { "tnix", "nix" }.
-  -- Use { "tnix" } to leave plain .nix files to another Nix LSP.
-  filetypes = { "tnix", "nix" },
+require("tynix").setup({
+  -- Filetypes the server attaches to. Defaults to { "tynix", "nix" }.
+  -- Use { "tynix" } to leave plain .nix files to another Nix LSP.
+  filetypes = { "tynix", "nix" },
 
   -- Override the server command (string or argv list).
-  cmd = { "tnix-lsp" },
+  cmd = { "tynix-lsp" },
 
   -- Extra environment for the server process.
   cmd_env = {},
 
   -- Project-root markers, or a string / function for custom layouts.
   -- Defaults to flake.nix, cabal.project, pnpm-workspace.yaml,
-  -- tnix.config.tnix, and .git.
-  root_markers = { "flake.nix", "tnix.config.tnix", ".git" },
+  -- tynix.config.tynix, and .git.
+  root_markers = { "flake.nix", "tynix.config.tynix", ".git" },
 
   -- LSP initializationOptions and workspace/configuration settings.
   init_options = {},
-  settings = { tnix = {} },
+  settings = { tynix = {} },
 
   -- false: use the FileType + vim.lsp.start path even on 0.11+.
   native_lsp = true,
 
-  -- false: skip LSP setup (e.g. when another plugin manages tnix-lsp).
+  -- false: skip LSP setup (e.g. when another plugin manages tynix-lsp).
   lsp = true,
 
   -- false to skip, or { parser_path = "...", highlight = true }.
@@ -109,16 +109,16 @@ require("tnix").setup({
 })
 ```
 
-On 0.11+ the server is registered as `vim.lsp.config.tnix`, so you can also
-tweak it with `vim.lsp.config("tnix", { ... })` after `setup()`.
+On 0.11+ the server is registered as `vim.lsp.config.tynix`, so you can also
+tweak it with `vim.lsp.config("tynix", { ... })` after `setup()`.
 
 ## Health check
 
 ```vim
-:checkhealth tnix
+:checkhealth tynix
 ```
 
-reports the Neovim version, whether `tnix-lsp` / `tnix` are on `PATH` (with
+reports the Neovim version, whether `tynix-lsp` / `tynix` are on `PATH` (with
 their versions), parser and query availability, and running clients.
 
 ## Tests
@@ -131,24 +131,24 @@ nvim --headless -u NONE -i NONE \
   -l editors/neovim/test/config_spec.lua
 
 # parser + query smoke test (needs a compiled parser)
-cc -shared -fPIC -O2 -I editors/tree-sitter-tnix/src \
-  editors/tree-sitter-tnix/src/parser.c editors/tree-sitter-tnix/src/scanner.c -o "$TMPDIR/tnix.so"
-TNIX_PARSER="$TMPDIR/tnix.so" nvim --headless -u NONE -i NONE \
+cc -shared -fPIC -O2 -I editors/tree-sitter-tynix/src \
+  editors/tree-sitter-tynix/src/parser.c editors/tree-sitter-tynix/src/scanner.c -o "$TMPDIR/tynix.so"
+TYNIX_PARSER="$TMPDIR/tynix.so" nvim --headless -u NONE -i NONE \
   -c "lua vim.opt.runtimepath:append(vim.fn.getcwd() .. '/editors/neovim')" \
   -l editors/neovim/test/treesitter_spec.lua
 ```
 
-`queries/tnix/*.scm` are generated from `editors/tree-sitter-tnix/queries`;
-run `node editors/tree-sitter-tnix/scripts/sync-queries.mjs` after editing
+`queries/tynix/*.scm` are generated from `editors/tree-sitter-tynix/queries`;
+run `node editors/tree-sitter-tynix/scripts/sync-queries.mjs` after editing
 those.
 
 ## Troubleshooting
 
-- Run `:checkhealth tnix`.
-- Confirm `tnix-lsp --version` works in the shell Neovim inherits.
+- Run `:checkhealth tynix`.
+- Confirm `tynix-lsp --version` works in the shell Neovim inherits.
 - Check `:LspInfo` (or `:checkhealth vim.lsp`) and `:messages` for the
   resolved command and any start error.
 - If another Nix language server already owns `.nix`, set
-  `filetypes = { "tnix" }` to avoid attaching two servers.
+  `filetypes = { "tynix" }` to avoid attaching two servers.
 
 See [docs/troubleshooting.md](../../docs/troubleshooting.md) for more.

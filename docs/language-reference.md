@@ -2,33 +2,33 @@
 
 ## Overview
 
-`tnix` keeps Nix value syntax and adds type-only syntax for checking and
+`tynix` keeps Nix value syntax and adds type-only syntax for checking and
 tooling.
 
 The runtime model is simple:
 
-- parse `.tnix`
+- parse `.tynix`
 - type-check it
 - erase type syntax
 - emit ordinary `.nix`
 
 ## Files
 
-- `.tnix`: implementation files with value-level Nix syntax plus types
-- `.d.tnix`: declaration-only files that describe existing `.nix` surfaces
+- `.tynix`: implementation files with value-level Nix syntax plus types
+- `.d.tynix`: declaration-only files that describe existing `.nix` surfaces
 - `.nix`: erased runtime output
 
 ## Nix Compatibility
 
 The expression grammar covers the whole Nix language. Every construct the
-reference implementation accepts also parses as `.tnix`, and erasing a file
+reference implementation accepts also parses as `.tynix`, and erasing a file
 without type syntax gives back the same program: over a sample of 4000 nixpkgs
 files, the compiled output parses to an AST identical to the source's under
 `nix-instantiate --parse` (up to how equal strings are split into segments).
 
 Only Nix keywords are reserved in expressions: `if`, `then`, `else`, `let`,
 `in`, `rec`, `with`, `assert`, `inherit`, `or`, plus `true`, `false` and `null`.
-tnix's own keywords are reserved only inside types, so `type`, `any`,
+tynix's own keywords are reserved only inside types, so `type`, `any`,
 `import`, `declare`, `forall` and friends are ordinary names in expressions.
 `as` is contextual: it is an ordinary binder and variable (`as: as.x` works),
 and `e as T` is a cast only where a type can follow.
@@ -41,7 +41,7 @@ are accepted in argument position. Quote them anywhere else, since a bare
 
 ### Literals
 
-```tnix
+```tynix
 {
   string = "hello";
   indented = ''
@@ -64,7 +64,7 @@ Strings support `${...}` interpolation and Nix's escapes, including `$$` and
 
 ### Variables and builtins
 
-```tnix
+```tynix
 let
   value = 1;
 in {
@@ -81,7 +81,7 @@ typed by the built-in prelude. See [builtins and the registry](./reference/built
 
 ### Lambdas
 
-```tnix
+```tynix
 {
   plain = x: x;
   annotated = (x :: Int): x;
@@ -99,7 +99,7 @@ optional: the pattern above has type `{ a :: Int; b? :: Int; ... } -> Int`.
 
 ### Application
 
-```tnix
+```tynix
 let
   f = x: x + 1;
   xs = [ { name = "a"; } ];
@@ -111,7 +111,7 @@ in {
 
 ### `let`
 
-```tnix
+```tynix
 let
   value :: Int;
   value = 1;
@@ -130,9 +130,9 @@ attribute names are not allowed in `let`, as in Nix (`TC0022`).
 
 `let` items are also where the diagnostic directives are most useful:
 
-```tnix
+```tynix
 let
-  # @tnix-expected
+  # @tynix-expected
   value :: Int;
   value = "oops";
 in value
@@ -140,9 +140,9 @@ in value
 
 ### Attribute Sets
 
-```tnix
+```tynix
 let
-  name = "tnix";
+  name = "tynix";
   key = "computed";
   src = { url = "https://example.org"; rev = "abc"; };
 in {
@@ -163,7 +163,7 @@ refer to each other.
 
 ### Selection, defaults and presence tests
 
-```tnix
+```tynix
 let
   cfg = { server = { port = 80; }; };
   key = "server";
@@ -181,7 +181,7 @@ in {
 
 ### Lists
 
-```tnix
+```tynix
 [ 1 2 3 ]
 ```
 
@@ -190,7 +190,7 @@ Nested lists infer shapes such as `Matrix 2 2 Int`; see
 
 ### Operators
 
-```tnix
+```tynix
 let
   n = 7;
 in {
@@ -213,7 +213,7 @@ in {
 
 ### Conditionals, `with` and `assert`
 
-```tnix
+```tynix
 let
   cond = true;
   lib = { version = "1"; };
@@ -225,7 +225,7 @@ if cond then version else "none"
 
 ### Import
 
-```tnix
+```tynix
 declare "./lib.nix" { default :: { value :: Int; }; };
 
 {
@@ -243,7 +243,7 @@ declare "./lib.nix" { default :: { value :: Int; }; };
 Signatures go next to `let` bindings, annotations on lambda binders and pattern
 fields:
 
-```tnix
+```tynix
 let
   name :: String;
   name = "x";
@@ -263,11 +263,11 @@ with `type mismatch: 1 vs a`.
 A type may carry a Haskell-style constraint context such as `Functor f =>` or
 `(Eq a, Show a) =>`, at the start of the type or right after its `forall`
 (`forall f a b. Functor f => (a -> b) -> f a -> f b`). Contexts are parsed for
-documentation but not enforced, because tnix has no type classes yet.
+documentation but not enforced, because tynix has no type classes yet.
 
 ## Casts
 
-```tnix
+```tynix
 let
   value :: unknown;
   value = 1;
@@ -275,7 +275,7 @@ in value as Int
 ```
 
 `as` is a value-level cast. It changes the static type of the expression when
-the source and target overlap in one of the ways `tnix` allows:
+the source and target overlap in one of the ways `tynix` allows:
 
 - normal widening (`1 as Number`)
 - structural narrowing (`value as { name :: String; }`)
@@ -285,25 +285,25 @@ Concrete unrelated casts such as `1 as String` are rejected (`TC0015`).
 
 ## Diagnostic Directives
 
-`tnix` recognizes two line-comment directives modeled after TypeScript.
+`tynix` recognizes two line-comment directives modeled after TypeScript.
 
-### `# @tnix-ignore`
+### `# @tynix-ignore`
 
 Suppress the next root-expression or `let`-item checker failure.
 
-```tnix
+```tynix
 let
-  # @tnix-ignore
+  # @tynix-ignore
   value = missing;
 in value
 ```
 
-### `# @tnix-expected`
+### `# @tynix-expected`
 
 Suppress the next failure, but raise an error if that line does not fail.
 
-```tnix
-# @tnix-expected
+```tynix
+# @tynix-expected
 missing
 ```
 
@@ -317,7 +317,7 @@ aliases, or in `declare` blocks.
 
 ### Primitive Constructors
 
-```tnix
+```tynix
 String
 Int
 Float
@@ -333,8 +333,8 @@ unknown
 
 ### Literal Singleton Types
 
-```tnix
-"tnix"
+```tynix
+"tynix"
 1
 1.5
 true
@@ -343,7 +343,7 @@ false
 
 ### Function Types
 
-```tnix
+```tynix
 Int -> Int
 String -> { name :: String; }
 Int %1 -> Int
@@ -354,7 +354,7 @@ exactly once. It may be used wherever `->` is expected.
 
 ### Record Types
 
-```tnix
+```tynix
 { name :: String; version :: String; }
 { name :: String; version? :: String; }
 { name :: String; ... }
@@ -372,7 +372,7 @@ exactly once. It may be used wherever `->` is expected.
 
 ### Dictionaries
 
-```tnix
+```tynix
 AttrsOf Int
 AttrsOf (List String)
 ```
@@ -384,14 +384,14 @@ AttrsOf (List String)
 
 ### Union Types
 
-```tnix
+```tynix
 String | Int
 { ok :: true; value :: a; } | { ok :: false; error :: e; }
 ```
 
 ### Parametric Polymorphism
 
-```tnix
+```tynix
 forall a. a -> a
 forall f a. f a -> f a
 forall f a b. Functor f => (a -> b) -> f a -> f b
@@ -399,14 +399,14 @@ forall f a b. Functor f => (a -> b) -> f a -> f b
 
 ### Type Aliases
 
-```tnix
+```tynix
 type Box a = { value :: a; };
 type Pair = Tuple [Int String];
 ```
 
 ### Higher-Kinded Application
 
-```tnix
+```tynix
 type Apply f a = f a;
 type Id f = f;
 type ListOfInt = Apply (Id List) Int;
@@ -414,7 +414,7 @@ type ListOfInt = Apply (Id List) Int;
 
 ### Conditional Types
 
-```tnix
+```tynix
 type Element t = t extends List (infer a) ? a : t;
 type ReturnOf f = f extends (infer a -> infer r) ? r : dynamic;
 ```
@@ -423,14 +423,14 @@ type ReturnOf f = f extends (infer a -> infer r) ? r : dynamic;
 
 `Tuple` is the heterogeneous fixed-length sequence form.
 
-```tnix
+```tynix
 Tuple [Int String]
 Tuple [1 "x" true]
 ```
 
 ### Indexed Containers
 
-```tnix
+```tynix
 Vec 3 Int
 Matrix 2 4 Float
 Tensor [2 3 4] Number
@@ -440,7 +440,7 @@ Tensor [2 (Range 1 2 Nat) 1] Int
 
 ### Numeric Validators
 
-```tnix
+```tynix
 Nat
 Range 0 10 Int
 Range 0 5000 Nat
@@ -453,7 +453,7 @@ A numeric literal is a subtype of a validator when it satisfies it: `3` fits
 
 ### Units
 
-```tnix
+```tynix
 Unit "ms" Nat
 Unit "ms" (Range 0 5000 Nat)
 Unit "MiB" Int
@@ -466,7 +466,7 @@ labels never mix: `Unit "ms" Nat` is not a subtype of `Unit "s" Nat`.
 
 Ambient declarations attach types to existing runtime files.
 
-```tnix
+```tynix
 declare "./legacy/default.nix" {
   value :: Int;
   mkPkg :: { name :: String; } -> Derivation;
@@ -479,11 +479,11 @@ replaces the built-in prelude for the whole workspace.
 
 ### Bundled Registry Packs
 
-The repository also ships curated `.d.tnix` packs under `registry/`. These
+The repository also ships curated `.d.tynix` packs under `registry/`. These
 packs are split into two groups:
 
 - `registry/workspace/` for root-adjacent files such as `builtins`,
-  `flake.nix`, and `tnix.config.tnix`
+  `flake.nix`, and `tynix.config.tynix`
 - `registry/ecosystem/` for alias-oriented ecosystem packs reused from local
   `declare` blocks
 
@@ -496,29 +496,29 @@ Current packs include:
 
 Example:
 
-```tnix
+```tynix
 declare "./nixpkgs.nix" { default :: NixpkgsImport; };
 declare "./home-manager.nix" { default :: HomeManagerFlake; };
 declare "./treefmt-nix.nix" { default :: TreefmtNixFlake; };
 ```
 
-You can also register external pack paths from `tnix.config.tnix`:
+You can also register external pack paths from `tynix.config.tynix`:
 
-```tnix
+```tynix
 {
   declarationPacks = [
-    ../vendor/tnix/registry/ecosystem
-    ../vendor/tnix/registry/workspace
+    ../vendor/tynix/registry/ecosystem
+    ../vendor/tynix/registry/workspace
   ];
 }
 ```
 
 Configured `registry/workspace/` packs are resolved against the current project
 root, so upstream workspace declarations still describe your local
-`tnix.config.tnix` and `flake.nix`.
+`tynix.config.tynix` and `flake.nix`.
 
 The checker resolves those aliases exactly like aliases written in your own
-`.d.tnix` files.
+`.d.tynix` files.
 
 ## Inference Notes
 
@@ -528,7 +528,7 @@ Unannotated `let` bindings get principal polymorphic types. Bindings are
 grouped by their dependencies, each group of mutually recursive bindings is
 inferred together, and the group is generalized before later groups use it:
 
-```tnix
+```tynix
 let
   id = x: x;
   compose = f: g: x: f (g x);
@@ -553,7 +553,7 @@ Pattern fields with defaults become optional fields. `x.a or d` never makes
 Width subtyping still applies to closed records: a value with more fields fits
 a record type with fewer.
 
-```tnix
+```tynix
 let
   pkg :: { name :: String; };
   pkg = { name = "a"; version = "1"; };
@@ -566,7 +566,7 @@ The three gradual escape hatches have different roles:
 
 - `any` is assignable to and from every type.
 - `unknown` is a top type. Every value can be viewed as `unknown`, but `unknown` does not flow back into concrete types without an annotation or narrowing.
-- `dynamic` keeps the existing tnix gradual-consistency behavior. It is consistent with every type, but not a concrete subtype of every type.
+- `dynamic` keeps the existing tynix gradual-consistency behavior. It is consistent with every type, but not a concrete subtype of every type.
 
 Unannotated code is accepted gradually where strict inference would produce
 false errors:
@@ -582,7 +582,7 @@ false errors:
 
 ### List Shape Inference
 
-```tnix
+```tynix
 {
   empty = [];
   pair = [1 2];
@@ -604,7 +604,7 @@ root: {
 
 ## Erasure
 
-The following syntax is erased during `.tnix -> .nix` compilation:
+The following syntax is erased during `.tynix -> .nix` compilation:
 
 - `::` annotations on `let` bindings, lambda binders and pattern fields
 - `as` casts
@@ -618,7 +618,7 @@ names.
 
 ### Typing A Legacy Import
 
-```tnix
+```tynix
 declare "./lib.nix" {
   default :: { value :: Int; };
 };
@@ -628,7 +628,7 @@ declare "./lib.nix" {
 
 ### Narrowing A Gradual Boundary
 
-```tnix
+```tynix
 let
   payload = import ./opaque.nix;
 in payload as { value :: String; }
@@ -636,7 +636,7 @@ in payload as { value :: String; }
 
 ### A Typed `callPackage` Function
 
-```tnix
+```tynix
 { name :: String, version ? "1.0", doCheck ? true }:
 {
   pname = name;
@@ -646,7 +646,7 @@ in payload as { value :: String; }
 
 ### Bounded Sequence Contracts
 
-```tnix
+```tynix
 let
   xs :: Vec (Range 2 4 Nat) Int;
   xs = [1 2 3];
@@ -655,7 +655,7 @@ in xs
 
 ### Unit-Safe Numeric Contracts
 
-```tnix
+```tynix
 let
   timeout :: Unit "ms" (Range 0 5000 Nat);
   timeout = 2500;

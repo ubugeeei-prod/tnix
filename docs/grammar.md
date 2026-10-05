@@ -1,10 +1,10 @@
-# tnix Grammar
+# tynix Grammar
 
-This is the executable surface grammar of `.tnix` and `.d.tnix` files as
+This is the executable surface grammar of `.tynix` and `.d.tynix` files as
 implemented by the parser in
-[`packages/tnix-core/src/ParserExpr.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/ParserExpr.hs),
-[`packages/tnix-core/src/ParserType.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/ParserType.hs),
-and [`packages/tnix-core/src/ParserLexer.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/ParserLexer.hs).
+[`packages/tynix-core/src/ParserExpr.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/ParserExpr.hs),
+[`packages/tynix-core/src/ParserType.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/ParserType.hs),
+and [`packages/tynix-core/src/ParserLexer.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/ParserLexer.hs).
 
 The notation is EBNF with these conventions:
 
@@ -23,8 +23,8 @@ lexer (`sc`). All productions below assume that implicit skipping.
 
 ## Program Structure
 
-A tnix file is a sequence of declarations followed by an optional root
-expression. Declaration-only files (`.d.tnix`) end after the declarations.
+A tynix file is a sequence of declarations followed by an optional root
+expression. Declaration-only files (`.d.tynix`) end after the declarations.
 
 ```ebnf
 program     = declaration* root_expression?
@@ -164,7 +164,7 @@ list_cast       = select_expr ("as" type)*
 ```
 
 List elements are selection-level expressions, as in Nix, so `[ f x ]` is a
-two-element list. tnix additionally accepts casts and a few compound forms
+two-element list. tynix additionally accepts casts and a few compound forms
 inside lists that would otherwise need parentheses.
 
 ## Types
@@ -182,7 +182,7 @@ application_type = atom_type+
 ```
 
 A constraint context (`Functor f =>`, `(Eq a, Show a) =>`) may open a type or
-follow a `forall`. It is parsed and then dropped: tnix has no type classes yet,
+follow a `forall`. It is parsed and then dropped: tynix has no type classes yet,
 so contexts are documentation only.
 
 Function arrows are right-associative: `A -> B -> C` parses as `A -> (B -> C)`.
@@ -268,8 +268,8 @@ line_comment      = "#" ... <end-of-line>
 block_comment     = "/*" ... "*/"
 ```
 
-Block comments do not nest. Line comments that begin with `# @tnix-ignore`
-or `# @tnix-expected` are also picked up by the directive scanner — they
+Block comments do not nest. Line comments that begin with `# @tynix-ignore`
+or `# @tynix-expected` are also picked up by the directive scanner — they
 remain ordinary comments to the parser but are attached to the next root
 expression or `let` item as a `DiagnosticDirective`. See
 [Language Reference: Diagnostic Directives](./language-reference.md#diagnostic-directives).
@@ -320,7 +320,7 @@ In expressions, only the Nix keywords are reserved: `if`, `then`, `else`,
 a type can follow it; it is an ordinary name in binding positions (lambda
 binders, pattern fields, `let` keys), so `as: as.x` parses as in Nix.
 
-In types, tnix's own keywords are reserved as well: `type`, `declare`,
+In types, tynix's own keywords are reserved as well: `type`, `declare`,
 `import`, `forall`, `extends`, `infer`, `any`, `dynamic`, `unknown`, `Tuple`
 and `as`. This is why `type`, `any`, `import` and `declare` can be bound and
 used as ordinary names in expressions.
@@ -345,9 +345,9 @@ expressions, declarations, and lists can all span multiple lines freely.
   report `line:col` positions and editors underline the exact range.
 - `programParser` requires the input to end with `eof`, so unterminated
   expressions are rejected with a structured `ParseError` (see
-  [`Parser.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Parser.hs)).
+  [`Parser.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Parser.hs)).
 - The integration tests in
-  [`Parser.spec.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Parser.spec.hs) double as
+  [`Parser.spec.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Parser.spec.hs) double as
   executable examples for every production in this document; if you change
   the grammar, mirror the change there first.
 
@@ -355,7 +355,7 @@ expressions, declarations, and lists can all span multiple lines freely.
 
 The parser accepts every expression form of the Nix language. Erasing a file
 without type syntax gives back the same program: over a sample of 4000
-nixpkgs files, `tnix compile` output parses to the same AST as the source
+nixpkgs files, `tynix compile` output parses to the same AST as the source
 under `nix-instantiate --parse`, up to how equal strings are split into
 segments. The known differences from Nix's lexer are:
 

@@ -1,0 +1,6 @@
+let
+  pkg = {
+    name = "tynix";
+    meta = { license = "MIT"; };
+  };
+in pkg.meta.license

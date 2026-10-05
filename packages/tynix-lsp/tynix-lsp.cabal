@@ -1,0 +1,297 @@
+cabal-version:      3.8
+name:               tynix-lsp
+version:            2.0.0.0
+build-type:         Simple
+license:            MIT
+license-file:       LICENSE
+author:             tynix contributors
+maintainer:         tynix contributors
+homepage:           https://github.com/ubugeeei/tynix
+bug-reports:        https://github.com/ubugeeei/tynix/issues
+category:           Language
+synopsis:           Minimal LSP server for tynix
+
+library
+  exposed-modules:
+      AnalysisCache
+    , Server
+    , ServerProtocol
+    , ServerUri
+    , Session
+    , SessionDiagnostics
+    , SessionDocuments
+    , SessionFolding
+    , SessionInlayHints
+    , SessionLinks
+    , SessionCompletion
+    , SessionHover
+    , SessionNavigation
+    , SessionPublish
+    , SessionReferences
+    , SessionResolve
+    , SessionScan
+    , SessionSemanticTokens
+    , SessionSymbols
+    , SessionText
+    , SessionTypes
+    , SessionWorkspace
+  hs-source-dirs: src
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , text
+    , tynix-core
+  default-language: GHC2021
+
+executable tynix-lsp
+  main-is: Main.hs
+  hs-source-dirs: app
+  ghc-options: -threaded -rtsopts
+  other-modules:
+      Paths_tynix_lsp
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , text
+    , tynix-lsp
+    , tynix-core
+  default-language: GHC2021
+
+test-suite tynix-lsp-spec
+  type: exitcode-stdio-1.0
+  main-is: Server.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      Server
+    , ServerProtocol
+    , ServerUri
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tynix-core
+    , tynix-lsp
+    , unix
+  default-language: GHC2021
+
+test-suite tynix-lsp-analysis-cache-spec
+  type: exitcode-stdio-1.0
+  main-is: AnalysisCache.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      AnalysisCache
+  build-depends:
+      base >=4.19 && <5
+    , containers
+    , hspec
+    , text
+    , tynix-core
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-diagnostics-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionDiagnostics.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      Server
+    , ServerProtocol
+    , ServerUri
+    , SessionDiagnostics
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tynix-core
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-server-uri-spec
+  type: exitcode-stdio-1.0
+  main-is: ServerUri.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      ServerUri
+  build-depends:
+      base >=4.19 && <5
+    , bytestring
+    , hspec
+    , text
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-text-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionText.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      SessionText
+  build-depends:
+      base >=4.19 && <5
+    , hspec
+    , QuickCheck
+    , text
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-features-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionFeatures.spec.hs
+  hs-source-dirs: test
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tynix-core
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-scan-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionScan.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      SessionScan
+  build-depends:
+      base >=4.19 && <5
+    , containers
+    , hspec
+    , text
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-workspace-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionWorkspace.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      SessionWorkspace
+  build-depends:
+      base >=4.19 && <5
+    , directory
+    , filepath
+    , hspec
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-folding-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionFolding.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      SessionFolding
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , hspec
+    , text
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-links-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionLinks.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      Server
+    , ServerProtocol
+    , ServerUri
+    , SessionLinks
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tynix-core
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-inlay-hints-spec
+  type: exitcode-stdio-1.0
+  main-is: SessionInlayHints.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      Server
+    , ServerProtocol
+    , ServerUri
+    , SessionInlayHints
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tynix-core
+    , tynix-lsp
+  default-language: GHC2021
+
+test-suite tynix-lsp-session-spec
+  type: exitcode-stdio-1.0
+  main-is: Session.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      Server
+    , ServerProtocol
+    , ServerUri
+    , Session
+    , SessionCompletion
+    , SessionDiagnostics
+    , SessionDocuments
+    , SessionFolding
+    , SessionHover
+    , SessionInlayHints
+    , SessionLinks
+    , SessionNavigation
+    , SessionPublish
+    , SessionReferences
+    , SessionResolve
+    , SessionScan
+    , SessionSemanticTokens
+    , SessionSymbols
+    , SessionText
+    , SessionTypes
+    , SessionWorkspace
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , text
+    , tynix-core
+    , tynix-lsp
+  default-language: GHC2021
+
+source-repository head
+  type: git
+  location: https://github.com/ubugeeei/tynix.git

@@ -1,0 +1,20 @@
+{
+  name = "tynix-examples";
+  sourceDir = ./basics;
+  entry = ./main.tynix;
+  declarationDir = ./support;
+  declarationPacks = [];
+  buildDir = ./dist;
+  generatedDeclarationDir = ./dist/types;
+  entries = [
+    ./main.tynix
+    ./basics
+    ./gradual
+    ./polymorphism
+    ./indexed
+    ./interop
+  ];
+  include = [];
+  exclude = [];
+  builtins = false;
+}

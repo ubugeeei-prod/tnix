@@ -1,12 +1,12 @@
 ---
 title: "9. Typing a flake and a package.nix"
-description: Apply tnix to the two most common Nix files, a callPackage-style package and a flake, with small hand-written nixpkgs types.
+description: Apply tynix to the two most common Nix files, a callPackage-style package and a flake, with small hand-written nixpkgs types.
 ---
 
 # 9. Typing a flake and a package.nix
 
 Time to type real Nix shapes. You will describe the slice of nixpkgs that you
-use, write a `callPackage`-style package in tnix, and author a flake whose
+use, write a `callPackage`-style package in tynix, and author a flake whose
 outputs are checked.
 
 ## Describe the nixpkgs you use
@@ -14,7 +14,7 @@ outputs are checked.
 You do not need a type for all of nixpkgs. Describe the handful of attributes
 your files touch:
 
-```tnix [types/nixpkgs.d.tnix]
+```tynix [types/nixpkgs.d.tynix]
 type Derivation = {
   name :: String;
   outPath :: String;
@@ -55,7 +55,7 @@ with the same name takes precedence, which keeps this example small.
 
 > [!TIP]
 > The repository ships much larger alias packs for nixpkgs, `lib`, and popular
-> flakes in [`registry/ecosystem/`](https://github.com/ubugeeei-prod/tnix/tree/main/registry/ecosystem).
+> flakes in [`registry/ecosystem/`](https://github.com/ubugeeei-prod/tynix/tree/main/registry/ecosystem).
 > They are a good source to copy from. See
 > [builtins and the registry](../reference/builtins.md).
 
@@ -66,7 +66,7 @@ arguments to pass, so a package keeps the usual `{ stdenv, fetchurl }:` shape.
 Annotate the pattern fields you want checked. The annotations are erased, so
 `callPackage` still sees exactly the pattern it expects:
 
-```tnix [package.tnix]
+```tynix [package.tynix]
 { stdenv :: Stdenv, fetchurl :: FetchUrl, doCheck ? true }:
 stdenv.mkDerivation {
   pname = "hello";
@@ -81,7 +81,7 @@ stdenv.mkDerivation {
 ```
 
 ```bash
-tnix check package.tnix
+tynix check package.tynix
 ```
 
 ```text
@@ -107,7 +107,7 @@ missing field:
 Compile it to the `package.nix` that `callPackage` will load:
 
 ```bash
-tnix compile package.tnix -o package.nix
+tynix compile package.tynix -o package.nix
 ```
 
 ```nix [package.nix]
@@ -125,11 +125,11 @@ tnix compile package.tnix -o package.nix
 
 ### Unannotated dependencies stay gradual
 
-You can also leave the pattern unannotated. tnix then treats the injected
+You can also leave the pattern unannotated. tynix then treats the injected
 dependencies as *gradual*: it records which fields you select, but calling one
 of them does not fix its type from that single call site.
 
-```tnix [package-untyped.tnix]
+```tynix [package-untyped.tynix]
 { stdenv, fetchurl }:
 stdenv.mkDerivation {
   pname = "hello";
@@ -162,9 +162,9 @@ licenses;`, `meta.license = ...;`, `import <nixpkgs> { }`, `x.a or default`,
 A flake's `outputs` is a function from the resolved inputs to an attribute set.
 Annotate the inputs you use and every lookup through them is checked:
 
-```tnix [flake.tnix]
+```tynix [flake.tynix]
 {
-  description = "hello, typed with tnix";
+  description = "hello, typed with tynix";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -179,8 +179,8 @@ Annotate the inputs you use and every lookup through them is checked:
 ```
 
 ```bash
-tnix check flake.tnix
-tnix compile flake.tnix -o flake.nix
+tynix check flake.tynix
+tynix compile flake.tynix -o flake.nix
 ```
 
 Mistakes that would otherwise surface only during `nix flake check` on a
@@ -199,17 +199,17 @@ string `"git"`, and the error names the field:
 ```
 
 > [!TIP]
-> Commit both `flake.tnix` and the generated `flake.nix`. Nix reads only
+> Commit both `flake.tynix` and the generated `flake.nix`. Nix reads only
 > `flake.nix`, and flakes see only files tracked by Git.
 
 ## Alternative: type an existing flake without converting it
 
 If you would rather keep `flake.nix` as hand-written Nix, describe it with a
-declaration and check a small typed *projection* of it instead. tnix does this
+declaration and check a small typed *projection* of it instead. tynix does this
 for its own flake in
-[`dogfood/flake-surface.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/dogfood/flake-surface.tnix):
+[`dogfood/flake-surface.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/dogfood/flake-surface.tynix):
 
-```tnix [types/flake.d.tnix]
+```tynix [types/flake.d.tynix]
 type FlakeOutputs = {
   packages :: { x86_64-linux :: { default :: Derivation; }; };
 };
@@ -220,13 +220,13 @@ declare "../flake.nix" {
 };
 ```
 
-```tnix [flake-surface.tnix]
+```tynix [flake-surface.tynix]
 let
   flake = import ./flake.nix;
 in flake.description
 ```
 
-The declaration's target path is relative to the `.d.tnix` file, hence
+The declaration's target path is relative to the `.d.tynix` file, hence
 `../flake.nix` from `types/`.
 
 ## Recap
@@ -236,7 +236,7 @@ The declaration's target path is relative to the `.d.tnix` file, hence
 - Keep `callPackage` patterns and annotate their fields
   (`{ stdenv :: Stdenv, ... }:`); unannotated dependencies stay gradual.
 - Annotate the flake inputs you use to check every lookup through them.
-- Generate `flake.nix` from `flake.tnix`, or keep `flake.nix` and declare it.
+- Generate `flake.nix` from `flake.tynix`, or keep `flake.nix` and declare it.
 
 <div class="tx-pager">
 

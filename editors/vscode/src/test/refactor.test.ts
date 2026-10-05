@@ -13,18 +13,18 @@ const position = new vscode.Position(3, 3);
 suite("refactor and symbols", () => {
   setup(async () => {
     await activateExtension();
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
   });
 
   test("rename returns a workspace edit", async () => {
     const edit = await execProvider<vscode.WorkspaceEdit>(
       "vscode.executeDocumentRenameProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       position,
       "renamed",
     );
     assert.ok(edit instanceof vscode.WorkspaceEdit);
-    const edits = edit.get(fixtureUri("sample.tnix"));
+    const edits = edit.get(fixtureUri("sample.tynix"));
     assert.ok(edits.length >= 1);
     assert.ok(edits[0].newText.includes(`${STUB}Renamed`));
   });
@@ -32,7 +32,7 @@ suite("refactor and symbols", () => {
   test("document symbols are returned", async () => {
     const symbols = await execProvider<
       Array<vscode.SymbolInformation | vscode.DocumentSymbol>
-    >("vscode.executeDocumentSymbolProvider", fixtureUri("sample.tnix"));
+    >("vscode.executeDocumentSymbolProvider", fixtureUri("sample.tynix"));
     assert.ok(symbols.length >= 1);
     assert.ok(symbols.some((symbol) => symbol.name.includes(`${STUB}Symbol`)));
   });
@@ -49,7 +49,7 @@ suite("refactor and symbols", () => {
     const range = new vscode.Range(position, position);
     const actions = await execProvider<vscode.CodeAction[]>(
       "vscode.executeCodeActionProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       range,
     );
     assert.ok(actions.length >= 1);

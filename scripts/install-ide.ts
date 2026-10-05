@@ -8,7 +8,7 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
     "Usage: vp ide",
     "",
     "Builds and installs the local editor integrations:",
-    "- installs the local `tnix` / `tnix-lsp` toolchain into the active Nix profile",
+    "- installs the local `tynix` / `tynix-lsp` toolchain into the active Nix profile",
     "- packages and installs the VS Code extension when `code` is available",
     "- builds and installs the Zed extension when Zed support files are available",
   ]);
@@ -27,13 +27,13 @@ function installVscode(): void {
     return;
   }
 
-  const stageDir = mkdtempSync(join(tmpdir(), "tnix-vscode-"));
-  const vsixPath = join(stageDir, "tnix-vscode-local.vsix");
+  const stageDir = mkdtempSync(join(tmpdir(), "tynix-vscode-"));
+  const vsixPath = join(stageDir, "tynix-vscode-local.vsix");
 
   try {
     console.log("Building VS Code extension...");
-    run("pnpm", ["--filter", "tnix", "build"]);
-    run("pnpm", ["--filter", "tnix", "exec", "vsce", "package", "--no-dependencies", "--out", vsixPath]);
+    run("pnpm", ["--filter", "tynix", "build"]);
+    run("pnpm", ["--filter", "tynix", "exec", "vsce", "package", "--no-dependencies", "--out", vsixPath]);
 
     console.log("Installing VS Code extension...");
     run("code", ["--install-extension", vsixPath, "--force"]);
@@ -84,19 +84,19 @@ function installZed(): void {
   }
 
   if (!existsSync(nixGrammarSource)) {
-    console.log("Skipping Zed extension install: install the built-in/published Nix Zed extension first so tnix can reuse its grammar.");
+    console.log("Skipping Zed extension install: install the built-in/published Nix Zed extension first so tynix can reuse its grammar.");
     return;
   }
 
   console.log("Building Zed extension...");
   buildZedWasm();
 
-  const destination = join(installedDir, "tnix");
+  const destination = join(installedDir, "tynix");
   console.log(`Installing Zed extension into ${destination}...`);
   rmSync(destination, { recursive: true, force: true });
   mkdirSync(join(destination, "grammars"), { recursive: true });
   cpSync(join(rootDir, "editors/zed/extension.toml"), join(destination, "extension.toml"));
-  cpSync(join(rootDir, "editors/zed/target/wasm32-wasip1/release/tnix_zed.wasm"), join(destination, "extension.wasm"));
+  cpSync(join(rootDir, "editors/zed/target/wasm32-wasip1/release/tynix_zed.wasm"), join(destination, "extension.wasm"));
   cpSync(join(rootDir, "editors/zed/languages"), join(destination, "languages"), { recursive: true });
   cpSync(nixGrammarSource, join(destination, "grammars/nix.wasm"));
 }

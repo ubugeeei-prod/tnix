@@ -7,7 +7,7 @@ description: Compute types from other types with extends ? : and pull pieces out
 
 Sometimes the type you want is a function of another type: "the element type of
 this list", "the return type of that function", "the type of the `port` field
-of this config". tnix borrows TypeScript's **conditional types** for this.
+of this config". tynix borrows TypeScript's **conditional types** for this.
 
 ```text
 Checked extends Pattern ? WhenMatched : Otherwise
@@ -19,7 +19,7 @@ that `WhenMatched` can use it.
 
 ## A small toolbox
 
-```tnix [conditional.tnix]
+```tynix [conditional.tynix]
 type ElementOf t = t extends List (infer a) ? a : t;
 type ReturnOf f = f extends (infer a -> infer r) ? r : dynamic;
 type ArgOf f = f extends (infer a -> infer r) ? a : dynamic;
@@ -48,7 +48,7 @@ in { inherit item same result arg field yes; }
 ```
 
 ```bash
-tnix check conditional.tnix
+tynix check conditional.tynix
 ```
 
 Every binding checks. Output keeps the alias spelling (`item :: ElementOf (List
@@ -62,7 +62,7 @@ against the *reduced* type:
 | `ReturnOf (String -> Int)` | `Int` | the function pattern binds `a = String`, `r = Int` |
 | `ArgOf (String -> Int)` | `String` | same match, other variable |
 | `FieldOf { value :: Bool; label :: String; }` | `Bool` | record patterns match by field; extra fields are fine |
-| `IsString "nix"` | `true` | no `infer`, so tnix falls back to subtyping: `"nix" <: String` |
+| `IsString "nix"` | `true` | no `infer`, so tynix falls back to subtyping: `"nix" <: String` |
 
 Change `result = 42;` to a string and the reduced type shows its teeth:
 
@@ -72,14 +72,14 @@ Change `result = 42;` to a string and the reduced type shows its teeth:
 
 ## How matching works
 
-tnix reduces a conditional type in two stages:
+tynix reduces a conditional type in two stages:
 
-1. **Pattern match.** If the pattern contains `infer`, tnix matches the checked
+1. **Pattern match.** If the pattern contains `infer`, tynix matches the checked
    type against it structurally: functions against functions, records field by
    field, applications such as `List a` argument by argument. Each `infer x`
    binds the part it lines up with. Using the same `infer x` twice requires
    both occurrences to bind the same type.
-2. **Subtype test.** If the pattern does not match structurally, tnix asks
+2. **Subtype test.** If the pattern does not match structurally, tynix asks
    whether `Checked` is a subtype of `Pattern` and picks the branch from the
    answer. This is how `IsString "nix"` works.
 
@@ -95,7 +95,7 @@ Two practical rules follow:
 > [!WARNING]
 > Keep conditional aliases non-recursive. A conditional alias that refers to
 > itself in a branch, such as `Unwrap t = t extends { value :: infer v; } ?
-> Unwrap v : t`, is cut off by tnix's reduction budget and does not reduce the
+> Unwrap v : t`, is cut off by tynix's reduction budget and does not reduce the
 > way you would expect. Unroll the recursion to the depth you need instead.
 
 ## Combining with real types
@@ -103,7 +103,7 @@ Two practical rules follow:
 Conditional types are most useful on top of record types you already have.
 Here a config's port type is extracted once and reused, refinement and all:
 
-```tnix [port.tnix]
+```tynix [port.tynix]
 type PortOf c = c extends { port :: infer p; } ? p : Int;
 type Config = { port :: Range 1 65535 Int; host :: String; };
 

@@ -1,4 +1,4 @@
-# tnix code owners.
+# tynix code owners.
 #
 # Lines below are matched bottom-up; later patterns override earlier ones.
 # Adding a path here automatically requests a review from the listed owners.
@@ -6,9 +6,9 @@
 * @ubugeeei
 
 # Haskell core packages
-/packages/tnix-core/  @ubugeeei
-/packages/tnix-cli/   @ubugeeei
-/packages/tnix-lsp/   @ubugeeei
+/packages/tynix-core/  @ubugeeei
+/packages/tynix-cli/   @ubugeeei
+/packages/tynix-lsp/   @ubugeeei
 
 # Editor integrations
 /editors/vscode/  @ubugeeei

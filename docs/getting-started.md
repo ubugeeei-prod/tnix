@@ -1,26 +1,26 @@
 # Getting Started
 
-## What `tnix` Is
+## What `tynix` Is
 
-`tnix` is a static type layer for Nix.
+`tynix` is a static type layer for Nix.
 
-- `.tnix` keeps ordinary Nix value syntax
+- `.tynix` keeps ordinary Nix value syntax
 - types are used for checking, hover, and declaration emit
 - generated `.nix` erases all type syntax
 
-If you already know Nix, the goal is that `tnix` feels like "Nix plus a type surface", not a different runtime language.
+If you already know Nix, the goal is that `tynix` feels like "Nix plus a type surface", not a different runtime language.
 
 ## Installation
 
 ### Install script (Linux, macOS)
 
 ```bash
-curl -fsSL https://tnix.dev/install.sh | sh
+curl -fsSL https://tynix.dev/install.sh | sh
 ```
 
 The script detects your OS and CPU, downloads the matching release archive,
-verifies its SHA-256 checksum, and installs `tnix` and `tnix-lsp` into
-`~/.tnix/bin` (it prints the line to add to your shell profile if that
+verifies its SHA-256 checksum, and installs `tynix` and `tynix-lsp` into
+`~/.tynix/bin` (it prints the line to add to your shell profile if that
 directory is not on `PATH`). The binaries do not need Nix: Linux builds are
 fully static, and macOS builds only link system libraries.
 
@@ -28,11 +28,11 @@ Options can be passed after `sh -s --`, or as environment variables:
 
 ```bash
 # A specific release
-curl -fsSL https://tnix.dev/install.sh | sh -s -- --version 0.5.0   # or TNIX_VERSION=0.5.0
+curl -fsSL https://tynix.dev/install.sh | sh -s -- --version 0.5.0   # or TYNIX_VERSION=0.5.0
 # A custom install directory
-curl -fsSL https://tnix.dev/install.sh | TNIX_INSTALL_DIR="$HOME/.local/bin" sh
+curl -fsSL https://tynix.dev/install.sh | TYNIX_INSTALL_DIR="$HOME/.local/bin" sh
 # Uninstall
-curl -fsSL https://tnix.dev/install.sh | sh -s -- --uninstall
+curl -fsSL https://tynix.dev/install.sh | sh -s -- --uninstall
 ```
 
 Re-running the script upgrades to the latest release.
@@ -40,38 +40,38 @@ Re-running the script upgrades to the latest release.
 ### Nix flake
 
 ```bash
-# Install tnix and tnix-lsp into your profile
-nix profile install github:ubugeeei-prod/tnix
+# Install tynix and tynix-lsp into your profile
+nix profile install github:ubugeeei-prod/tynix
 
 # Or run without installing
-nix run github:ubugeeei-prod/tnix -- check ./main.tnix
+nix run github:ubugeeei-prod/tynix -- check ./main.tynix
 ```
 
-The flake also exports `overlays.default` (adds `pkgs.tnix`, `pkgs.tnix-lsp`
-and `pkgs.tnix-toolchain`) and modules that install the toolchain with
-`programs.tnix.enable = true;`:
+The flake also exports `overlays.default` (adds `pkgs.tynix`, `pkgs.tynix-lsp`
+and `pkgs.tynix-toolchain`) and modules that install the toolchain with
+`programs.tynix.enable = true;`:
 
 ```nix
-# flake.nix: inputs.tnix.url = "github:ubugeeei-prod/tnix";
+# flake.nix: inputs.tynix.url = "github:ubugeeei-prod/tynix";
 
-# NixOS (use tnix.darwinModules.default for nix-darwin)
+# NixOS (use tynix.darwinModules.default for nix-darwin)
 { inputs, ... }:
 {
-  imports = [ inputs.tnix.nixosModules.default ];
-  programs.tnix.enable = true;
+  imports = [ inputs.tynix.nixosModules.default ];
+  programs.tynix.enable = true;
 }
 
 # Home Manager
 { inputs, ... }:
 {
-  imports = [ inputs.tnix.homeManagerModules.default ];
-  programs.tnix.enable = true;
+  imports = [ inputs.tynix.homeManagerModules.default ];
+  programs.tynix.enable = true;
 }
 ```
 
 ### Supported platforms
 
-Prebuilt `tnix` and `tnix-lsp` archives ship for Linux x64, Linux arm64, macOS
+Prebuilt `tynix` and `tynix-lsp` archives ship for Linux x64, Linux arm64, macOS
 arm64 (Apple silicon), and macOS x64 (Intel). Other platforms can build from
 source through the Nix flake. Windows is not tested today. Use WSL2 and the
 Linux install script there. See [support-matrix.md](./support-matrix.md) for
@@ -80,8 +80,8 @@ the full per-platform tier table.
 Check the install:
 
 ```bash
-tnix --version
-tnix-lsp --version
+tynix --version
+tynix-lsp --version
 ```
 
 ## First Commands
@@ -95,46 +95,46 @@ nix develop
 Typical CLI entry points:
 
 ```bash
-tnix init .
-tnix scaffold .
-tnix check ./examples/main.tnix
-tnix compile ./examples/main.tnix -o ./dist/main.nix
-tnix emit ./examples/main.tnix -o ./dist/main.d.tnix
+tynix init .
+tynix scaffold .
+tynix check ./examples/main.tynix
+tynix compile ./examples/main.tynix -o ./dist/main.nix
+tynix emit ./examples/main.tynix -o ./dist/main.d.tynix
 ```
 
 If you are using the published flake directly:
 
 ```bash
-nix run github:ubugeeei-prod/tnix#tnix -- check ./main.tnix
-nix run github:ubugeeei-prod/tnix#tnix -- compile ./main.tnix -o ./main.nix
-nix run github:ubugeeei-prod/tnix#tnix -- emit ./main.tnix -o ./main.d.tnix
+nix run github:ubugeeei-prod/tynix#tynix -- check ./main.tynix
+nix run github:ubugeeei-prod/tynix#tynix -- compile ./main.tynix -o ./main.nix
+nix run github:ubugeeei-prod/tynix#tynix -- emit ./main.tynix -o ./main.d.tynix
 ```
 
-To set up an editor, run `tnix ide install vscode` (or `cursor`, `vscodium`,
-`zed`, `neovim`, `helix`), then `tnix doctor`. See [Editor Setup](./editors.md).
+To set up an editor, run `tynix ide install vscode` (or `cursor`, `vscodium`,
+`zed`, `neovim`, `helix`), then `tynix doctor`. See [Editor Setup](./editors.md).
 
 ## Scaffolding A Project
 
-`tnix init` creates a starter project in the target directory:
+`tynix init` creates a starter project in the target directory:
 
-- `tnix.config.tnix`
-- `tnix.config.d.tnix`
-- `src/main.tnix`
-- `types/builtins.d.tnix`
+- `tynix.config.tynix`
+- `tynix.config.d.tynix`
+- `src/main.tynix`
+- `types/builtins.d.tynix`
 
 `builtins` and the global builtins (`toString`, `map`, `throw`, ...) are typed
 out of the box by a prelude embedded in the binary. A workspace
 `declare "builtins"` block replaces that prelude, so delete the scaffolded
-`types/builtins.d.tnix` unless you want to restrict the builtins, and set
-`builtins = false;` to keep `tnix scaffold` from recreating it.
+`types/builtins.d.tynix` unless you want to restrict the builtins, and set
+`builtins = false;` to keep `tynix scaffold` from recreating it.
 
-The generated config is ordinary tnix syntax:
+The generated config is ordinary tynix syntax:
 
-```tnix
+```tynix
 {
   name = "demo";
   sourceDir = ./src;
-  entry = ./src/main.tnix;
+  entry = ./src/main.tynix;
   declarationDir = ./types;
   declarationPacks = [];
   buildDir = ./dist;
@@ -149,17 +149,17 @@ The generated config is ordinary tnix syntax:
 You can later re-run:
 
 ```bash
-tnix scaffold .
+tynix scaffold .
 ```
 
 to materialize any missing scaffold files without overwriting existing ones.
 
-The generated `tnix.config.d.tnix` lets other typed files import the project
+The generated `tynix.config.d.tynix` lets other typed files import the project
 config with a stable declaration instead of treating it as untyped.
 
-## Your First `.tnix` File
+## Your First `.tynix` File
 
-```tnix
+```tynix
 let
   greeting :: String;
   greeting = "hello";
@@ -178,12 +178,12 @@ in greeting
 
 ## Records And Field Access
 
-`tnix` uses structural typing for attribute sets.
+`tynix` uses structural typing for attribute sets.
 
-```tnix
+```tynix
 let
   pkg :: { name :: String; version :: String; };
-  pkg = { name = "tnix"; version = "0.1.0"; };
+  pkg = { name = "tynix"; version = "0.1.0"; };
 in pkg.name
 ```
 
@@ -193,7 +193,7 @@ The checker understands the field projection and infers the root type as `String
 
 You can type legacy `.nix` modules without rewriting them.
 
-```tnix
+```tynix
 declare "./legacy/default.nix" {
   default :: { name :: String; version :: String; };
 };
@@ -204,15 +204,15 @@ import ./legacy/default.nix
 This is the main bridge for incremental adoption:
 
 - keep the runtime implementation in `.nix`
-- describe its public API in `.d.tnix` or inline `declare`
-- use that API from typed `.tnix`
+- describe its public API in `.d.tynix` or inline `declare`
+- use that API from typed `.tynix`
 
 ## Nix Syntax
 
-`.tnix` accepts the whole Nix expression language, so existing code can be
-renamed to `.tnix` and annotated gradually. For example:
+`.tynix` accepts the whole Nix expression language, so existing code can be
+renamed to `.tynix` and annotated gradually. For example:
 
-```tnix
+```tynix
 { lib ? null, name ? "demo", version, ... }@args:
 let
   base = { meta.license = "MIT"; meta.homepage = "https://example.org"; };
@@ -238,7 +238,7 @@ ordinary names in expressions, and `as` is an ordinary name except in the
 
 ## Flake Workflow
 
-A flake can be written directly as `flake.tnix` and compiled to `flake.nix`;
+A flake can be written directly as `flake.tynix` and compiled to `flake.nix`;
 the [flake tutorial](./tutorial/flakes-and-packages.md#a-flake) walks through
 it. Annotate the inputs you use, `{ self, nixpkgs :: NixpkgsInput, ... }:`, and
 every lookup through them is checked.
@@ -246,7 +246,7 @@ every lookup through them is checked.
 If you would rather keep `flake.nix` hand-written, describe it with a
 declaration and check a typed *projection* of the parts you care about:
 
-```tnix
+```tynix
 declare "./flake.nix" {
   description :: String;
   outputs :: dynamic -> {
@@ -274,7 +274,7 @@ point instead of handwriting every ambient declaration.
 
 Directory layout:
 
-- `registry/workspace/` for `builtins`, `flake.nix`, and `tnix.config.tnix`
+- `registry/workspace/` for `builtins`, `flake.nix`, and `tynix.config.tynix`
 - `registry/ecosystem/` for reusable alias packs such as `nixpkgs` and popular flakes
 
 Available packs currently cover:
@@ -286,7 +286,7 @@ Available packs currently cover:
 
 Example:
 
-```tnix
+```tynix
 declare "./flake-utils.nix" { default :: NixFlakeUtilsFlake; };
 declare "./devenv.nix" { default :: DevenvFlake; };
 declare "./pre-commit-hooks.nix" { default :: PreCommitHooksFlake; };
@@ -298,24 +298,24 @@ alias names from the bundled registry packs.
 If you want to consume the upstream packs without copying them into your
 repository, list them in `declarationPacks`:
 
-```tnix
+```tynix
 {
   declarationPacks = [
-    ../vendor/tnix/registry/ecosystem
-    ../vendor/tnix/registry/workspace
+    ../vendor/tynix/registry/ecosystem
+    ../vendor/tynix/registry/workspace
   ];
 }
 ```
 
 `registry/workspace/` packs are rebased onto your current project root, so
 their ambient declarations still target your local `flake.nix` and
-`tnix.config.tnix`.
+`tynix.config.tynix`.
 
 ## Lists, Vectors, And Matrices
 
 Plain Nix list syntax can infer more precise indexed shapes.
 
-```tnix
+```tynix
 {
   pair = [1 2];
   grid = [[1 2] [3 4]];
@@ -333,7 +333,7 @@ root: {
 
 You can also write shape annotations directly:
 
-```tnix
+```tynix
 let
   xs :: Vec 3 Int;
   xs = [1 2 3];
@@ -342,7 +342,7 @@ in xs
 
 Bounded lengths are supported too:
 
-```tnix
+```tynix
 let
   xs :: Vec (Range 2 4 Nat) Int;
   xs = [1 2 3];
@@ -351,9 +351,9 @@ in xs
 
 ## Numeric Validation
 
-`tnix` includes a small refinement surface for numeric values.
+`tynix` includes a small refinement surface for numeric values.
 
-```tnix
+```tynix
 let
   ratio :: Range 0.0 1.0 Float;
   ratio = 0.5;
@@ -362,7 +362,7 @@ in ratio
 
 This passes, while:
 
-```tnix
+```tynix
 let
   ratio :: Range 0.0 1.0 Float;
   ratio = 1.5;
@@ -375,7 +375,7 @@ is rejected.
 
 Units are phantom wrappers that survive checking but disappear at runtime.
 
-```tnix
+```tynix
 let
   timeout :: Unit "ms" (Range 0 5000 Nat);
   timeout = 2500;
@@ -384,7 +384,7 @@ in timeout
 
 Different labels stay distinct:
 
-```tnix
+```tynix
 let
   timeoutMs :: Unit "ms" Nat;
   timeoutMs = 1;
@@ -397,10 +397,10 @@ The assignment to `timeoutS` is rejected.
 
 ## Casts
 
-`tnix` also supports explicit `as` casts for the places where you want to
+`tynix` also supports explicit `as` casts for the places where you want to
 assert a more useful static view.
 
-```tnix
+```tynix
 let
   value :: unknown;
   value = 1;
@@ -409,13 +409,13 @@ in value as Int
 
 This is accepted because the cast is explicit. Widening casts work too:
 
-```tnix
+```tynix
 1 as Number
 ```
 
 Concrete unrelated casts are still rejected:
 
-```tnix
+```tynix
 1 as String
 ```
 
@@ -424,22 +424,22 @@ only the original runtime expression.
 
 ## Diagnostic Directives
 
-`tnix` supports TypeScript-style line comments for intentional checker failures.
+`tynix` supports TypeScript-style line comments for intentional checker failures.
 
 Ignore the next line's checker error:
 
-```tnix
+```tynix
 let
-  # @tnix-ignore
+  # @tynix-ignore
   value = missing;
 in value
 ```
 
 Expect the next line to fail and report an error if it does not:
 
-```tnix
+```tynix
 let
-  # @tnix-expected
+  # @tynix-expected
   value :: Int;
   value = "oops";
 in value
@@ -449,11 +449,11 @@ These directives apply to the root expression or to one `let` item.
 
 ## Declaration Emit
 
-`tnix emit` turns a `.tnix` file into a `.d.tnix` API surface.
+`tynix emit` turns a `.tynix` file into a `.d.tynix` API surface.
 
-Source (`user.tnix`):
+Source (`user.tynix`):
 
-```tnix
+```tynix
 type User = { name :: String; };
 
 {
@@ -463,7 +463,7 @@ type User = { name :: String; };
 
 Emitted declaration:
 
-```tnix
+```tynix
 type User  = {
   name :: String;
 };
@@ -472,21 +472,21 @@ declare "./user.nix" {
 };
 ```
 
-The `declare` target is not a literal string: `tnix emit` derives it from the
-source path by replacing the `.tnix` extension with `.nix`, expressed relative
-to the emitted `.d.tnix` file's directory. So emitting `widget.tnix` produces
+The `declare` target is not a literal string: `tynix emit` derives it from the
+source path by replacing the `.tynix` extension with `.nix`, expressed relative
+to the emitted `.d.tynix` file's directory. So emitting `widget.tynix` produces
 `declare "./widget.nix" { … }`. The `%1 ->` arrow marks a function that uses its
 argument exactly once; see [Annotations and inference](./tutorial/annotations.md#functions-and-the-1-arrow).
 
 ## Suggested Learning Path
 
-1. Start by renaming a file to `.tnix` and running `tnix check`; inference and
+1. Start by renaming a file to `.tynix` and running `tynix check`; inference and
    the builtins prelude cover a lot without any annotations.
 2. Add annotations on `let` bindings and function parameters where you want
    to state intent.
 3. Add ambient declarations for existing `.nix` imports.
 4. Use `emit` to stabilize public APIs between files.
-5. Add `tnix.config.tnix` and `tnix scaffold` once the project layout is settling.
+5. Add `tynix.config.tynix` and `tynix scaffold` once the project layout is settling.
 6. Reach for `Vec` / `Matrix` / `Tensor`, `Range`, and `Unit` when the shape or numeric contract actually matters.
 
 ## Next Docs

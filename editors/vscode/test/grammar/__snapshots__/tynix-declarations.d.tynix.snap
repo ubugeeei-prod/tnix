@@ -1,0 +1,148 @@
+  1 "type" meta.type-alias.tynix storage.type.type.tynix
+  1 "Option" meta.type-alias.tynix entity.name.type.alias.tynix
+  1 "a" meta.type-alias.tynix entity.name.type.parameter.tynix
+  1 "=" meta.type-alias.tynix keyword.operator.assignment.tynix
+  1 "{" meta.type-alias.tynix meta.type.record.tynix punctuation.section.braces.begin.tynix
+  1 "_tag" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix entity.other.attribute-name.tynix
+  1 "::" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix keyword.operator.type.annotation.tynix
+  1 "\"" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+  1 "some" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix string.quoted.double.tynix
+  1 "\"" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+  1 ";" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix punctuation.terminator.field.tynix
+  1 "value" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix entity.other.attribute-name.tynix
+  1 "::" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix keyword.operator.type.annotation.tynix
+  1 "a" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix entity.name.type.parameter.tynix
+  1 ";" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix punctuation.terminator.field.tynix
+  1 "}" meta.type-alias.tynix meta.type.record.tynix punctuation.section.braces.end.tynix
+  1 "|" meta.type-alias.tynix keyword.operator.type.union.tynix
+  1 "{" meta.type-alias.tynix meta.type.record.tynix punctuation.section.braces.begin.tynix
+  1 "_tag" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix entity.other.attribute-name.tynix
+  1 "::" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix keyword.operator.type.annotation.tynix
+  1 "\"" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+  1 "none" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix string.quoted.double.tynix
+  1 "\"" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+  1 ";" meta.type-alias.tynix meta.type.record.tynix meta.type.field.tynix punctuation.terminator.field.tynix
+  1 "}" meta.type-alias.tynix meta.type.record.tynix punctuation.section.braces.end.tynix
+  1 ";" meta.type-alias.tynix punctuation.terminator.statement.tynix
+  2 "type" meta.type-alias.tynix storage.type.type.tynix
+  2 "Element" meta.type-alias.tynix entity.name.type.alias.tynix
+  2 "t" meta.type-alias.tynix entity.name.type.parameter.tynix
+  2 "=" meta.type-alias.tynix keyword.operator.assignment.tynix
+  2 "t" meta.type-alias.tynix entity.name.type.parameter.tynix
+  2 "extends" meta.type-alias.tynix storage.modifier.extends.tynix
+  2 "List" meta.type-alias.tynix support.type.builtin.tynix
+  2 "(" meta.type-alias.tynix meta.type.paren.tynix punctuation.section.parens.begin.tynix
+  2 "infer" meta.type-alias.tynix meta.type.paren.tynix keyword.operator.expression.infer.tynix
+  2 "a" meta.type-alias.tynix meta.type.paren.tynix entity.name.type.parameter.tynix
+  2 ")" meta.type-alias.tynix meta.type.paren.tynix punctuation.section.parens.end.tynix
+  2 "?" meta.type-alias.tynix keyword.operator.ternary.tynix
+  2 "a" meta.type-alias.tynix entity.name.type.parameter.tynix
+  2 ":" meta.type-alias.tynix keyword.operator.ternary.tynix
+  2 "dynamic" meta.type-alias.tynix support.type.primitive.gradual.tynix
+  2 ";" meta.type-alias.tynix punctuation.terminator.statement.tynix
+  3 "type" meta.type-alias.tynix storage.type.type.tynix
+  3 "Apply" meta.type-alias.tynix entity.name.type.alias.tynix
+  3 "f" meta.type-alias.tynix entity.name.type.parameter.tynix
+  3 "a" meta.type-alias.tynix entity.name.type.parameter.tynix
+  3 "=" meta.type-alias.tynix keyword.operator.assignment.tynix
+  3 "f" meta.type-alias.tynix entity.name.type.parameter.tynix
+  3 "a" meta.type-alias.tynix entity.name.type.parameter.tynix
+  3 ";" meta.type-alias.tynix punctuation.terminator.statement.tynix
+  4 "type" meta.type-alias.tynix storage.type.type.tynix
+  4 "Pair" meta.type-alias.tynix entity.name.type.alias.tynix
+  4 "=" meta.type-alias.tynix keyword.operator.assignment.tynix
+  4 "Tuple" meta.type-alias.tynix support.type.builtin.tynix
+  4 "[" meta.type-alias.tynix meta.type.list.tynix punctuation.section.brackets.begin.tynix
+  4 "Int" meta.type-alias.tynix meta.type.list.tynix support.type.primitive.tynix
+  4 "String" meta.type-alias.tynix meta.type.list.tynix support.type.primitive.tynix
+  4 "]" meta.type-alias.tynix meta.type.list.tynix punctuation.section.brackets.end.tynix
+  4 ";" meta.type-alias.tynix punctuation.terminator.statement.tynix
+  5 "type" meta.type-alias.tynix storage.type.type.tynix
+  5 "NixpkgsSystem" meta.type-alias.tynix entity.name.type.alias.tynix
+  5 "=" meta.type-alias.tynix keyword.operator.assignment.tynix
+  6 "\"" meta.type-alias.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+  6 "aarch64-linux" meta.type-alias.tynix string.quoted.double.tynix
+  6 "\"" meta.type-alias.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+  7 "|" meta.type-alias.tynix keyword.operator.type.union.tynix
+  7 "\"" meta.type-alias.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+  7 "x86_64-darwin" meta.type-alias.tynix string.quoted.double.tynix
+  7 "\"" meta.type-alias.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+  7 ";" meta.type-alias.tynix punctuation.terminator.statement.tynix
+  8 "type" meta.type-alias.tynix storage.type.type.tynix
+  8 "Shape" meta.type-alias.tynix entity.name.type.alias.tynix
+  8 "=" meta.type-alias.tynix keyword.operator.assignment.tynix
+  8 "Tensor" meta.type-alias.tynix support.type.builtin.tynix
+  8 "[" meta.type-alias.tynix meta.type.list.tynix punctuation.section.brackets.begin.tynix
+  8 "2" meta.type-alias.tynix meta.type.list.tynix constant.numeric.integer.tynix
+  8 "3" meta.type-alias.tynix meta.type.list.tynix constant.numeric.integer.tynix
+  8 "4" meta.type-alias.tynix meta.type.list.tynix constant.numeric.integer.tynix
+  8 "]" meta.type-alias.tynix meta.type.list.tynix punctuation.section.brackets.end.tynix
+  8 "Number" meta.type-alias.tynix support.type.primitive.tynix
+  8 ";" meta.type-alias.tynix punctuation.terminator.statement.tynix
+  9 "type" meta.type-alias.tynix storage.type.type.tynix
+  9 "Timeout" meta.type-alias.tynix entity.name.type.alias.tynix
+  9 "=" meta.type-alias.tynix keyword.operator.assignment.tynix
+  9 "Unit" meta.type-alias.tynix support.type.builtin.tynix
+  9 "\"" meta.type-alias.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+  9 "ms" meta.type-alias.tynix string.quoted.double.tynix
+  9 "\"" meta.type-alias.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+  9 "(" meta.type-alias.tynix meta.type.paren.tynix punctuation.section.parens.begin.tynix
+  9 "Range" meta.type-alias.tynix meta.type.paren.tynix support.type.builtin.tynix
+  9 "0" meta.type-alias.tynix meta.type.paren.tynix constant.numeric.integer.tynix
+  9 "5000" meta.type-alias.tynix meta.type.paren.tynix constant.numeric.integer.tynix
+  9 "Nat" meta.type-alias.tynix meta.type.paren.tynix support.type.primitive.tynix
+  9 ")" meta.type-alias.tynix meta.type.paren.tynix punctuation.section.parens.end.tynix
+  9 ";" meta.type-alias.tynix punctuation.terminator.statement.tynix
+ 10 "type" meta.type-alias.tynix storage.type.type.tynix
+ 10 "Show" meta.type-alias.tynix entity.name.type.alias.tynix
+ 10 "a" meta.type-alias.tynix entity.name.type.parameter.tynix
+ 10 "=" meta.type-alias.tynix keyword.operator.assignment.tynix
+ 10 "Showable" meta.type-alias.tynix entity.name.type.tynix
+ 10 "a" meta.type-alias.tynix entity.name.type.parameter.tynix
+ 10 "=>" meta.type-alias.tynix keyword.operator.type.constraint.tynix
+ 10 "a" meta.type-alias.tynix entity.name.type.parameter.tynix
+ 10 "->" meta.type-alias.tynix storage.type.function.arrow.tynix
+ 10 "String" meta.type-alias.tynix support.type.primitive.tynix
+ 10 ";" meta.type-alias.tynix punctuation.terminator.statement.tynix
+ 12 "declare" meta.declare.tynix storage.modifier.declare.tynix
+ 12 "\"" meta.declare.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+ 12 "./legacy/default.nix" meta.declare.tynix string.quoted.double.tynix
+ 12 "\"" meta.declare.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+ 12 "{" meta.declare.tynix meta.declare.body.tynix punctuation.section.braces.begin.tynix
+ 13 "#" meta.declare.tynix meta.declare.body.tynix comment.line.number-sign.tynix punctuation.definition.comment.tynix
+ 13 " entries are signatures" meta.declare.tynix meta.declare.body.tynix comment.line.number-sign.tynix
+ 14 "default" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix entity.name.function.tynix
+ 14 "::" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix keyword.operator.type.annotation.tynix
+ 14 "{" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix punctuation.section.braces.begin.tynix
+ 14 "name" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix entity.other.attribute-name.tynix
+ 14 "::" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix keyword.operator.type.annotation.tynix
+ 14 "String" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix support.type.primitive.tynix
+ 14 ";" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix punctuation.terminator.field.tynix
+ 14 "\"quoted-key\"" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix string.quoted.double.tynix
+ 14 "::" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix keyword.operator.type.annotation.tynix
+ 14 "Int" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix support.type.primitive.tynix
+ 14 ";" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix punctuation.terminator.field.tynix
+ 14 "}" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix punctuation.section.braces.end.tynix
+ 14 ";" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix punctuation.terminator.signature.tynix
+ 15 "mkPkg" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix entity.name.function.tynix
+ 15 "::" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix keyword.operator.type.annotation.tynix
+ 15 "{" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix punctuation.section.braces.begin.tynix
+ 15 "name" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix entity.other.attribute-name.tynix
+ 15 "::" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix keyword.operator.type.annotation.tynix
+ 15 "String" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix support.type.primitive.tynix
+ 15 ";" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix meta.type.field.tynix punctuation.terminator.field.tynix
+ 15 "}" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix meta.type.record.tynix punctuation.section.braces.end.tynix
+ 15 "->" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix storage.type.function.arrow.tynix
+ 15 "Derivation" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix entity.name.type.tynix
+ 15 ";" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix punctuation.terminator.signature.tynix
+ 16 "}" meta.declare.tynix meta.declare.body.tynix punctuation.section.braces.end.tynix
+ 16 ";" meta.declare.tynix punctuation.terminator.statement.tynix
+ 18 "declare" meta.declare.tynix storage.modifier.declare.tynix
+ 18 "./lib.nix" meta.declare.tynix string.unquoted.path.tynix
+ 18 "{" meta.declare.tynix meta.declare.body.tynix punctuation.section.braces.begin.tynix
+ 18 "value" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix entity.name.function.tynix
+ 18 "::" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix keyword.operator.type.annotation.tynix
+ 18 "any" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix support.type.primitive.gradual.tynix
+ 18 ";" meta.declare.tynix meta.declare.body.tynix meta.signature.tynix punctuation.terminator.signature.tynix
+ 18 "}" meta.declare.tynix meta.declare.body.tynix punctuation.section.braces.end.tynix
+ 18 ";" meta.declare.tynix punctuation.terminator.statement.tynix

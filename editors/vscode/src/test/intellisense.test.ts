@@ -14,13 +14,13 @@ const position = new vscode.Position(3, 3);
 suite("intellisense", () => {
   setup(async () => {
     await activateExtension();
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
   });
 
   test("hover surfaces server-provided contents", async () => {
     const hovers = await execProvider<vscode.Hover[]>(
       "vscode.executeHoverProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       position,
     );
     const rendered = hoverText(hovers);
@@ -30,7 +30,7 @@ suite("intellisense", () => {
   test("completion surfaces server-provided items", async () => {
     const list = await execProvider<vscode.CompletionList>(
       "vscode.executeCompletionItemProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       position,
     );
     const labels = list.items.map((item) =>
@@ -43,7 +43,7 @@ suite("intellisense", () => {
   test("signature help surfaces server-provided signatures", async () => {
     const help = await execProvider<vscode.SignatureHelp>(
       "vscode.executeSignatureHelpProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       position,
       "(",
     );

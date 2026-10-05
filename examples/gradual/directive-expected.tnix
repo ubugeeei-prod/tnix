@@ -1,5 +1,0 @@
-let
-  # @tnix-expected
-  value :: Int;
-  value = "oops";
-in value

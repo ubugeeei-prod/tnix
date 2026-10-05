@@ -12,27 +12,27 @@ import {
 } from "./settings.js";
 
 test("findExecutable searches PATH entries in order", () => {
-  const existing = new Set(["/b/tnix-lsp", "/c/tnix-lsp"]);
+  const existing = new Set(["/b/tynix-lsp", "/c/tynix-lsp"]);
   assert.equal(
-    findExecutable("tnix-lsp", { PATH: "/a::/b:/c" }, "linux", (p) =>
+    findExecutable("tynix-lsp", { PATH: "/a::/b:/c" }, "linux", (p) =>
       existing.has(p),
     ),
-    "/b/tnix-lsp",
+    "/b/tynix-lsp",
   );
   assert.equal(
-    findExecutable("tnix-lsp", { PATH: "/a" }, "linux", (p) => existing.has(p)),
+    findExecutable("tynix-lsp", { PATH: "/a" }, "linux", (p) => existing.has(p)),
     undefined,
   );
 });
 
 test("findExecutable checks explicit paths directly", () => {
   assert.equal(
-    findExecutable("/nix/store/x/bin/tnix-lsp", {}, "linux", () => true),
-    "/nix/store/x/bin/tnix-lsp",
+    findExecutable("/nix/store/x/bin/tynix-lsp", {}, "linux", () => true),
+    "/nix/store/x/bin/tynix-lsp",
   );
   assert.equal(
     findExecutable(
-      "./bin/tnix-lsp",
+      "./bin/tynix-lsp",
       { PATH: "/usr/bin" },
       "linux",
       () => false,
@@ -44,24 +44,24 @@ test("findExecutable checks explicit paths directly", () => {
 
 test("findExecutable honours PATHEXT on Windows", () => {
   const found = findExecutable(
-    "tnix-lsp",
+    "tynix-lsp",
     { PATH: "C:\\tools", PATHEXT: ".EXE;.CMD" },
     "win32",
-    (p) => p.endsWith("tnix-lsp.CMD"),
+    (p) => p.endsWith("tynix-lsp.CMD"),
   );
-  assert.ok(found?.endsWith("tnix-lsp.CMD"));
+  assert.ok(found?.endsWith("tynix-lsp.CMD"));
 });
 
 test("normalizeSeverityOverrides upper-cases codes and drops invalid entries", () => {
   assert.deepEqual(
     normalizeSeverityOverrides({
-      "tnix-t0001": "Warning",
-      TNIX_X: "off",
+      "tynix-t0001": "Warning",
+      TYNIX_X: "off",
       bad: "fatal",
       "": "error",
       num: 3,
     }),
-    { "TNIX-T0001": "warning", TNIX_X: "off" },
+    { "TYNIX-T0001": "warning", TYNIX_X: "off" },
   );
   assert.deepEqual(normalizeSeverityOverrides(null), {});
   assert.deepEqual(normalizeSeverityOverrides(["x"]), {});
@@ -76,11 +76,11 @@ test("diagnosticCode reads string, number, and { value } codes", () => {
 
 test("overrideSeverity remaps, silences, or keeps diagnostics", () => {
   const overrides = normalizeSeverityOverrides({
-    "TNIX-T0001": "hint",
+    "TYNIX-T0001": "hint",
     TP0004: "off",
   });
   assert.equal(
-    overrideSeverity("tnix-t0001", "msg", 0, overrides),
+    overrideSeverity("tynix-t0001", "msg", 0, overrides),
     VSCODE_SEVERITY.hint,
   );
   assert.equal(
@@ -92,7 +92,7 @@ test("overrideSeverity remaps, silences, or keeps diagnostics", () => {
     null,
   );
   assert.equal(overrideSeverity("OTHER1", "msg", 1, overrides), 1);
-  assert.equal(overrideSeverity("TNIX-T0001", "msg", 0, {}), 0);
+  assert.equal(overrideSeverity("TYNIX-T0001", "msg", 0, {}), 0);
 });
 
 test("buildInitializationOptions mirrors the client settings", () => {
@@ -109,27 +109,27 @@ test("buildInitializationOptions mirrors the client settings", () => {
 });
 
 test("parseVersion extracts versions from --version output", () => {
-  assert.equal(parseVersion("tnix-lsp 0.5.0\n"), "0.5.0");
-  assert.equal(parseVersion("tnix 1.2.3-rc.1"), "1.2.3-rc.1");
+  assert.equal(parseVersion("tynix-lsp 0.5.0\n"), "0.5.0");
+  assert.equal(parseVersion("tynix 1.2.3-rc.1"), "1.2.3-rc.1");
   assert.equal(parseVersion("no version here"), undefined);
 });
 
 test("resolveCliPath prefers explicit paths, then Nix profiles, then PATH", () => {
   assert.equal(
-    resolveCliPath(" /opt/tnix ", "/home/a", () => false),
-    "/opt/tnix",
+    resolveCliPath(" /opt/tynix ", "/home/a", () => false),
+    "/opt/tynix",
   );
   assert.equal(
-    resolveCliPath("", "/home/a", (p) => p === "/home/a/.nix-profile/bin/tnix"),
-    "/home/a/.nix-profile/bin/tnix",
+    resolveCliPath("", "/home/a", (p) => p === "/home/a/.nix-profile/bin/tynix"),
+    "/home/a/.nix-profile/bin/tynix",
   );
   assert.equal(
     resolveCliPath(undefined, "/home/a", () => false),
-    "tnix",
+    "tynix",
   );
   assert.ok(
-    defaultBinaryCandidates("tnix", "/home/a").every((c) =>
-      c.endsWith("/tnix"),
+    defaultBinaryCandidates("tynix", "/home/a").every((c) =>
+      c.endsWith("/tynix"),
     ),
   );
 });

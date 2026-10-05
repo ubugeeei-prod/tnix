@@ -1,0 +1,328 @@
+# Types for flakes and the most common flake libraries: the flake output
+# schema, nixpkgs-as-a-flake, flake-utils, flake-parts, home-manager and
+# nix-darwin.
+#
+# Alias-only; builds on `nixpkgs-lib.d.tynix`, `nixpkgs-pkgs.d.tynix` and
+# `nixos-modules.d.tynix`. Typical usage:
+#
+#   declare "./flake.nix" { default :: NixFlake; };
+#   { self, nixpkgs :: NixpkgsFlake, flake-utils :: NixFlakeUtilsFlake, ... }:
+#   flake-utils.lib.eachDefaultSystem (system: { ... })
+
+# --- flake.nix ---------------------------------------------------------------
+
+# One entry of `inputs`. `inputs.<name>.inputs.<dep>.follows = "..."` is typed
+# one level deep (the record is not recursive on purpose).
+type NixFlakeInputSpec = {
+  url? :: String;
+  type? :: String;
+  owner? :: String;
+  repo? :: String;
+  ref? :: String;
+  rev? :: String;
+  dir? :: String;
+  host? :: String;
+  path? :: String;
+  narHash? :: String;
+  submodules? :: Bool;
+  flake? :: Bool;
+  follows? :: String;
+  inputs? :: AttrsOf {
+    follows? :: String;
+    url? :: String;
+    flake? :: Bool;
+    ...
+  };
+};
+
+type NixFlakeApp = {
+  type :: "app";
+  program :: String;
+  meta? :: NixpkgsMeta;
+};
+
+type NixFlakeTemplate = {
+  path :: Path;
+  description :: String;
+  welcomeText? :: String;
+};
+
+# A closed record with the four common systems. Kept for compatibility;
+# `NixFlakePerSystem a` (any system name) is usually the better fit.
+type NixFlakeSystemOutputs a = {
+  x86_64-linux :: a;
+  aarch64-linux :: a;
+  x86_64-darwin :: a;
+  aarch64-darwin :: a;
+};
+
+# `packages.<system>.<name>`-style outputs.
+type NixFlakePerSystem a = AttrsOf a;
+
+# The standard flake output schema (`nix flake check` / `nix flake show`).
+# Every output is optional and the record is open for custom outputs.
+type NixFlakeOutputs = {
+  packages? :: AttrsOf (AttrsOf NixpkgsDerivationCore);
+  legacyPackages? :: AttrsOf dynamic;
+  devShells? :: AttrsOf (AttrsOf NixpkgsDerivationCore);
+  apps? :: AttrsOf (AttrsOf NixFlakeApp);
+  checks? :: AttrsOf (AttrsOf NixpkgsDerivationCore);
+  formatter? :: AttrsOf NixpkgsDerivationCore;
+  bundlers? :: AttrsOf (AttrsOf (dynamic -> NixpkgsDerivationCore));
+  hydraJobs? :: NixpkgsAttrs;
+  overlays? :: AttrsOf NixpkgsOverlay;
+  nixosModules? :: AttrsOf dynamic;
+  nixosConfigurations? :: AttrsOf NixosConfiguration;
+  darwinModules? :: AttrsOf dynamic;
+  darwinConfigurations? :: AttrsOf NixosConfiguration;
+  homeModules? :: AttrsOf dynamic;
+  homeManagerModules? :: AttrsOf dynamic;
+  homeConfigurations? :: AttrsOf HomeManagerConfiguration;
+  flakeModules? :: AttrsOf dynamic;
+  templates? :: AttrsOf NixFlakeTemplate;
+  lib? :: NixpkgsAttrs;
+  ...
+};
+
+# A whole `flake.nix`.
+type NixFlake = {
+  description? :: String;
+  inputs? :: AttrsOf NixFlakeInputSpec;
+  outputs :: dynamic -> NixFlakeOutputs;
+  nixConfig? :: NixpkgsAttrs;
+};
+
+# Fields every resolved flake input has (`inputs.foo.outPath`, ...).
+type NixFlakeSourceInfo = {
+  outPath :: String;
+  narHash :: String;
+  lastModified :: Int;
+  lastModifiedDate :: String;
+  rev? :: String;
+  shortRev? :: String;
+  dirtyRev? :: String;
+  revCount? :: Int;
+  ...
+};
+
+# --- nixpkgs as a flake --------------------------------------------------------
+
+type NixpkgsFlake = {
+  lib :: NixpkgsLib;
+  legacyPackages :: AttrsOf NixpkgsPkgs;
+  overlays :: AttrsOf NixpkgsOverlay;
+  nixosModules :: AttrsOf dynamic;
+  outPath :: String;
+  narHash :: String;
+  lastModified :: Int;
+  rev? :: String;
+  shortRev? :: String;
+  ...
+};
+
+# --- flake-utils ---------------------------------------------------------------
+
+type NixFlakeUtilsLib = {
+  defaultSystems :: List NixpkgsSystem;
+  allSystems :: List String;
+  # `eachDefaultSystem (system: { packages.default = ...; })` turns
+  # per-system outputs into `{ packages.<system>.default = ...; }`.
+  eachDefaultSystem :: forall r. (NixpkgsSystem -> { ...r }) -> NixFlakeOutputs;
+  eachDefaultSystemPassThrough :: (NixpkgsSystem -> NixpkgsAttrs) -> NixFlakeOutputs;
+  eachSystem :: forall r. List String -> (NixpkgsSystem -> { ...r }) -> NixFlakeOutputs;
+  eachSystemPassThrough :: List String -> (NixpkgsSystem -> NixpkgsAttrs) -> NixFlakeOutputs;
+  eachSystemMap :: forall a. List String -> (NixpkgsSystem -> a) -> AttrsOf a;
+  eachDefaultSystemMap :: forall a. (NixpkgsSystem -> a) -> AttrsOf a;
+  flattenTree :: NixpkgsAttrs -> AttrsOf NixpkgsDerivationCore;
+  filterPackages :: String -> NixpkgsAttrs -> NixpkgsAttrs;
+  meld :: NixpkgsAttrs -> List Path -> NixpkgsAttrs;
+  mkApp :: {
+    drv :: NixpkgsDerivationCore;
+    name? :: String;
+    exePath? :: String;
+  } -> NixFlakeApp;
+  simpleFlake :: NixpkgsAttrs -> NixFlakeOutputs;
+  system :: {
+    x86_64-linux :: NixpkgsSystem;
+    aarch64-linux :: NixpkgsSystem;
+    x86_64-darwin :: NixpkgsSystem;
+    aarch64-darwin :: NixpkgsSystem;
+    ...
+  };
+  ...
+};
+
+type NixFlakeUtilsFlake = {
+  lib :: NixFlakeUtilsLib;
+  ...
+};
+
+# --- flake-parts ---------------------------------------------------------------
+
+# Arguments of a top-level flake-parts module.
+type FlakePartsModuleArgs = {
+  config :: dynamic;
+  options :: dynamic;
+  lib :: NixpkgsLib;
+  self :: dynamic;
+  inputs :: dynamic;
+  flake-parts-lib :: dynamic;
+  withSystem :: forall a. String -> (FlakePartsPerSystemArgs -> a) -> a;
+  getSystem :: String -> dynamic;
+  moduleWithSystem :: dynamic -> dynamic;
+  ...
+};
+
+# Arguments of a `perSystem = { pkgs, system, ... }: { ... };` module.
+type FlakePartsPerSystemArgs = {
+  config :: dynamic;
+  options :: dynamic;
+  lib :: NixpkgsLib;
+  pkgs :: NixpkgsPkgs;
+  system :: String;
+  self' :: dynamic;
+  inputs' :: dynamic;
+  final? :: dynamic;
+  ...
+};
+
+type FlakePartsPerSystemAttrs = {
+  imports? :: List dynamic;
+  packages? :: AttrsOf NixpkgsDerivationCore;
+  legacyPackages? :: NixpkgsAttrs;
+  devShells? :: AttrsOf NixpkgsDerivationCore;
+  apps? :: AttrsOf NixFlakeApp;
+  checks? :: AttrsOf NixpkgsDerivationCore;
+  formatter? :: NixpkgsDerivationCore;
+  overlayAttrs? :: NixpkgsAttrs;
+  _module? :: dynamic;
+  ...
+};
+
+# The attribute-set form of a top-level flake-parts module.
+type FlakePartsModuleAttrs = {
+  imports? :: List dynamic;
+  systems? :: List String;
+  perSystem? :: dynamic;
+  flake? :: NixpkgsAttrs;
+  debug? :: Bool;
+  options? :: dynamic;
+  config? :: dynamic;
+  ...
+};
+
+type FlakePartsModule = FlakePartsModuleAttrs | (FlakePartsModuleArgs -> FlakePartsModuleAttrs) | Path;
+
+type FlakePartsMkFlakeArgs = {
+  inputs :: NixpkgsAttrs;
+  specialArgs? :: NixpkgsAttrs;
+  moduleLocation? :: String | Path;
+};
+
+type FlakePartsLib = {
+  mkFlake :: FlakePartsMkFlakeArgs -> FlakePartsModule -> NixFlakeOutputs;
+  evalFlakeModule :: FlakePartsMkFlakeArgs -> dynamic -> NixpkgsAttrs;
+  importApply :: Path -> NixpkgsAttrs -> dynamic;
+  mkPerSystemOption :: dynamic -> NixpkgsOption dynamic;
+  mkTransposedPerSystemModule :: { name :: String; option :: NixpkgsOption dynamic; file :: String | Path; } -> dynamic;
+  withSystem :: dynamic;
+  ...
+};
+
+type FlakePartsFlake = {
+  lib :: FlakePartsLib;
+  flakeModules :: AttrsOf dynamic;
+  templates :: AttrsOf NixFlakeTemplate;
+  ...
+};
+
+# --- home-manager --------------------------------------------------------------
+
+type HomeManagerConfigurationArgs = {
+  pkgs :: NixpkgsPkgs;
+  modules? :: List dynamic;
+  extraSpecialArgs? :: NixpkgsAttrs;
+  lib? :: dynamic;
+  check? :: Bool;
+};
+
+type HomeManagerConfiguration = {
+  activationPackage :: NixpkgsDerivation;
+  config :: dynamic;
+  options :: dynamic;
+  pkgs :: dynamic;
+  newsDisplay :: String;
+  newsEntries :: List dynamic;
+  ...
+};
+
+# `lib.hm.dag` (home.activation, programs.*.initExtra ordering).
+type HomeManagerDagEntry a = {
+  data :: a;
+  after :: List String;
+  before :: List String;
+};
+
+type HomeManagerDag = {
+  entryAnywhere :: forall a. a -> HomeManagerDagEntry a;
+  entryAfter :: forall a. List String -> a -> HomeManagerDagEntry a;
+  entryBefore :: forall a. List String -> a -> HomeManagerDagEntry a;
+  entryBetween :: forall a. List String -> List String -> a -> HomeManagerDagEntry a;
+  ...
+};
+
+type HomeManagerLib = {
+  homeManagerConfiguration :: HomeManagerConfigurationArgs -> HomeManagerConfiguration;
+  hm :: {
+    dag :: HomeManagerDag;
+    ...
+  };
+  ...
+};
+
+type HomeManagerFlake = {
+  lib :: HomeManagerLib;
+  nixosModules :: AttrsOf dynamic;
+  darwinModules :: AttrsOf dynamic;
+  flakeModules :: AttrsOf dynamic;
+  homeManagerModules :: AttrsOf dynamic;
+  templates :: {
+    default :: NixFlakeTemplate;
+    nixos :: NixFlakeTemplate;
+    nix-darwin :: NixFlakeTemplate;
+    standalone :: NixFlakeTemplate;
+    ...
+  };
+  packages :: AttrsOf (AttrsOf NixpkgsDerivation);
+  devShells :: AttrsOf (AttrsOf NixpkgsDerivation);
+  legacyPackages :: AttrsOf dynamic;
+  ...
+};
+
+# --- nix-darwin ----------------------------------------------------------------
+
+type NixDarwinEvalConfigArgs = {
+  modules :: List dynamic;
+  pkgs? :: NixpkgsPkgs | Null;
+  system? :: String | Null;
+  inputs? :: NixpkgsAttrs | Null;
+  specialArgs? :: NixpkgsAttrs;
+  lib? :: dynamic;
+};
+
+type NixDarwinLib = {
+  evalConfig :: dynamic;
+  darwinSystem :: NixDarwinEvalConfigArgs -> NixosConfiguration;
+  ...
+};
+
+type NixDarwinFlake = {
+  lib :: NixDarwinLib;
+  overlays :: AttrsOf NixpkgsOverlay;
+  darwinModules :: AttrsOf dynamic;
+  flakeModules :: AttrsOf dynamic;
+  templates :: AttrsOf NixFlakeTemplate;
+  packages :: AttrsOf (AttrsOf NixpkgsDerivation);
+  checks :: AttrsOf (AttrsOf NixpkgsDerivationCore);
+  ...
+};

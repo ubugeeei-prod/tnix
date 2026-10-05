@@ -1,4 +1,4 @@
-// tnix brand tokens for the docs site.
+// tynix brand tokens for the docs site.
 //
 // This file is the executable half of docs/brand.md: the palette, type
 // stacks, code theme, and the CSS layer on top of the Ox Content default
@@ -49,7 +49,7 @@ export const googleFontsHref =
 // Shiki theme used for every code block. Code blocks stay dark in both colour
 // schemes so the "annotation amber" for type-only syntax always reads clearly.
 export const codeTheme = {
-  name: "tnix-ink",
+  name: "tynix-ink",
   type: "dark",
   colors: {
     "editor.background": palette.ink900,
@@ -58,27 +58,27 @@ export const codeTheme = {
   settings: [
     { settings: { background: palette.ink900, foreground: palette.slate100 } },
     { scope: ["comment", "punctuation.definition.comment"], settings: { foreground: palette.slate400, fontStyle: "italic" } },
-    { scope: ["keyword.control.directive.tnix"], settings: { foreground: palette.mint400, fontStyle: "bold" } },
+    { scope: ["keyword.control.directive.tynix"], settings: { foreground: palette.mint400, fontStyle: "bold" } },
     {
       scope: ["keyword", "storage", "keyword.control", "support.function.import", "keyword.control.flow"],
       settings: { foreground: palette.lambda300 },
     },
     {
       scope: [
-        "keyword.other.type.tnix",
-        "keyword.operator.annotation.tnix",
-        "keyword.operator.type.tnix",
+        "keyword.other.type.tynix",
+        "keyword.operator.annotation.tynix",
+        "keyword.operator.type.tynix",
         "entity.name.type",
-        "entity.name.type.alias.tnix",
+        "entity.name.type.alias.tynix",
         "support.type",
-        "variable.parameter.type.tnix",
-        "punctuation.definition.type.record.tnix",
-        "punctuation.terminator.type.tnix",
+        "variable.parameter.type.tynix",
+        "punctuation.definition.type.record.tynix",
+        "punctuation.terminator.type.tynix",
         "storage.type",
       ],
       settings: { foreground: palette.amber },
     },
-    { scope: ["support.type.gradual.tnix"], settings: { foreground: palette.amber, fontStyle: "italic" } },
+    { scope: ["support.type.gradual.tynix"], settings: { foreground: palette.amber, fontStyle: "italic" } },
     { scope: ["string", "string.quoted", "string.unquoted.path"], settings: { foreground: palette.mint400 } },
     { scope: ["constant.character.escape", "punctuation.section.embedded"], settings: { foreground: palette.lambda200 } },
     { scope: ["constant.numeric", "constant.language"], settings: { foreground: palette.coral } },
@@ -123,10 +123,10 @@ export const headHtml = [
   '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
   '<meta name="theme-color" content="#FBFCFE" media="(prefers-color-scheme: light)">',
   '<meta name="theme-color" content="#0A0F1C" media="(prefers-color-scheme: dark)">',
-  '<meta property="og:site_name" content="tnix">',
+  '<meta property="og:site_name" content="tynix">',
   '<meta property="og:image:width" content="1200">',
   '<meta property="og:image:height" content="630">',
-  '<meta property="og:image:alt" content="tnix: TypeScript-grade types for Nix, zero runtime">',
+  '<meta property="og:image:alt" content="tynix: TypeScript-grade types for Nix, zero runtime">',
   '<link rel="preconnect" href="https://fonts.googleapis.com">',
   '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
   `<link rel="stylesheet" href="${googleFontsHref}">`,

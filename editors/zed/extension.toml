@@ -1,31 +1,31 @@
-id = "tnix"
-name = "tnix"
-version = "1.0.0"
+id = "tynix"
+name = "tynix"
+version = "2.0.0"
 schema_version = 1
-authors = ["tnix contributors"]
-description = "tnix (typed Nix) syntax highlighting and tnix-lsp support"
-repository = "https://github.com/ubugeeei-prod/tnix"
+authors = ["tynix contributors"]
+description = "tynix (typed Nix) syntax highlighting and tynix-lsp support"
+repository = "https://github.com/ubugeeei-prod/tynix"
 
-[language_servers.tnix-lsp]
-name = "tnix LSP"
-# Attach to `.tnix` / `.d.tnix` (this extension) and to plain `.nix` buffers
+[language_servers.tynix-lsp]
+name = "tynix LSP"
+# Attach to `.tynix` / `.d.tynix` (this extension) and to plain `.nix` buffers
 # owned by Zed's Nix extension so existing Nix code gets ambient typing.
-languages = ["tnix", "Nix"]
+languages = ["tynix", "Nix"]
 
-[language_servers.tnix-lsp.language_ids]
-"tnix" = "tnix"
+[language_servers.tynix-lsp.language_ids]
+"tynix" = "tynix"
 "Nix" = "nix"
 
-# The grammar lives in this repository under editors/tree-sitter-tnix.
+# The grammar lives in this repository under editors/tree-sitter-tynix.
 #
-# NOTE: `rev` must point at a commit that contains editors/tree-sitter-tnix.
+# NOTE: `rev` must point at a commit that contains editors/tree-sitter-tynix.
 # Bump it to the merge commit of the change that introduced the grammar (and
 # whenever grammar.js / src/parser.c change) before publishing the extension.
 #
 # For local development, point `repository` at your checkout instead:
-#   repository = "file:///absolute/path/to/tnix"
+#   repository = "file:///absolute/path/to/tynix"
 # and set `rev` to a local commit sha that contains the grammar.
-[grammars.tnix]
-repository = "https://github.com/ubugeeei-prod/tnix"
+[grammars.tynix]
+repository = "https://github.com/ubugeeei-prod/tynix"
 rev = "9127396e40802435404ba9c2598c5cf57c1e6914"
-path = "editors/tree-sitter-tnix"
+path = "editors/tree-sitter-tynix"

@@ -1,0 +1,30 @@
+{
+  "grammars": [
+    {
+      "name": "tynix",
+      "camelcase": "Tynix",
+      "scope": "source.tynix",
+      "path": ".",
+      "file-types": ["tynix"],
+      "highlights": "queries/highlights.scm",
+      "injections": "queries/injections.scm",
+      "locals": "queries/locals.scm",
+      "injection-regex": "^tynix$"
+    }
+  ],
+  "metadata": {
+    "version": "2.0.0",
+    "license": "MIT",
+    "description": "tree-sitter grammar for tynix (Nix with a gradual type layer)",
+    "authors": [{ "name": "tynix contributors" }],
+    "links": { "repository": "https://github.com/ubugeeei/tynix" }
+  },
+  "bindings": {
+    "c": false,
+    "go": false,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "swift": false
+  }
+}

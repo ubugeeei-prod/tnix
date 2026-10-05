@@ -1,14 +1,14 @@
 ---
 layout: entry
 title: TypeScript-grade types for Nix
-description: tnix adds a gradual, structural type system to Nix. Write .tnix, check it, and ship plain .nix with every type erased.
+description: tynix adds a gradual, structural type system to Nix. Write .tynix, check it, and ship plain .nix with every type erased.
 hero:
-  name: tnix
+  name: tynix
   text: TypeScript-grade types for Nix. Zero runtime.
-  tagline: Annotate the Nix you already write. tnix checks records, functions, generics and gradual boundaries, then erases every type and hands your toolchain plain .nix.
+  tagline: Annotate the Nix you already write. tynix checks records, functions, generics and gradual boundaries, then erases every type and hands your toolchain plain .nix.
   image:
-    src: /brand/tnix-mark.svg
-    alt: The tnix mark, a blue hexagon with a lowercase t and a mint colon
+    src: /brand/tynix-mark.svg
+    alt: The tynix mark, a blue hexagon with a lowercase t and a mint colon
   actions:
     - theme: brand
       text: Start the tutorial
@@ -31,7 +31,7 @@ features:
     link: /tutorial/gradual
   - icon: /brand/icons/declare.svg
     title: Type existing .nix
-    details: Describe modules you will not rewrite with .d.tnix declarations, the same way DefinitelyTyped describes JavaScript.
+    details: Describe modules you will not rewrite with .d.tynix declarations, the same way DefinitelyTyped describes JavaScript.
     link: /tutorial/declarations
   - icon: /brand/icons/generics.svg
     title: Generics, HKT and conditional types
@@ -51,7 +51,7 @@ features:
 One-line installer (Linux x64 and macOS arm64)
 
 ```bash
-curl -fsSL https://tnix.dev/install.sh | sh
+curl -fsSL https://tynix.dev/install.sh | sh
 ```
 
 </div>
@@ -60,19 +60,19 @@ curl -fsSL https://tnix.dev/install.sh | sh
 From the flake, on any Nix-enabled host
 
 ```bash
-nix profile install github:ubugeeei-prod/tnix
+nix profile install github:ubugeeei-prod/tynix
 ```
 
 </div>
 </div>
 
-<p class="tx-section-label">Write .tnix, ship .nix</p>
+<p class="tx-section-label">Write .tynix, ship .nix</p>
 
 <div class="tx-compare">
 <div>
-<p class="tx-file">greet.tnix: what you write</p>
+<p class="tx-file">greet.tynix: what you write</p>
 
-```tnix
+```tynix
 type User = { name :: String; admin :: Bool; };
 
 let
@@ -85,7 +85,7 @@ in greet { name = "Ada"; admin = true; }
 ```
 
 </div>
-<div class="tx-arrow"><strong>→</strong>tnix compile</div>
+<div class="tx-arrow"><strong>→</strong>tynix compile</div>
 <div>
 <p class="tx-file">greet.nix: what Nix evaluates</p>
 
@@ -103,16 +103,16 @@ in greet {
 </div>
 </div>
 
-<p class="tx-caption">Everything in <span class="tx-amber">amber</span> is type-only syntax. tnix checks it, then removes it. Misspell <code>user.nmae</code> and you get <code>[TC0009] missing field `nmae`</code> before Nix ever evaluates the file.</p>
+<p class="tx-caption">Everything in <span class="tx-amber">amber</span> is type-only syntax. tynix checks it, then removes it. Misspell <code>user.nmae</code> and you get <code>[TC0009] missing field `nmae`</code> before Nix ever evaluates the file.</p>
 
-<p class="tx-section-label">Why tnix</p>
+<p class="tx-section-label">Why tynix</p>
 
 Nix is a lazy, dynamically typed language, so a typo in an attribute name only
-surfaces when that branch is evaluated, sometimes deep inside a build. tnix
+surfaces when that branch is evaluated, sometimes deep inside a build. tynix
 borrows the adoption model that made TypeScript work: the type layer is
 optional, gradual and structural, and it never changes what runs.
 
-- **Familiar surface.** `.tnix` is Nix plus annotations. `let`, attribute sets,
+- **Familiar surface.** `.tynix` is Nix plus annotations. `let`, attribute sets,
   lambdas, `with`, `rec`, `inherit`, interpolation and imports work as they do in
   Nix.
 - **Precise where it helps.** Literal types, unions, `Range`, `Unit`, and
@@ -125,7 +125,7 @@ optional, gradual and structural, and it never changes what runs.
 
 ## Ready in fifteen minutes
 
-Install tnix, type your first file, and finish with a checked flake.
+Install tynix, type your first file, and finish with a checked flake.
 
 </div>
 

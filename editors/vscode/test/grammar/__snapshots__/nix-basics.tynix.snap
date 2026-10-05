@@ -1,0 +1,230 @@
+  1 "#" comment.line.number-sign.tynix punctuation.definition.comment.tynix
+  1 " A plain Nix file: comments, literals, operators." comment.line.number-sign.tynix
+  2 "/*" comment.block.tynix punctuation.definition.comment.tynix
+  2 " block" comment.block.tynix
+  3 "   comment " comment.block.tynix
+  3 "*/" comment.block.tynix punctuation.definition.comment.tynix
+  4 "/**" comment.block.documentation.tynix punctuation.definition.comment.tynix
+  4 " Doc comment. " comment.block.documentation.tynix
+  4 "TODO" comment.block.documentation.tynix keyword.other.todo.tynix
+  4 ": more " comment.block.documentation.tynix
+  4 "*/" comment.block.documentation.tynix punctuation.definition.comment.tynix
+  5 "{" meta.braces.tynix punctuation.section.braces.begin.tynix
+  5 "lib" meta.braces.tynix variable.parameter.tynix
+  5 "," meta.braces.tynix punctuation.separator.comma.tynix
+  5 "stdenv" meta.braces.tynix variable.parameter.tynix
+  5 "?" meta.braces.tynix keyword.operator.default.tynix
+  5 "null" meta.braces.tynix constant.language.null.tynix
+  5 "," meta.braces.tynix punctuation.separator.comma.tynix
+  5 "..." meta.braces.tynix keyword.operator.ellipsis.tynix
+  5 "}" meta.braces.tynix punctuation.section.braces.end.tynix
+  5 "@" meta.braces.tynix keyword.operator.at.tynix
+  5 "args" meta.braces.tynix variable.parameter.tynix
+  5 ":" storage.type.function.arrow.tynix
+  6 "let" keyword.other.let.tynix
+  7 "answer" meta.binding.tynix entity.other.attribute-name.tynix
+  7 "=" meta.binding.tynix keyword.operator.assignment.tynix
+  7 "42" meta.binding.tynix constant.numeric.integer.tynix
+  7 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+  8 "ratio" meta.binding.tynix entity.other.attribute-name.tynix
+  8 "=" meta.binding.tynix keyword.operator.assignment.tynix
+  8 "0.5e3" meta.binding.tynix constant.numeric.float.tynix
+  8 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+  9 "enabled" meta.binding.tynix entity.other.attribute-name.tynix
+  9 "=" meta.binding.tynix keyword.operator.assignment.tynix
+  9 "true" meta.binding.tynix constant.language.boolean.true.tynix
+  9 "&&" meta.binding.tynix keyword.operator.logical.tynix
+  9 "!" meta.binding.tynix keyword.operator.logical.not.tynix
+  9 "false" meta.binding.tynix constant.language.boolean.false.tynix
+  9 "||" meta.binding.tynix keyword.operator.logical.tynix
+  9 "null" meta.binding.tynix constant.language.null.tynix
+  9 "==" meta.binding.tynix keyword.operator.comparison.tynix
+  9 "null" meta.binding.tynix constant.language.null.tynix
+  9 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 10 "merged" meta.binding.tynix entity.other.attribute-name.tynix
+ 10 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 10 "{" meta.binding.tynix meta.braces.tynix punctuation.section.braces.begin.tynix
+ 10 "a" meta.binding.tynix meta.braces.tynix meta.binding.tynix entity.other.attribute-name.tynix
+ 10 "=" meta.binding.tynix meta.braces.tynix meta.binding.tynix keyword.operator.assignment.tynix
+ 10 "1" meta.binding.tynix meta.braces.tynix meta.binding.tynix constant.numeric.integer.tynix
+ 10 ";" meta.binding.tynix meta.braces.tynix meta.binding.tynix punctuation.terminator.binding.tynix
+ 10 "}" meta.binding.tynix meta.braces.tynix punctuation.section.braces.end.tynix
+ 10 "//" meta.binding.tynix keyword.operator.update.tynix
+ 10 "{" meta.binding.tynix meta.braces.tynix punctuation.section.braces.begin.tynix
+ 10 "b" meta.binding.tynix meta.braces.tynix meta.binding.tynix entity.other.attribute-name.tynix
+ 10 "=" meta.binding.tynix meta.braces.tynix meta.binding.tynix keyword.operator.assignment.tynix
+ 10 "2" meta.binding.tynix meta.braces.tynix meta.binding.tynix constant.numeric.integer.tynix
+ 10 ";" meta.binding.tynix meta.braces.tynix meta.binding.tynix punctuation.terminator.binding.tynix
+ 10 "}" meta.binding.tynix meta.braces.tynix punctuation.section.braces.end.tynix
+ 10 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 11 "joined" meta.binding.tynix entity.other.attribute-name.tynix
+ 11 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 11 "[" meta.binding.tynix meta.list.tynix punctuation.section.brackets.begin.tynix
+ 11 "1" meta.binding.tynix meta.list.tynix constant.numeric.integer.tynix
+ 11 "2" meta.binding.tynix meta.list.tynix constant.numeric.integer.tynix
+ 11 "]" meta.binding.tynix meta.list.tynix punctuation.section.brackets.end.tynix
+ 11 "++" meta.binding.tynix keyword.operator.concat.tynix
+ 11 "[" meta.binding.tynix meta.list.tynix punctuation.section.brackets.begin.tynix
+ 11 "3" meta.binding.tynix meta.list.tynix constant.numeric.integer.tynix
+ 11 "]" meta.binding.tynix meta.list.tynix punctuation.section.brackets.end.tynix
+ 11 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 12 "piped" meta.binding.tynix entity.other.attribute-name.tynix
+ 12 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 12 "answer" meta.binding.tynix variable.other.readwrite.tynix
+ 12 "|>" meta.binding.tynix keyword.operator.pipe.tynix
+ 12 "toString" meta.binding.tynix support.function.builtin.tynix
+ 12 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 13 "implies" meta.binding.tynix entity.other.attribute-name.tynix
+ 13 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 13 "enabled" meta.binding.tynix variable.other.readwrite.tynix
+ 13 "->" meta.binding.tynix keyword.operator.logical.implication.tynix
+ 13 "enabled" meta.binding.tynix variable.other.readwrite.tynix
+ 13 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 14 "has" meta.binding.tynix entity.other.attribute-name.tynix
+ 14 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 14 "args" meta.binding.tynix variable.other.readwrite.tynix
+ 14 "?" meta.binding.tynix keyword.operator.has-attr.tynix
+ 14 "lib" meta.binding.tynix variable.other.readwrite.tynix
+ 14 "." meta.binding.tynix punctuation.accessor.tynix
+ 14 "version" meta.binding.tynix variable.other.property.tynix
+ 14 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 15 "fallback" meta.binding.tynix entity.other.attribute-name.tynix
+ 15 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 15 "args" meta.binding.tynix variable.other.readwrite.tynix
+ 15 "." meta.binding.tynix punctuation.accessor.tynix
+ 15 "missing" meta.binding.tynix variable.other.property.tynix
+ 15 "or" meta.binding.tynix keyword.operator.or.tynix
+ 15 "\"" meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+ 15 "default" meta.binding.tynix string.quoted.double.tynix
+ 15 "\"" meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+ 15 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 16 "nested" meta.binding.tynix entity.other.attribute-name.tynix
+ 16 "." meta.binding.tynix punctuation.accessor.tynix
+ 16 "attr" meta.binding.tynix entity.other.attribute-name.tynix
+ 16 "." meta.binding.tynix punctuation.accessor.tynix
+ 16 "\"" meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+ 16 "quoted key" meta.binding.tynix string.quoted.double.tynix
+ 16 "\"" meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+ 16 "." meta.binding.tynix punctuation.accessor.tynix
+ 16 "${" meta.binding.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.begin.tynix
+ 16 "answer" meta.binding.tynix meta.embedded.interpolation.tynix variable.other.readwrite.tynix
+ 16 "}" meta.binding.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.end.tynix
+ 16 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 16 "1" meta.binding.tynix constant.numeric.integer.tynix
+ 16 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 17 "inherit" meta.inherit.tynix keyword.other.inherit.tynix
+ 17 "(" meta.inherit.tynix punctuation.section.parens.begin.tynix
+ 17 "lib" meta.inherit.tynix variable.other.readwrite.tynix
+ 17 ")" meta.inherit.tynix punctuation.section.parens.end.tynix
+ 17 "mkIf" meta.inherit.tynix entity.other.attribute-name.tynix
+ 17 "optional" meta.inherit.tynix entity.other.attribute-name.tynix
+ 17 ";" meta.inherit.tynix punctuation.terminator.inherit.tynix
+ 18 "inherit" meta.inherit.tynix keyword.other.inherit.tynix
+ 18 "answer" meta.inherit.tynix entity.other.attribute-name.tynix
+ 18 ";" meta.inherit.tynix punctuation.terminator.inherit.tynix
+ 19 "math" meta.binding.tynix entity.other.attribute-name.tynix
+ 19 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 19 "1" meta.binding.tynix constant.numeric.integer.tynix
+ 19 "+" meta.binding.tynix keyword.operator.arithmetic.tynix
+ 19 "2" meta.binding.tynix constant.numeric.integer.tynix
+ 19 "-" meta.binding.tynix keyword.operator.arithmetic.tynix
+ 19 "3" meta.binding.tynix constant.numeric.integer.tynix
+ 19 "*" meta.binding.tynix keyword.operator.arithmetic.tynix
+ 19 "4" meta.binding.tynix constant.numeric.integer.tynix
+ 19 "/" meta.binding.tynix keyword.operator.arithmetic.tynix
+ 19 "5" meta.binding.tynix constant.numeric.integer.tynix
+ 19 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 20 "cmp" meta.binding.tynix entity.other.attribute-name.tynix
+ 20 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 20 "1" meta.binding.tynix constant.numeric.integer.tynix
+ 20 "<" meta.binding.tynix keyword.operator.relational.tynix
+ 20 "2" meta.binding.tynix constant.numeric.integer.tynix
+ 20 "&&" meta.binding.tynix keyword.operator.logical.tynix
+ 20 "2" meta.binding.tynix constant.numeric.integer.tynix
+ 20 "<=" meta.binding.tynix keyword.operator.relational.tynix
+ 20 "3" meta.binding.tynix constant.numeric.integer.tynix
+ 20 "&&" meta.binding.tynix keyword.operator.logical.tynix
+ 20 "3" meta.binding.tynix constant.numeric.integer.tynix
+ 20 ">" meta.binding.tynix keyword.operator.relational.tynix
+ 20 "2" meta.binding.tynix constant.numeric.integer.tynix
+ 20 "&&" meta.binding.tynix keyword.operator.logical.tynix
+ 20 "3" meta.binding.tynix constant.numeric.integer.tynix
+ 20 ">=" meta.binding.tynix keyword.operator.relational.tynix
+ 20 "3" meta.binding.tynix constant.numeric.integer.tynix
+ 20 "&&" meta.binding.tynix keyword.operator.logical.tynix
+ 20 "1" meta.binding.tynix constant.numeric.integer.tynix
+ 20 "!=" meta.binding.tynix keyword.operator.comparison.tynix
+ 20 "2" meta.binding.tynix constant.numeric.integer.tynix
+ 20 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 21 "kebab-case'" meta.binding.tynix entity.other.attribute-name.tynix
+ 21 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 21 "answer" meta.binding.tynix variable.other.readwrite.tynix
+ 21 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 22 "in" keyword.other.in.tynix
+ 23 "assert" meta.assert.tynix keyword.control.assert.tynix
+ 23 "answer" meta.assert.tynix variable.other.readwrite.tynix
+ 23 ">" meta.assert.tynix keyword.operator.relational.tynix
+ 23 "0" meta.assert.tynix constant.numeric.integer.tynix
+ 23 ";" meta.assert.tynix punctuation.terminator.assert.tynix
+ 24 "with" meta.with.tynix keyword.other.with.tynix
+ 24 "lib" meta.with.tynix variable.other.readwrite.tynix
+ 24 ";" meta.with.tynix punctuation.terminator.with.tynix
+ 25 "rec" storage.modifier.rec.tynix
+ 25 "{" meta.braces.tynix punctuation.section.braces.begin.tynix
+ 26 "name" meta.braces.tynix meta.binding.tynix entity.other.attribute-name.tynix
+ 26 "=" meta.braces.tynix meta.binding.tynix keyword.operator.assignment.tynix
+ 26 "if" meta.braces.tynix meta.binding.tynix keyword.control.conditional.tynix
+ 26 "enabled" meta.braces.tynix meta.binding.tynix variable.other.readwrite.tynix
+ 26 "then" meta.braces.tynix meta.binding.tynix keyword.control.conditional.tynix
+ 26 "\"" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+ 26 "on" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix
+ 26 "\"" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+ 26 "else" meta.braces.tynix meta.binding.tynix keyword.control.conditional.tynix
+ 26 "\"" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+ 26 "off" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix
+ 26 "\"" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+ 26 ";" meta.braces.tynix meta.binding.tynix punctuation.terminator.binding.tynix
+ 27 "value" meta.braces.tynix meta.binding.tynix entity.other.attribute-name.tynix
+ 27 "=" meta.braces.tynix meta.binding.tynix keyword.operator.assignment.tynix
+ 27 "builtins" meta.braces.tynix meta.binding.tynix variable.language.builtins.tynix
+ 27 "." meta.braces.tynix meta.binding.tynix punctuation.accessor.tynix
+ 27 "map" meta.braces.tynix meta.binding.tynix support.function.builtin.tynix
+ 27 "(" meta.braces.tynix meta.binding.tynix punctuation.section.parens.begin.tynix
+ 27 "x" meta.braces.tynix meta.binding.tynix variable.parameter.tynix
+ 27 ":" meta.braces.tynix meta.binding.tynix storage.type.function.arrow.tynix
+ 27 "x" meta.braces.tynix meta.binding.tynix variable.other.readwrite.tynix
+ 27 "*" meta.braces.tynix meta.binding.tynix keyword.operator.arithmetic.tynix
+ 27 "2" meta.braces.tynix meta.binding.tynix constant.numeric.integer.tynix
+ 27 ")" meta.braces.tynix meta.binding.tynix punctuation.section.parens.end.tynix
+ 27 "[" meta.braces.tynix meta.binding.tynix meta.list.tynix punctuation.section.brackets.begin.tynix
+ 27 "1" meta.braces.tynix meta.binding.tynix meta.list.tynix constant.numeric.integer.tynix
+ 27 "2" meta.braces.tynix meta.binding.tynix meta.list.tynix constant.numeric.integer.tynix
+ 27 "]" meta.braces.tynix meta.binding.tynix meta.list.tynix punctuation.section.brackets.end.tynix
+ 27 ";" meta.braces.tynix meta.binding.tynix punctuation.terminator.binding.tynix
+ 28 "thrown" meta.braces.tynix meta.binding.tynix entity.other.attribute-name.tynix
+ 28 "=" meta.braces.tynix meta.binding.tynix keyword.operator.assignment.tynix
+ 28 "throw" meta.braces.tynix meta.binding.tynix support.function.builtin.tynix
+ 28 "\"" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+ 28 "nope" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix
+ 28 "\"" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+ 28 ";" meta.braces.tynix meta.binding.tynix punctuation.terminator.binding.tynix
+ 29 "imported" meta.braces.tynix meta.binding.tynix entity.other.attribute-name.tynix
+ 29 "=" meta.braces.tynix meta.binding.tynix keyword.operator.assignment.tynix
+ 29 "import" meta.braces.tynix meta.binding.tynix keyword.control.import.tynix
+ 29 "./default.nix" meta.braces.tynix meta.binding.tynix string.unquoted.path.tynix
+ 29 ";" meta.braces.tynix meta.binding.tynix punctuation.terminator.binding.tynix
+ 30 "formatted" meta.braces.tynix meta.binding.tynix entity.other.attribute-name.tynix
+ 30 "=" meta.braces.tynix meta.binding.tynix keyword.operator.assignment.tynix
+ 30 "lib" meta.braces.tynix meta.binding.tynix variable.other.readwrite.tynix
+ 30 "." meta.braces.tynix meta.binding.tynix punctuation.accessor.tynix
+ 30 "concatStringsSep" meta.braces.tynix meta.binding.tynix variable.other.property.tynix
+ 30 "\"" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+ 30 ", " meta.braces.tynix meta.binding.tynix string.quoted.double.tynix
+ 30 "\"" meta.braces.tynix meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+ 30 "[" meta.braces.tynix meta.binding.tynix meta.list.tynix punctuation.section.brackets.begin.tynix
+ 30 "\"" meta.braces.tynix meta.binding.tynix meta.list.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+ 30 "a" meta.braces.tynix meta.binding.tynix meta.list.tynix string.quoted.double.tynix
+ 30 "\"" meta.braces.tynix meta.binding.tynix meta.list.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+ 30 "]" meta.braces.tynix meta.binding.tynix meta.list.tynix punctuation.section.brackets.end.tynix
+ 30 ";" meta.braces.tynix meta.binding.tynix punctuation.terminator.binding.tynix
+ 31 "}" meta.braces.tynix punctuation.section.braces.end.tynix
