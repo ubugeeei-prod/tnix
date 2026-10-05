@@ -18,8 +18,8 @@
     "docs:check-deploy": "pnpm --filter tnix-docs-site run check"
   },
   "devDependencies": {
-    "@ox-content/vite-plugin": "2.36.0",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.1.21",
-    "vite-plus": "^0.1.21"
+    "@ox-content/vite-plugin": "3.2.13",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "vite-plus": "^1.0.0"
   }
 }
