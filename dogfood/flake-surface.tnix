@@ -2,10 +2,13 @@ let
   flake = import ../flake.nix;
 
   inputs :: ResolvedFlakeInputs;
+  # The inputs are never evaluated here; `throw` stands in for each resolved
+  # flake and takes whatever type the input declaration asks for.
+  unevaluated = throw "dogfood: flake inputs are not evaluated";
   inputs = {
-    self = builtins;
-    nixpkgs = builtins;
-    flake-utils = builtins;
+    self = unevaluated;
+    nixpkgs = unevaluated;
+    flake-utils = unevaluated;
   };
 
   outputs :: FlakeOutputs;

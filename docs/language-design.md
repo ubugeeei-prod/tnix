@@ -19,7 +19,7 @@
 
 ### `.tnix`
 
-Implementation files. They preserve the main Nix surface syntax such as expressions, `let`, lambdas, attribute sets, lists, `if`, paths, and `import`, while adding type annotations and type aliases.
+Implementation files. They accept the whole Nix expression language, while adding type annotations, type aliases, casts, and declarations.
 
 ### `.d.tnix`
 
@@ -113,7 +113,13 @@ mapNames = fmap: xs: fmap (x: x.name) xs;
 
 ## Future Extensions
 
+Row-polymorphic attribute sets (`{ a :: T; ...r }`) and optional fields have
+shipped. Still planned:
+
+- type classes behind the constraint contexts that signatures can already
+  write
+- flow-sensitive narrowing through `isAttrs` / `?` guards
+- `config`-aware typing of NixOS modules
 - kind annotations
-- row-polymorphic attribute set extensions
 - module-aware declaration emit
 - incremental build graph support

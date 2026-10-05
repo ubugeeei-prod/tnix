@@ -25,12 +25,16 @@
 -- system for dependent types. It is a pragmatic static approximation that keeps
 -- useful facts alive for later phases.
 module Subtyping
-  ( foldRight1,
+  ( attrsOfView,
+    foldRight1,
     isConsistent,
     isSubtype,
     joinTypes,
     lookupRecordField,
+    recordView,
+    resolveHead,
     resolveType,
+    unOptional,
   )
 where
 
@@ -80,6 +84,8 @@ resolveType env = go 0 . prepare . eraseForall
             TTypeList items -> TTypeList (map (go depth) items)
             TFun mult a b -> TFun mult (go depth a) (go depth b)
             TRecord fields -> TRecord (fmap (go depth) fields)
+            TOpenRecord fields tail' -> mkOpenRecord (fmap (go depth) fields) (go depth tail')
+            TOptional inner -> TOptional (go depth inner)
             TUnion members -> flattenUnion (TUnion (map (go depth) members))
             TApp f x -> TApp (go depth f) (go depth x)
             TForall vars body -> TForall vars (go depth body)
@@ -90,6 +96,31 @@ resolveType env = go 0 . prepare . eraseForall
                   if isSubtype env a b
                     then go (depth + 1) c
                     else go (depth + 1) d
+            other -> other
+
+-- | Resolve only the outermost structure of a type: expand head aliases,
+-- erase a top-level `forall`, normalize indexed constructors, reduce a head
+-- conditional, and resolve union members' heads. Nested types are left as
+-- written, so callers that walk a type resolve each level lazily; field types
+-- keep their alias names for display.
+resolveHead :: AliasEnv -> Type -> Type
+resolveHead env = go 0
+  where
+    go :: Int -> Type -> Type
+    go depth ty
+      | depth > conditionalReductionBudget = ty
+      | otherwise =
+          case expandAliasHead env (eraseForall ty) of
+            TConditional a b c d ->
+              let a' = resolveType env a
+                  b' = resolveType env b
+               in case matchPattern a' b' of
+                    Just subst -> go (depth + 1) (substituteTypeVars subst c)
+                    Nothing
+                      | isSubtype env a b -> go (depth + 1) c
+                      | otherwise -> go (depth + 1) d
+            TUnion members -> flattenUnion (TUnion (map (go depth) members))
+            app@(TApp _ _) -> normalizeIndexedType app
             other -> other
 
 -- | Maximum number of chained conditional-type reductions.
@@ -122,8 +153,15 @@ conditionalReductionBudget = 32
 -- @
 lookupRecordField :: AliasEnv -> Type -> Name -> Maybe Type
 lookupRecordField env ty field =
-  case resolveType env ty of
-    TRecord fields -> Map.lookup field fields
+  case resolveHead env ty of
+    TRecord fields -> unOptional <$> Map.lookup field fields
+    TOpenRecord fields tail' ->
+      case Map.lookup field fields of
+        Just fieldTy -> Just (unOptional fieldTy)
+        Nothing
+          | tail' == tDynamic || tail' == tAny -> Just tail'
+          | otherwise -> Nothing
+    TApp (TCon "AttrsOf") valueTy -> Just valueTy
     TUnion members ->
       let hits = mapMaybe (\member -> lookupRecordField env member field) members
        in case hits of
@@ -190,8 +228,8 @@ joinTypes env left right =
                         (Just leftList, Just rightList) -> joinTypes env leftList rightList
                         _ -> fallback
   where
-    left' = resolveType env left
-    right' = resolveType env right
+    left' = resolveHead env left
+    right' = resolveHead env right
     fallback
       | left' == right' = left'
       | isSubtype env left' right' = right'
@@ -216,17 +254,55 @@ joinTypes env left right =
 -- isConsistent String Int     => False
 -- @
 isConsistent :: AliasEnv -> Type -> Type -> Bool
-isConsistent env left right =
-  left' == TAny
-    || right' == TAny
-    || left' == TDynamic
-    || right' == TDynamic
-    || left' == right'
-    || isSubtype env left' right'
-    || isSubtype env right' left'
+isConsistent env = go
   where
-    left' = resolveType env left
-    right' = resolveType env right
+    go left right =
+      let left' = resolveHead env left
+          right' = resolveHead env right
+       in left' == TAny
+            || right' == TAny
+            || left' == TDynamic
+            || right' == TDynamic
+            || left' == right'
+            || isSubtype env left' right'
+            || isSubtype env right' left'
+            || structural left' right'
+    -- Consistency is structural: `List dynamic` is consistent with
+    -- `List String`, and `dynamic -> Bool` with `String -> Bool`.
+    structural a b =
+      case (a, b) of
+        -- Exact sequences meet lists through their element view.
+        _
+          | Just listA <- sequenceView a,
+            Just listB <- sequenceView b,
+            (listA, listB) /= (a, b) ->
+              go listA listB
+        (TApp f x, TApp g y) -> go f g && go x y
+        (TFun _ x y, TFun _ x' y') -> go x x' && go y y'
+        (TOptional x, TOptional y) -> go x y
+        (TUnion members, _) -> all (`go` b) members
+        (_, TUnion members) -> any (go a) members
+        _
+          | Just (fields, tailA) <- recordView a,
+            Just (fields', tailB) <- recordView b ->
+              and (Map.intersectionWith (\x y -> go (unOptional x) (unOptional y)) fields fields')
+                && coveredBy fields tailA fields'
+                && coveredBy fields' tailB fields
+        _ -> False
+    sequenceView ty =
+      case (tensorListView ty, tupleListView ty) of
+        (Just listTy, _) -> Just listTy
+        (_, Just listTy) -> Just listTy
+        _ -> case ty of
+          TApp (TCon "List") _ -> Just ty
+          _ -> Nothing
+    -- Every required field of @other@ must exist on a closed record.
+    coveredBy fields tail' other =
+      isJust tail'
+        || all (\(name, ty) -> Map.member name fields || isOptional ty) (Map.toList other)
+    isOptional = \case
+      TOptional _ -> True
+      _ -> False
 
 -- | Structural subtyping relation used by the checker.
 --
@@ -253,27 +329,30 @@ isConsistent env left right =
 -- Vec 0 dynamic <: Vec (Range 0 2 Nat) Int => True
 -- @
 isSubtype :: AliasEnv -> Type -> Type -> Bool
-isSubtype env left right = go (resolveType env left) (resolveType env right)
+isSubtype env = go
   where
-    go a b | a == b = True
-    go _ ty | ty == tAny = True
-    go _ ty | ty == tDynamic = True
-    go ty _ | ty == tAny = True
-    go ty _ | ty == tDynamic = False
-    go _ ty | ty == tUnknown = True
-    go ty _ | ty == tUnknown = False
-    go (TLit (LString _)) ty | ty == tString = True
-    go (TLit (LFloat _)) ty | ty == tFloat = True
-    go (TLit lit) ty | ty == tNumber = isNumericLiteral lit
-    go (TLit (LInt _)) ty | ty == tInt = True
-    go (TLit (LInt n)) ty | ty == tNat = n >= 0
-    go (TLit (LBool _)) ty | ty == tBool = True
-    go ty other | ty == tNat, other == tInt = True
-    go ty other | ty == tNat, other == tNumber = True
-    go ty other | ty == tInt, other == tNumber = True
-    go ty other | ty == tFloat, other == tNumber = True
-    go (TTypeList xs) (TTypeList ys) = length xs == length ys && and (zipWith go xs ys)
-    go (TUnion leftMembers) (TUnion rightMembers) =
+    -- Each level is resolved as it is reached, so large and recursive aliases
+    -- are only expanded as far as the comparison actually looks.
+    go a b = step (resolveHead env a) (resolveHead env b)
+    step a b | a == b = True
+    step _ ty | ty == tAny = True
+    step _ ty | ty == tDynamic = True
+    step ty _ | ty == tAny = True
+    step ty _ | ty == tDynamic = False
+    step _ ty | ty == tUnknown = True
+    step ty _ | ty == tUnknown = False
+    step (TLit (LString _)) ty | ty == tString = True
+    step (TLit (LFloat _)) ty | ty == tFloat = True
+    step (TLit lit) ty | ty == tNumber = isNumericLiteral lit
+    step (TLit (LInt _)) ty | ty == tInt = True
+    step (TLit (LInt n)) ty | ty == tNat = n >= 0
+    step (TLit (LBool _)) ty | ty == tBool = True
+    step ty other | ty == tNat, other == tInt = True
+    step ty other | ty == tNat, other == tNumber = True
+    step ty other | ty == tInt, other == tNumber = True
+    step ty other | ty == tFloat, other == tNumber = True
+    step (TTypeList xs) (TTypeList ys) = length xs == length ys && and (zipWith go xs ys)
+    step (TUnion leftMembers) (TUnion rightMembers) =
       -- Every left member must be covered by some right member. An exact match
       -- is by far the common case (identical or overlapping unions), and `go`
       -- already answers True for equal types, so consult a set first and only
@@ -282,9 +361,9 @@ isSubtype env left right = go (resolveType env left) (resolveType env right)
        in all
             (\member -> Set.member member rightSet || any (go member) rightMembers)
             leftMembers
-    go a (TUnion members) = any (go a) members
-    go (TUnion members) b = all (`go` b) members
-    go a b
+    step a (TUnion members) = any (go a) members
+    step (TUnion members) b = all (`go` b) members
+    step a b
       | Just (leftLower, leftUpper, leftBase) <- rangeView a,
         Just (rightLower, rightUpper, rightBase) <- rangeView b =
           rangeBaseSubtype go leftLower leftUpper leftBase rightBase
@@ -294,22 +373,22 @@ isSubtype env left right = go (resolveType env left) (resolveType env right)
           (leftBase == tInt || leftBase == tNat) && nonNegativeIntegerBounds leftLower leftUpper
       | Just (_, _, leftBase) <- rangeView a =
           go leftBase b
-    go a b
+    step a b
       | Just (rightLower, rightUpper, rightBase) <- rangeView b =
           go a rightBase && literalWithinRange a rightLower rightUpper
-    go a b
+    step a b
       | Just (leftUnit, leftBase) <- unitView a,
         Just (rightUnit, rightBase) <- unitView b =
           leftUnit == rightUnit && go leftBase rightBase
       | Just (rightUnit, rightBase) <- unitView b =
           unitLabelLiteral rightUnit && numericLiteralType a && go a rightBase
-    go a b
+    step a b
       | Just leftItems <- tupleView a,
         Just rightItems <- tupleView b =
           length leftItems == length rightItems && and (zipWith go leftItems rightItems)
       | Just leftList <- tupleListView a =
           go leftList b
-    go a b
+    step a b
       | Just (leftShape, leftElem) <- tensorView a,
         Just (rightShape, rightElem) <- tensorView b =
           length leftShape == length rightShape
@@ -317,12 +396,56 @@ isSubtype env left right = go (resolveType env left) (resolveType env right)
             && (shapeDefinitelyEmpty leftShape || go leftElem rightElem)
       | Just leftList <- tensorListView a =
           go leftList b
-    go (TFun leftMult a b) (TFun rightMult c d) =
+    step (TFun leftMult a b) (TFun rightMult c d) =
       multiplicitySubtype leftMult rightMult && go c a && go b d
-    go (TRecord fields) (TRecord expected) =
-      all (\(name, ty) -> maybe False (`go` ty) (Map.lookup name fields)) (Map.toList expected)
-    go (TApp f x) (TApp g y) = go f g && go x y
-    go _ _ = False
+    step a b
+      | Just (fields, actualTail) <- recordView a,
+        Just (expected, _) <- recordView b =
+          -- Width subtyping; an optional expected field may be absent, and an
+          -- actual row with a `dynamic` tail may hold any further field.
+          all (fieldSatisfied fields actualTail) (Map.toList expected)
+      | Just (fields, actualTail) <- recordView a,
+        Just valueTy <- attrsOfView b =
+          all (\ty -> go (unOptional ty) valueTy) (Map.elems fields)
+            && maybe True (\tail' -> tail' == tDynamic || tail' == tAny) actualTail
+    step a b
+      | Just valueTy <- attrsOfView a,
+        Just (expected, Just tail') <- recordView b,
+        tail' == tDynamic || tail' == tAny =
+          -- A dictionary may lack any key, so it only meets an open record
+          -- whose listed fields are all optional.
+          all (\case TOptional ty -> go valueTy ty; _ -> False) (Map.elems expected)
+    step (TOptional a) (TOptional b) = go a b
+    step (TApp f x) (TApp g y) = go f g && go x y
+    step _ _ = False
+
+    fieldSatisfied fields actualTail (name, expectedTy) =
+      case (Map.lookup name fields, expectedTy) of
+        (Just (TOptional actualTy), TOptional inner) -> go actualTy inner
+        (Just (TOptional _), _) -> False
+        (Just actualTy, TOptional inner) -> go actualTy inner
+        (Just actualTy, _) -> go actualTy expectedTy
+        (Nothing, TOptional _) -> True
+        (Nothing, _) -> actualTail == Just tDynamic || actualTail == Just tAny
+
+-- | View a closed or open record as its fields plus an optional row tail.
+recordView :: Type -> Maybe (Map.Map Name Type, Maybe Type)
+recordView = \case
+  TRecord fields -> Just (fields, Nothing)
+  TOpenRecord fields tail' -> Just (fields, Just tail')
+  _ -> Nothing
+
+-- | Recognize the built-in dictionary type `AttrsOf a`.
+attrsOfView :: Type -> Maybe Type
+attrsOfView = \case
+  TApp (TCon "AttrsOf") valueTy -> Just valueTy
+  _ -> Nothing
+
+-- | Drop an optional-field marker.
+unOptional :: Type -> Type
+unOptional = \case
+  TOptional inner -> inner
+  other -> other
 
 -- | Multiplicity subtyping for function arrows.
 --

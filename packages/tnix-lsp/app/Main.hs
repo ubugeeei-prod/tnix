@@ -1,11 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | JSON-RPC/LSP bridge for tnix.
 --
 -- The server keeps protocol framing and stdio orchestration here while pushing
 -- semantic behavior into the core driver and the testable 'Session' helpers.
--- That makes hover, diagnostics, completion, and jump-to-definition available
--- to real editors without burying the logic inside an opaque event loop.
+--
+-- Concurrency model: a reader thread decodes framed messages from stdin into
+-- a queue, and a single worker (the main thread) handles them in order. The
+-- split buys two things without any locking around the document store:
+--
+-- * @$/cancelRequest@ is applied by the reader as soon as it arrives, so a
+--   request still waiting in the queue is answered with @RequestCancelled@
+--   instead of being computed;
+-- * @didChange@ only updates the text and schedules a debounced
+--   re-analysis: a timer thread enqueues an internal message after a quiet
+--   period, and the worker drops it if newer edits arrived meanwhile. Typing
+--   bursts therefore cost one analysis, not one per keystroke.
 module Main (main) where
 
 import AnalysisCache
@@ -14,16 +25,26 @@ import AnalysisCache
     emptyAnalysisCache,
     insertAnalysisCache,
   )
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Control.Exception (IOException, SomeException, fromException, throwIO, try)
+import Control.Monad (forM_, void, when)
 import Data.Aeson
+import Data.ByteString.Lazy.Char8 qualified as LB8
 import Data.IORef
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import Data.Maybe (isJust)
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
-import Driver (Analysis (..), SupportCache, analyzeTextWith, newSupportCache)
+import Driver (Analysis (..), SupportCache, analyzeTextForEditorWith, newSupportCache)
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
 import Paths_tnix_lsp qualified as PackageInfo
-import Server (asText, clearDiagnostics, clientCapabilities, field, publishDiagnostics, publishDiagnosticsWithContent, respond, respondError)
+import Server (asText, clearDiagnostics, field, pathUri, respond, respondError, serverCapabilities)
 import ServerProtocol (ReadOutcome (..), notify, readMessageOutcome)
 import Session qualified
 import System.Environment (getArgs)
@@ -43,6 +64,8 @@ import System.IO
 -- | Start the stdio event loop and keep the latest document text in memory.
 main :: IO ()
 main = do
+  -- Source files are UTF-8 whatever the locale says (e.g. a C locale).
+  setLocaleEncoding utf8
   args <- getArgs
   handleArgs args
 
@@ -79,6 +102,31 @@ parseServerArgs = go Nothing
 -- configured, are also appended to that file.
 type Logger = Text -> IO ()
 
+-- | Messages consumed by the worker.
+data Incoming
+  = FromClient Value
+  | -- | debounce timer fired for a document at an edit generation
+    Debounced FilePath Int
+  | EndOfInput
+
+-- | Mutable server state, touched only by the worker thread (except
+-- 'stCancelled', which the reader updates).
+data ServerState = ServerState
+  { stLogger :: Logger,
+    stDocs :: IORef Session.Documents,
+    stCache :: IORef AnalysisCache,
+    stShutdown :: IORef Bool,
+    stQueue :: Chan Incoming,
+    stCancelled :: IORef (Set Text),
+    stGenerations :: IORef (Map FilePath Int),
+    stPullDiagnostics :: IORef Bool,
+    stHierarchicalSymbols :: IORef Bool
+  }
+
+-- | Quiet period before re-analysing after an edit.
+debounceMicros :: Int
+debounceMicros = 200000
+
 runServer :: Maybe FilePath -> IO ()
 runServer logFile = do
   hSetBinaryMode stdin True
@@ -86,12 +134,18 @@ runServer logFile = do
   hSetBuffering stdin NoBuffering
   hSetBuffering stdout NoBuffering
   logHandle <- traverse openLogHandle logFile
-  let logger = makeLogger logHandle
-  ref <- newIORef mempty
-  cacheRef <- newIORef emptyAnalysisCache
-  shutdownRef <- newIORef False
-  let clearCache = writeIORef cacheRef emptyAnalysisCache
-  loop logger shutdownRef ref (cachedAnalyzeText cacheRef) clearCache
+  st <-
+    ServerState (makeLogger logHandle)
+      <$> newIORef mempty
+      <*> newIORef emptyAnalysisCache
+      <*> newIORef False
+      <*> newChan
+      <*> newIORef Set.empty
+      <*> newIORef Map.empty
+      <*> newIORef False
+      <*> newIORef False
+  void (forkIO (reader st))
+  worker st
   where
     openLogHandle path = do
       h <- openFile path AppendMode
@@ -102,15 +156,45 @@ runServer logFile = do
       case logHandle of
         Just h -> hPutStrLn h ("tnix-lsp: " <> T.unpack message)
         Nothing -> pure ()
-    loop logger shutdownRef ref analyze clearCache = do
-      outcome <- readMessageOutcome stdin
-      case outcome of
-        ReadEof -> pure ()
-        ReadMessage msg ->
-          safeHandle logger shutdownRef ref analyze clearCache msg >> loop logger shutdownRef ref analyze clearCache
-        ReadError reason -> do
-          logger reason
-          loop logger shutdownRef ref analyze clearCache
+
+-- | Decode messages from stdin. Cancellations are applied immediately.
+reader :: ServerState -> IO ()
+reader st = do
+  outcome <- readMessageOutcome stdin
+  case outcome of
+    ReadEof -> writeChan (stQueue st) EndOfInput
+    ReadError reason -> stLogger st reason >> reader st
+    ReadMessage msg -> do
+      case field "method" msg >>= asText of
+        Just "$/cancelRequest" ->
+          forM_ (field "params" msg >>= field "id") $ \ident ->
+            atomicModifyIORef' (stCancelled st) (\s -> (Set.insert (idKey ident) s, ()))
+        _ -> writeChan (stQueue st) (FromClient msg)
+      reader st
+
+idKey :: Value -> Text
+idKey = T.pack . LB8.unpack . encode
+
+worker :: ServerState -> IO ()
+worker st = do
+  incoming <- readChan (stQueue st)
+  case incoming of
+    EndOfInput -> pure ()
+    FromClient msg -> do
+      cancelled <- case field "id" msg of
+        Just ident -> do
+          let key = idKey ident
+          atomicModifyIORef' (stCancelled st) (\s -> (Set.delete key s, Set.member key s))
+        Nothing -> pure False
+      if cancelled
+        then respondError stdout msg (-32800) "request cancelled"
+        else safeHandle st msg
+      worker st
+    Debounced file generation -> do
+      current <- Map.findWithDefault 0 file <$> readIORef (stGenerations st)
+      when (current == generation) $
+        guarded st Nothing (analyzeAndPublish st file)
+      worker st
 
 -- | Run one handler, isolating crashes so a single bad document or a partial
 -- function deep in the checker cannot take down the whole session.
@@ -119,35 +203,35 @@ runServer logFile = do
 -- can still terminate; any other exception is logged, surfaced to the client
 -- via @window/logMessage@, and—if the failing message was a request—answered
 -- with a JSON-RPC internal error so the client is never left waiting.
-safeHandle :: Logger -> IORef Bool -> IORef Session.Documents -> (SupportCache -> AnalyzeFn) -> IO () -> Value -> IO ()
-safeHandle logger shutdownRef ref analyzeWith clearCache msg = do
-  supportCache <- newSupportCache
-  result <- try (handle shutdownRef ref (analyzeWith supportCache) clearCache msg)
+safeHandle :: ServerState -> Value -> IO ()
+safeHandle st msg = guarded st (Just msg) (handle st msg)
+
+guarded :: ServerState -> Maybe Value -> IO () -> IO ()
+guarded st msg action = do
+  result <- try action
   case result of
     Right () -> pure ()
     Left err
       | Just code <- fromException err -> throwIO (code :: ExitCode)
       | otherwise -> do
           let detail = T.pack (show (err :: SomeException))
-          logger ("handler error: " <> detail)
+          stLogger st ("handler error: " <> detail)
           notify
             stdout
             "window/logMessage"
             (object ["type" .= (1 :: Int), "message" .= ("tnix-lsp internal error: " <> detail)])
-          case field "id" msg of
-            Just _ -> respondError stdout msg (-32603) ("internal error: " <> detail)
-            Nothing -> pure ()
+          case msg of
+            Just m | Just _ <- field "id" m -> respondError stdout m (-32603) ("internal error: " <> detail)
+            _ -> pure ()
+
+-- | The cached analyzer. A fresh declaration-support cache is used per call
+-- so edited `.d.tnix` files are never served stale.
+analyzer :: ServerState -> IO AnalyzeFn
+analyzer st = cachedAnalyzeText (stCache st) <$> newSupportCache
 
 -- | Wrap the driver with the workspace-wide analysis cache so repeated
 -- hover / workspace-symbol / definition requests against unchanged content
 -- collapse to a single driver invocation.
---
--- A second, shorter-lived cache covers declaration support. One request can
--- analyze every file in the workspace (workspace symbols, references, rename),
--- and each of those analyses would otherwise re-walk the workspace and
--- re-parse every `.d.tnix` file. The support cache is created per request in
--- 'safeHandle' and discarded with it, so it can share that work without ever
--- serving a declaration file the client has since edited.
 cachedAnalyzeText :: IORef AnalysisCache -> SupportCache -> FilePath -> Text -> IO (Either String Analysis)
 cachedAnalyzeText cacheRef supportCache file content = do
   cache <- readIORef cacheRef
@@ -156,7 +240,9 @@ cachedAnalyzeText cacheRef supportCache file content = do
       writeIORef cacheRef touchedCache
       pure result
     (Nothing, _) -> do
-      result <- analyzeTextWith supportCache file content
+      -- Checker failures carry a full source range; encode it as
+      -- `line:col:endLine:endCol:` so diagnostics underline the exact span.
+      result <- analyzeTextForEditorWith supportCache file content
       modifyIORef' cacheRef (insertAnalysisCache (file, content) result)
       pure result
 
@@ -166,7 +252,7 @@ helpText =
     [ "tnix-lsp",
       "",
       "Usage:",
-      "  tnix-lsp [--stdio]",
+      "  tnix-lsp [--stdio] [--log-file PATH]",
       "  tnix-lsp --version",
       "  tnix-lsp --help"
     ]
@@ -178,156 +264,134 @@ versionText = "tnix-lsp " <> showVersion PackageInfo.version
 type AnalyzeFn = FilePath -> Text -> IO (Either String Analysis)
 
 -- | Dispatch one incoming JSON-RPC message.
-handle :: IORef Bool -> IORef Session.Documents -> AnalyzeFn -> IO () -> Value -> IO ()
-handle shutdownRef ref analyze clearCache msg = case field "method" msg >>= asText of
-  Just "initialize" -> respond stdout msg clientCapabilities
-  Just "initialized" -> pure ()
-  Just "shutdown" -> writeIORef shutdownRef True >> respond stdout msg Null
-  -- Per the LSP spec, `exit` returns code 0 only when a `shutdown` request
-  -- preceded it, and 1 otherwise.
-  Just "exit" -> do
-    didShutdown <- readIORef shutdownRef
-    if didShutdown then exitSuccess else exitWith (ExitFailure 1)
-  -- Requests are processed synchronously, so by the time a cancellation
-  -- arrives its target has already been answered; acknowledge and ignore.
-  Just "$/cancelRequest" -> pure ()
-  Just "textDocument/didOpen" -> update ref analyze msg >>= publish
-  Just "textDocument/didChange" -> update ref analyze msg >>= publish
-  Just "textDocument/didSave" -> update ref analyze msg >>= publish
-  Just "textDocument/didClose" -> closeDocument ref msg
-  Just "textDocument/hover" -> hover ref analyze msg >>= respond stdout msg
-  Just "textDocument/signatureHelp" -> signatureHelp ref analyze msg >>= respond stdout msg
-  Just "textDocument/completion" -> completion ref analyze msg >>= respond stdout msg
-  Just "textDocument/definition" -> definition ref analyze msg >>= respond stdout msg
-  Just "textDocument/declaration" -> definition ref analyze msg >>= respond stdout msg
-  Just "textDocument/references" -> references ref analyze msg >>= respond stdout msg
-  Just "textDocument/documentHighlight" -> documentHighlights ref analyze msg >>= respond stdout msg
-  Just "textDocument/rename" -> rename ref analyze msg >>= respond stdout msg
-  Just "textDocument/documentSymbol" -> documentSymbols ref analyze msg >>= respond stdout msg
-  Just "workspace/symbol" -> workspaceSymbols ref analyze msg >>= respond stdout msg
-  Just "textDocument/codeAction" -> codeActions ref analyze msg >>= respond stdout msg
-  Just "textDocument/semanticTokens/full" -> semanticTokens ref analyze msg >>= respond stdout msg
-  Just "textDocument/formatting" -> formatting ref msg >>= respond stdout msg
-  Just "textDocument/foldingRange" -> foldingRanges ref msg >>= respond stdout msg
-  Just "textDocument/documentLink" -> documentLinks ref msg >>= respond stdout msg
-  Just "textDocument/inlayHint" -> inlayHints ref analyze msg >>= respond stdout msg
-  Just "workspace/didChangeWatchedFiles" -> clearCache
-  Just "workspace/didChangeConfiguration" -> clearCache
-  -- A request (carries an `id`) for a method we do not implement must be
-  -- answered with MethodNotFound; unknown notifications are ignored.
-  method -> case field "id" msg of
-    Just _ ->
-      respondError
-        stdout
-        msg
-        (-32601)
-        (maybe "method not found" ("method not found: " <>) method)
+handle :: ServerState -> Value -> IO ()
+handle st msg = do
+  analyze <- analyzer st
+  let docsRef = stDocs st
+      query run = do
+        docs <- readIORef docsRef
+        run readFileSafe analyze docs msg >>= respond stdout msg
+  case field "method" msg >>= asText of
+    Just "initialize" -> do
+      let caps = field "params" msg >>= field "capabilities" >>= field "textDocument"
+          pull = isJust (caps >>= field "diagnostic")
+          hierarchical = caps >>= field "documentSymbol" >>= field "hierarchicalDocumentSymbolSupport"
+      writeIORef (stPullDiagnostics st) pull
+      writeIORef (stHierarchicalSymbols st) (hierarchical == Just (Bool True))
+      respond stdout msg (withServerInfo (serverCapabilities pull))
+    Just "initialized" -> pure ()
+    Just "shutdown" -> writeIORef (stShutdown st) True >> respond stdout msg Null
+    -- Per the LSP spec, `exit` returns code 0 only when a `shutdown` request
+    -- preceded it, and 1 otherwise.
+    Just "exit" -> do
+      didShutdown <- readIORef (stShutdown st)
+      if didShutdown then exitSuccess else exitWith (ExitFailure 1)
+    Just "textDocument/didOpen" -> updateNow st analyze msg
+    Just "textDocument/didSave" -> updateNow st analyze msg
+    Just "textDocument/didChange" -> do
+      docs <- readIORef docsRef
+      case Session.updateDocumentText docs msg of
+        Right (docs', file) -> do
+          writeIORef docsRef docs'
+          scheduleAnalysis st file
+        -- not open yet (or a malformed edit): fall back to analysing now
+        Left _ -> updateNow st analyze msg
+    Just "textDocument/didClose" -> closeDocument st msg
+    Just "textDocument/hover" -> query Session.hoverDocument
+    Just "textDocument/signatureHelp" -> query Session.signatureHelpDocument
+    Just "textDocument/completion" -> query Session.completionDocument
+    Just "completionItem/resolve" -> query Session.completionResolveDocument
+    Just "textDocument/definition" -> query Session.definitionDocument
+    Just "textDocument/declaration" -> query Session.definitionDocument
+    Just "textDocument/references" -> query Session.referencesDocument
+    Just "textDocument/documentHighlight" -> query Session.documentHighlightsDocument
+    Just "textDocument/prepareRename" -> query Session.prepareRenameDocument
+    Just "textDocument/rename" -> query Session.renameDocument
+    Just "textDocument/documentSymbol" -> do
+      hierarchical <- readIORef (stHierarchicalSymbols st)
+      query (if hierarchical then Session.documentSymbolsHierarchicalDocument else Session.documentSymbolsDocument)
+    Just "workspace/symbol" -> query Session.workspaceSymbolsDocument
+    Just "textDocument/codeAction" -> query Session.codeActionsDocument
+    Just "textDocument/semanticTokens/full" -> query Session.semanticTokensDocument
+    Just "textDocument/semanticTokens/range" -> query Session.semanticTokensDocument
+    Just "textDocument/diagnostic" -> query Session.pullDiagnosticsDocument
+    Just "textDocument/formatting" -> query (\r _ d m -> Session.formattingDocument r d m)
+    Just "textDocument/foldingRange" -> query (\r _ d m -> Session.foldingRangesDocument r d m)
+    Just "textDocument/selectionRange" -> query (\r _ d m -> Session.selectionRangeDocument r d m)
+    Just "textDocument/documentLink" -> query (\r _ d m -> Session.documentLinksDocument r d m)
+    Just "textDocument/inlayHint" -> query Session.inlayHintsDocument
+    Just "workspace/didChangeWatchedFiles" -> writeIORef (stCache st) emptyAnalysisCache
+    Just "workspace/didChangeConfiguration" -> writeIORef (stCache st) emptyAnalysisCache
+    -- A request (carries an `id`) for a method we do not implement must be
+    -- answered with MethodNotFound; unknown notifications are ignored.
+    method -> case field "id" msg of
+      Just _ ->
+        respondError
+          stdout
+          msg
+          (-32601)
+          (maybe "method not found" ("method not found: " <>) method)
+      Nothing -> pure ()
+
+withServerInfo :: Value -> Value
+withServerInfo (Object obj) =
+  Object (obj <> (case object ["serverInfo" .= object ["name" .= ("tnix-lsp" :: Text), "version" .= showVersion PackageInfo.version]] of Object o -> o; _ -> mempty))
+withServerInfo other = other
+
+-- | Analyse a document now (open / save / unopened change) and publish.
+updateNow :: ServerState -> AnalyzeFn -> Value -> IO ()
+updateNow st analyze msg = do
+  docs <- readIORef (stDocs st)
+  (docs', file, result) <- Session.updateDocuments readFileSafe analyze docs msg
+  writeIORef (stDocs st) docs'
+  -- a direct analysis supersedes any pending debounced one
+  modifyIORef' (stGenerations st) (Map.adjust (+ 1) file)
+  case Session.lookupDocumentText file docs' of
+    Just content -> publish st analyze file content result
     Nothing -> pure ()
 
--- | Update the in-memory copy of a document and re-run analysis.
-update :: IORef Session.Documents -> AnalyzeFn -> Value -> IO (FilePath, Maybe Text, Either String Analysis)
-update ref analyze msg = do
-  docs <- readIORef ref
-  (docs', file, result) <- Session.updateDocuments readFileSafe analyze docs msg
-  writeIORef ref docs'
-  pure (file, Session.lookupDocumentText file docs', result)
+-- | Bump the edit generation and enqueue a debounced re-analysis.
+scheduleAnalysis :: ServerState -> FilePath -> IO ()
+scheduleAnalysis st file = do
+  generation <- atomicModifyIORef' (stGenerations st) (\m -> let g = Map.findWithDefault 0 file m + 1 in (Map.insert file g m, g))
+  void . forkIO $ do
+    threadDelay debounceMicros
+    writeChan (stQueue st) (Debounced file generation)
 
--- | Publish diagnostics for the latest analysis result.
-publish :: (FilePath, Maybe Text, Either String Analysis) -> IO ()
-publish (file, content, result) =
-  notify
-    stdout
-    "textDocument/publishDiagnostics"
-    (maybe (publishDiagnostics file result) (\text -> publishDiagnosticsWithContent file text result) content)
+-- | Analyse the current text of a document, store the result, and publish.
+analyzeAndPublish :: ServerState -> FilePath -> IO ()
+analyzeAndPublish st file = do
+  analyze <- analyzer st
+  docs <- readIORef (stDocs st)
+  case Session.lookupDocumentText file docs of
+    Nothing -> pure ()
+    Just content -> do
+      result <- analyze file content
+      modifyIORef' (stDocs st) (Session.storeDocumentAnalysis file content result)
+      publish st analyze file content result
+
+-- | Publish diagnostics unless the client pulls them.
+publish :: ServerState -> AnalyzeFn -> FilePath -> Text -> Either String Analysis -> IO ()
+publish st analyze file content result = do
+  pull <- readIORef (stPullDiagnostics st)
+  if pull
+    then pure ()
+    else do
+      docs <- readIORef (stDocs st)
+      items <- Session.documentDiagnostics readFileSafe analyze docs file content result
+      notify stdout "textDocument/publishDiagnostics" (object ["uri" .= pathUri file, "diagnostics" .= items])
 
 -- | Drop a document from the in-memory cache and clear its diagnostics.
-closeDocument :: IORef Session.Documents -> Value -> IO ()
-closeDocument ref msg = do
-  docs <- readIORef ref
+closeDocument :: ServerState -> Value -> IO ()
+closeDocument st msg = do
+  docs <- readIORef (stDocs st)
   let (docs', closed) = Session.closeDocuments docs msg
-  writeIORef ref docs'
+  writeIORef (stDocs st) docs'
   case closed of
-    Just file -> notify stdout "textDocument/publishDiagnostics" (clearDiagnostics file)
+    Just file -> do
+      modifyIORef' (stGenerations st) (Map.adjust (+ 1) file)
+      notify stdout "textDocument/publishDiagnostics" (clearDiagnostics file)
     Nothing -> pure ()
-
--- | Compute hover contents at the requested position.
-hover :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-hover ref analyze msg = do
-  docs <- readIORef ref
-  Session.hoverDocument readFileSafe analyze docs msg
-
--- | Compute signature help at the requested position.
-signatureHelp :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-signatureHelp ref analyze msg = do
-  docs <- readIORef ref
-  Session.signatureHelpDocument readFileSafe analyze docs msg
-
--- | Compute completion results at the requested position.
-completion :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-completion ref analyze msg = do
-  docs <- readIORef ref
-  Session.completionDocument readFileSafe analyze docs msg
-
--- | Resolve local or ambient definitions for the requested position.
-definition :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-definition ref analyze msg = do
-  docs <- readIORef ref
-  Session.definitionDocument readFileSafe analyze docs msg
-
-references :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-references ref analyze msg = do
-  docs <- readIORef ref
-  Session.referencesDocument readFileSafe analyze docs msg
-
-documentHighlights :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-documentHighlights ref analyze msg = do
-  docs <- readIORef ref
-  Session.documentHighlightsDocument readFileSafe analyze docs msg
-
-rename :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-rename ref analyze msg = do
-  docs <- readIORef ref
-  Session.renameDocument readFileSafe analyze docs msg
-
-documentSymbols :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-documentSymbols ref analyze msg = do
-  docs <- readIORef ref
-  Session.documentSymbolsDocument readFileSafe analyze docs msg
-
-workspaceSymbols :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-workspaceSymbols ref analyze msg = do
-  docs <- readIORef ref
-  Session.workspaceSymbolsDocument readFileSafe analyze docs msg
-
-codeActions :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-codeActions ref analyze msg = do
-  docs <- readIORef ref
-  Session.codeActionsDocument readFileSafe analyze docs msg
-
-semanticTokens :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-semanticTokens ref analyze msg = do
-  docs <- readIORef ref
-  Session.semanticTokensDocument readFileSafe analyze docs msg
-
-formatting :: IORef Session.Documents -> Value -> IO Value
-formatting ref msg = do
-  docs <- readIORef ref
-  Session.formattingDocument readFileSafe docs msg
-
-foldingRanges :: IORef Session.Documents -> Value -> IO Value
-foldingRanges ref msg = do
-  docs <- readIORef ref
-  Session.foldingRangesDocument readFileSafe docs msg
-
-documentLinks :: IORef Session.Documents -> Value -> IO Value
-documentLinks ref msg = do
-  docs <- readIORef ref
-  Session.documentLinksDocument readFileSafe docs msg
-
-inlayHints :: IORef Session.Documents -> AnalyzeFn -> Value -> IO Value
-inlayHints ref analyze msg = do
-  docs <- readIORef ref
-  Session.inlayHintsDocument readFileSafe analyze docs msg
 
 readFileSafe :: FilePath -> IO (Either String Text)
 readFileSafe file = do

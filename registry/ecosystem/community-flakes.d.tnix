@@ -10,8 +10,18 @@
 # declare "./pre-commit-hooks.nix" { default :: PreCommitHooksFlake; };
 
 type DevenvLib = {
-  mkShell :: dynamic -> dynamic;
+  mkShell :: {
+    inputs :: NixpkgsAttrs;
+    pkgs :: NixpkgsPkgs;
+    modules :: List dynamic;
+  } -> NixpkgsDerivation;
+  mkConfig :: {
+    inputs :: NixpkgsAttrs;
+    pkgs :: NixpkgsPkgs;
+    modules :: List dynamic;
+  } -> NixpkgsAttrs;
   mkTest :: dynamic -> dynamic;
+  ...
 };
 
 type DevenvFlake = {
@@ -63,13 +73,46 @@ type PreCommitHooksFlake = {
   flakeModule :: dynamic;
 };
 
+# Common arguments of crane builders; extra attributes are passed through to
+# `stdenv.mkDerivation`.
+type CraneBuildArgs = {
+  src? :: NixpkgsSourceLike;
+  pname? :: String;
+  version? :: String;
+  cargoArtifacts? :: NixpkgsDerivationCore | Null;
+  cargoExtraArgs? :: String;
+  cargoClippyExtraArgs? :: String;
+  cargoTestExtraArgs? :: String;
+  cargoNextestExtraArgs? :: String;
+  cargoLock? :: Path;
+  cargoToml? :: Path;
+  cargoVendorDir? :: NixpkgsSourceLike | Null;
+  doCheck? :: Bool;
+  strictDeps? :: Bool;
+  buildInputs? :: List NixpkgsBuildInput;
+  nativeBuildInputs? :: List NixpkgsBuildInput;
+  env? :: NixpkgsAttrs;
+  meta? :: NixpkgsMeta;
+};
+
 type CraneLib = {
-  buildPackage :: dynamic -> NixpkgsDerivation;
-  cargoClippy :: dynamic -> NixpkgsDerivation;
-  cargoDoc :: dynamic -> NixpkgsDerivation;
-  cargoFmt :: dynamic -> NixpkgsDerivation;
-  cargoNextest :: dynamic -> NixpkgsDerivation;
-  cargoTest :: dynamic -> NixpkgsDerivation;
+  buildPackage :: CraneBuildArgs -> NixpkgsDerivation;
+  buildDepsOnly :: CraneBuildArgs -> NixpkgsDerivation;
+  cargoBuild :: CraneBuildArgs -> NixpkgsDerivation;
+  cargoClippy :: CraneBuildArgs -> NixpkgsDerivation;
+  cargoDoc :: CraneBuildArgs -> NixpkgsDerivation;
+  cargoFmt :: CraneBuildArgs -> NixpkgsDerivation;
+  cargoNextest :: CraneBuildArgs -> NixpkgsDerivation;
+  cargoTest :: CraneBuildArgs -> NixpkgsDerivation;
+  cargoAudit :: NixpkgsAttrs -> NixpkgsDerivation;
+  cargoDeny :: NixpkgsAttrs -> NixpkgsDerivation;
+  cleanCargoSource :: NixpkgsSourceLike -> NixpkgsCleanSource;
+  filterCargoSources :: String -> String -> Bool;
+  crateNameFromCargoToml :: { src? :: NixpkgsSourceLike; cargoToml? :: Path; } -> { pname :: String; version :: String; };
+  vendorCargoDeps :: NixpkgsAttrs -> NixpkgsDerivation;
+  overrideToolchain :: dynamic -> dynamic;
+  path :: Path -> NixpkgsCleanSource;
+  ...
 };
 
 type CraneFlake = {

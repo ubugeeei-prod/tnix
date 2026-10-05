@@ -1,0 +1,155 @@
+================================================================================
+type alias
+================================================================================
+
+type Box a = { value :: a; };
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_variable)
+    (record_type
+      (type_signature
+        (identifier)
+        (type_identifier)))))
+
+================================================================================
+type alias without parameters
+================================================================================
+
+type Name = String;
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_identifier)))
+
+================================================================================
+ambient declaration with string path
+================================================================================
+
+declare "./legacy/default.nix" {
+  default :: { value :: Int; };
+  mkPkg :: { name :: String; } -> Derivation;
+};
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (ambient_declaration
+    (string_expression
+      (string_fragment))
+    (declaration_block
+      (type_signature
+        (identifier)
+        (record_type
+          (type_signature
+            (identifier)
+            (type_identifier))))
+      (type_signature
+        (identifier)
+        (function_type
+          (record_type
+            (type_signature
+              (identifier)
+              (type_identifier)))
+          (type_identifier))))))
+
+================================================================================
+ambient declaration with path literal
+================================================================================
+
+declare ./lib.nix { lib :: dynamic; };
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (ambient_declaration
+    (path_expression
+      (path_fragment))
+    (declaration_block
+      (type_signature
+        (identifier)
+        (builtin_type)))))
+
+================================================================================
+declarations followed by expression
+================================================================================
+
+type Id = Int;
+declare "./a.nix" { "quoted-key" :: any; };
+(import ./a.nix).value
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (type_identifier))
+  (ambient_declaration
+    (string_expression
+      (string_fragment))
+    (declaration_block
+      (type_signature
+        (string_expression
+          (string_fragment))
+        (builtin_type))))
+  (select_expression
+    (parenthesized_expression
+      (apply_expression
+        (variable_expression
+          (identifier))
+        (path_expression
+          (path_fragment))))
+    (attrpath
+      (identifier))))
+
+================================================================================
+let signatures
+================================================================================
+
+let
+  value :: Int;
+  value = 1;
+in value
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (let_expression
+    (binding_set
+      (type_signature
+        (identifier)
+        (type_identifier))
+      (binding
+        (attrpath
+          (identifier))
+        (integer_expression)))
+    (variable_expression
+      (identifier))))
+
+================================================================================
+keyword field names in records
+================================================================================
+
+type Lib = { any :: Bool; or :: Int; inherit :: String; };
+
+--------------------------------------------------------------------------------
+
+(source_code
+  (type_alias
+    (type_identifier)
+    (record_type
+      (type_signature
+        (identifier)
+        (type_identifier))
+      (type_signature
+        (identifier)
+        (type_identifier))
+      (type_signature
+        (identifier)
+        (type_identifier)))))

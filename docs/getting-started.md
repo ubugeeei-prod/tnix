@@ -10,14 +10,79 @@
 
 If you already know Nix, the goal is that `tnix` feels like "Nix plus a type surface", not a different runtime language.
 
-## Supported Platforms
+## Installation
 
-Prebuilt `tnix` and `tnix-lsp` archives ship for Linux x64 and macOS arm64.
-Linux arm64 and macOS x64 are best-effort and build through the Nix flake on
-the target host. Windows is not tested today — use WSL2 with the Linux x64
-instructions, or build from source through the flake on a Linux/macOS host.
-See [support-matrix.md](./support-matrix.md) for the full per-platform tier
-table.
+### Install script (Linux, macOS)
+
+```bash
+curl -fsSL https://tnix.dev/install.sh | sh
+```
+
+The script detects your OS and CPU, downloads the matching release archive,
+verifies its SHA-256 checksum, and installs `tnix` and `tnix-lsp` into
+`~/.tnix/bin` (it prints the line to add to your shell profile if that
+directory is not on `PATH`). The binaries do not need Nix: Linux builds are
+fully static, and macOS builds only link system libraries.
+
+Options can be passed after `sh -s --`, or as environment variables:
+
+```bash
+# A specific release
+curl -fsSL https://tnix.dev/install.sh | sh -s -- --version 0.5.0   # or TNIX_VERSION=0.5.0
+# A custom install directory
+curl -fsSL https://tnix.dev/install.sh | TNIX_INSTALL_DIR="$HOME/.local/bin" sh
+# Uninstall
+curl -fsSL https://tnix.dev/install.sh | sh -s -- --uninstall
+```
+
+Re-running the script upgrades to the latest release.
+
+### Nix flake
+
+```bash
+# Install tnix and tnix-lsp into your profile
+nix profile install github:ubugeeei-prod/tnix
+
+# Or run without installing
+nix run github:ubugeeei-prod/tnix -- check ./main.tnix
+```
+
+The flake also exports `overlays.default` (adds `pkgs.tnix`, `pkgs.tnix-lsp`
+and `pkgs.tnix-toolchain`) and modules that install the toolchain with
+`programs.tnix.enable = true;`:
+
+```nix
+# flake.nix: inputs.tnix.url = "github:ubugeeei-prod/tnix";
+
+# NixOS (use tnix.darwinModules.default for nix-darwin)
+{ inputs, ... }:
+{
+  imports = [ inputs.tnix.nixosModules.default ];
+  programs.tnix.enable = true;
+}
+
+# Home Manager
+{ inputs, ... }:
+{
+  imports = [ inputs.tnix.homeManagerModules.default ];
+  programs.tnix.enable = true;
+}
+```
+
+### Supported platforms
+
+Prebuilt `tnix` and `tnix-lsp` archives ship for Linux x64, Linux arm64, macOS
+arm64 (Apple silicon), and macOS x64 (Intel). Other platforms can build from
+source through the Nix flake. Windows is not tested today. Use WSL2 and the
+Linux install script there. See [support-matrix.md](./support-matrix.md) for
+the full per-platform tier table.
+
+Check the install:
+
+```bash
+tnix --version
+tnix-lsp --version
+```
 
 ## First Commands
 
@@ -40,10 +105,13 @@ tnix emit ./examples/main.tnix -o ./dist/main.d.tnix
 If you are using the published flake directly:
 
 ```bash
-nix run github:ubugeeei/tnix#tnix -- check ./main.tnix
-nix run github:ubugeeei/tnix#tnix -- compile ./main.tnix -o ./main.nix
-nix run github:ubugeeei/tnix#tnix -- emit ./main.tnix -o ./main.d.tnix
+nix run github:ubugeeei-prod/tnix#tnix -- check ./main.tnix
+nix run github:ubugeeei-prod/tnix#tnix -- compile ./main.tnix -o ./main.nix
+nix run github:ubugeeei-prod/tnix#tnix -- emit ./main.tnix -o ./main.d.tnix
 ```
+
+To set up an editor, run `tnix ide install vscode` (or `cursor`, `vscodium`,
+`zed`, `neovim`, `helix`), then `tnix doctor`. See [Editor Setup](./editors.md).
 
 ## Scaffolding A Project
 
@@ -53,6 +121,12 @@ nix run github:ubugeeei/tnix#tnix -- emit ./main.tnix -o ./main.d.tnix
 - `tnix.config.d.tnix`
 - `src/main.tnix`
 - `types/builtins.d.tnix`
+
+`builtins` and the global builtins (`toString`, `map`, `throw`, ...) are typed
+out of the box by a prelude embedded in the binary. A workspace
+`declare "builtins"` block replaces that prelude, so delete the scaffolded
+`types/builtins.d.tnix` unless you want to restrict the builtins, and set
+`builtins = false;` to keep `tnix scaffold` from recreating it.
 
 The generated config is ordinary tnix syntax:
 
@@ -133,45 +207,63 @@ This is the main bridge for incremental adoption:
 - describe its public API in `.d.tnix` or inline `declare`
 - use that API from typed `.tnix`
 
-## Flake Workflow Today
+## Nix Syntax
 
-For flakes, the most reliable workflow today is to keep the runtime flake logic
-in `.nix` and use `.tnix` as a typed projection over the parts you want to
-check.
-
-Example adapted from [`dogfood/flake-surface.tnix`](../dogfood/flake-surface.tnix):
+`.tnix` accepts the whole Nix expression language, so existing code can be
+renamed to `.tnix` and annotated gradually. For example:
 
 ```tnix
+{ lib ? null, name ? "demo", version, ... }@args:
 let
-  flake = import ../flake.nix;
-
-  inputs :: ResolvedFlakeInputs;
-  inputs = {
-    self = builtins;
-    nixpkgs = builtins;
-    flake-utils = builtins;
-  };
-
-  outputs :: FlakeOutputs;
-  outputs = flake.outputs inputs;
-in {
-  description = flake.description;
-  formatter = outputs.formatter.aarch64-darwin;
-  devShell = outputs.devShells.aarch64-darwin.default;
+  base = { meta.license = "MIT"; meta.homepage = "https://example.org"; };
+  inherit (base.meta) license;
+  greeting = "${name}-${version}";
+in base // {
+  inherit greeting license;
+  half = 7 / 2;
+  safe = args.extra.port or 8080;
+  piped = [ 1 2 3 ] |> builtins.length;
+  implied = true -> false;
+  src = ./${name}.nix;
 }
 ```
 
-This pattern lets you keep the checker on the stable surface while leaving the
-full flake implementation in `flake.nix` or a helper such as
-`nix/flake-outputs.nix`.
+Attribute-set patterns with defaults and `@` binders, `inherit (src)`, nested
+(`a.b.c = 1;`) and dynamic (`${k} = v;`) attribute paths, `x.a or default`,
+`x ? ${k}`, every operator (including `/`, `->`, `|>` and `<|`), `<nixpkgs>`,
+`~/` and interpolated paths, and `$$` string escapes all parse and type-check.
+Only Nix keywords are reserved: `type`, `any`, `import` and `declare` are
+ordinary names in expressions, and `as` is an ordinary name except in the
+`expr as Type` cast. See the [language reference](./language-reference.md#nix-compatibility).
 
-Recent parser/compiler work now also supports the flake-oriented Nix forms that
-show up quickly in real projects:
+## Flake Workflow
 
-- quoted attribute names such as `"dotnet-sdk_9"` or `"aarch64-darwin"`
-- dynamic attribute access such as `self.packages.${system}`
-- attrset lambda arguments such as `{ self, nixpkgs, tnix }:`
-- indented strings in the `'' ... ''` form for `shellHook` and `installPhase`
+A flake can be written directly as `flake.tnix` and compiled to `flake.nix`;
+the [flake tutorial](./tutorial/flakes-and-packages.md#a-flake) walks through
+it. Annotate the inputs you use, `{ self, nixpkgs :: NixpkgsInput, ... }:`, and
+every lookup through them is checked.
+
+If you would rather keep `flake.nix` hand-written, describe it with a
+declaration and check a typed *projection* of the parts you care about:
+
+```tnix
+declare "./flake.nix" {
+  description :: String;
+  outputs :: dynamic -> {
+    packages :: { x86_64-linux :: { default :: Derivation; }; };
+  };
+};
+
+let
+  flake = import ./flake.nix;
+  outputs = flake.outputs { };
+in {
+  description = flake.description;
+  package = outputs.packages.x86_64-linux.default;
+}
+```
+
+`Derivation` is one of the aliases the built-in prelude provides.
 
 ## Bundled Ecosystem Declarations
 
@@ -224,14 +316,19 @@ their ambient declarations still target your local `flake.nix` and
 Plain Nix list syntax can infer more precise indexed shapes.
 
 ```tnix
-[1 2]
-# => Vec 2 (1 | 2)
+{
+  pair = [1 2];
+  grid = [[1 2] [3 4]];
+  ragged = [[1] [2 3]];
+}
+```
 
-[[1 2] [3 4]]
-# => Matrix 2 2 (1 | 2 | 3 | 4)
-
-[[1] [2 3]]
-# => List (Vec (1 | 2) (1 | 2 | 3))
+```text
+root: {
+  grid :: Matrix 2 2 (1 | 2 | 3 | 4);
+  pair :: Vec 2 (1 | 2);
+  ragged :: List (Vec (1 | 2) (1 | 2 | 3));
+}
 ```
 
 You can also write shape annotations directly:
@@ -348,47 +445,54 @@ let
 in value
 ```
 
-Today these directives are aimed at root expressions and `let` items.
+These directives apply to the root expression or to one `let` item.
 
 ## Declaration Emit
 
 `tnix emit` turns a `.tnix` file into a `.d.tnix` API surface.
 
-Source:
+Source (`user.tnix`):
 
 ```tnix
 type User = { name :: String; };
 
 {
-  make = name: { inherit name; };
+  make = (name :: String): { inherit name; } as User;
 }
 ```
 
 Emitted declaration:
 
 ```tnix
-type User = { name :: String; };
-
-declare "./current-file.nix" {
-  default :: { make :: String -> User; };
+type User  = {
+  name :: String;
+};
+declare "./user.nix" {
+  make :: String %1 -> User;
 };
 ```
 
 The `declare` target is not a literal string: `tnix emit` derives it from the
 source path by replacing the `.tnix` extension with `.nix`, expressed relative
 to the emitted `.d.tnix` file's directory. So emitting `widget.tnix` produces
-`declare "./widget.nix" { … }`.
+`declare "./widget.nix" { … }`. The `%1 ->` arrow marks a function that uses its
+argument exactly once; see [Annotations and inference](./tutorial/annotations.md#functions-and-the-1-arrow).
 
 ## Suggested Learning Path
 
-1. Start with plain annotations on `let` bindings and function parameters.
-2. Add ambient declarations for existing `.nix` imports.
-3. Use `emit` to stabilize public APIs between files.
-4. Add `tnix.config.tnix` and `tnix scaffold` once the project layout is settling.
-5. Reach for `Vec` / `Matrix` / `Tensor`, `Range`, and `Unit` when the shape or numeric contract actually matters.
+1. Start by renaming a file to `.tnix` and running `tnix check`; inference and
+   the builtins prelude cover a lot without any annotations.
+2. Add annotations on `let` bindings and function parameters where you want
+   to state intent.
+3. Add ambient declarations for existing `.nix` imports.
+4. Use `emit` to stabilize public APIs between files.
+5. Add `tnix.config.tnix` and `tnix scaffold` once the project layout is settling.
+6. Reach for `Vec` / `Matrix` / `Tensor`, `Range`, and `Unit` when the shape or numeric contract actually matters.
 
 ## Next Docs
 
+- [Tutorial](./tutorial/index.md)
+- [Editor Setup](./editors.md)
 - [Language Reference](./language-reference.md)
 - [Type System](./type-system.md)
 - [Language Design](./language-design.md)

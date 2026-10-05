@@ -1,0 +1,230 @@
+  1 "#" comment.line.number-sign.tnix punctuation.definition.comment.tnix
+  1 " A plain Nix file: comments, literals, operators." comment.line.number-sign.tnix
+  2 "/*" comment.block.tnix punctuation.definition.comment.tnix
+  2 " block" comment.block.tnix
+  3 "   comment " comment.block.tnix
+  3 "*/" comment.block.tnix punctuation.definition.comment.tnix
+  4 "/**" comment.block.documentation.tnix punctuation.definition.comment.tnix
+  4 " Doc comment. " comment.block.documentation.tnix
+  4 "TODO" comment.block.documentation.tnix keyword.other.todo.tnix
+  4 ": more " comment.block.documentation.tnix
+  4 "*/" comment.block.documentation.tnix punctuation.definition.comment.tnix
+  5 "{" meta.braces.tnix punctuation.section.braces.begin.tnix
+  5 "lib" meta.braces.tnix variable.parameter.tnix
+  5 "," meta.braces.tnix punctuation.separator.comma.tnix
+  5 "stdenv" meta.braces.tnix variable.parameter.tnix
+  5 "?" meta.braces.tnix keyword.operator.default.tnix
+  5 "null" meta.braces.tnix constant.language.null.tnix
+  5 "," meta.braces.tnix punctuation.separator.comma.tnix
+  5 "..." meta.braces.tnix keyword.operator.ellipsis.tnix
+  5 "}" meta.braces.tnix punctuation.section.braces.end.tnix
+  5 "@" meta.braces.tnix keyword.operator.at.tnix
+  5 "args" meta.braces.tnix variable.parameter.tnix
+  5 ":" storage.type.function.arrow.tnix
+  6 "let" keyword.other.let.tnix
+  7 "answer" meta.binding.tnix entity.other.attribute-name.tnix
+  7 "=" meta.binding.tnix keyword.operator.assignment.tnix
+  7 "42" meta.binding.tnix constant.numeric.integer.tnix
+  7 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+  8 "ratio" meta.binding.tnix entity.other.attribute-name.tnix
+  8 "=" meta.binding.tnix keyword.operator.assignment.tnix
+  8 "0.5e3" meta.binding.tnix constant.numeric.float.tnix
+  8 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+  9 "enabled" meta.binding.tnix entity.other.attribute-name.tnix
+  9 "=" meta.binding.tnix keyword.operator.assignment.tnix
+  9 "true" meta.binding.tnix constant.language.boolean.true.tnix
+  9 "&&" meta.binding.tnix keyword.operator.logical.tnix
+  9 "!" meta.binding.tnix keyword.operator.logical.not.tnix
+  9 "false" meta.binding.tnix constant.language.boolean.false.tnix
+  9 "||" meta.binding.tnix keyword.operator.logical.tnix
+  9 "null" meta.binding.tnix constant.language.null.tnix
+  9 "==" meta.binding.tnix keyword.operator.comparison.tnix
+  9 "null" meta.binding.tnix constant.language.null.tnix
+  9 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 10 "merged" meta.binding.tnix entity.other.attribute-name.tnix
+ 10 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 10 "{" meta.binding.tnix meta.braces.tnix punctuation.section.braces.begin.tnix
+ 10 "a" meta.binding.tnix meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 10 "=" meta.binding.tnix meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 10 "1" meta.binding.tnix meta.braces.tnix meta.binding.tnix constant.numeric.integer.tnix
+ 10 ";" meta.binding.tnix meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 10 "}" meta.binding.tnix meta.braces.tnix punctuation.section.braces.end.tnix
+ 10 "//" meta.binding.tnix keyword.operator.update.tnix
+ 10 "{" meta.binding.tnix meta.braces.tnix punctuation.section.braces.begin.tnix
+ 10 "b" meta.binding.tnix meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 10 "=" meta.binding.tnix meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 10 "2" meta.binding.tnix meta.braces.tnix meta.binding.tnix constant.numeric.integer.tnix
+ 10 ";" meta.binding.tnix meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 10 "}" meta.binding.tnix meta.braces.tnix punctuation.section.braces.end.tnix
+ 10 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 11 "joined" meta.binding.tnix entity.other.attribute-name.tnix
+ 11 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 11 "[" meta.binding.tnix meta.list.tnix punctuation.section.brackets.begin.tnix
+ 11 "1" meta.binding.tnix meta.list.tnix constant.numeric.integer.tnix
+ 11 "2" meta.binding.tnix meta.list.tnix constant.numeric.integer.tnix
+ 11 "]" meta.binding.tnix meta.list.tnix punctuation.section.brackets.end.tnix
+ 11 "++" meta.binding.tnix keyword.operator.concat.tnix
+ 11 "[" meta.binding.tnix meta.list.tnix punctuation.section.brackets.begin.tnix
+ 11 "3" meta.binding.tnix meta.list.tnix constant.numeric.integer.tnix
+ 11 "]" meta.binding.tnix meta.list.tnix punctuation.section.brackets.end.tnix
+ 11 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 12 "piped" meta.binding.tnix entity.other.attribute-name.tnix
+ 12 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 12 "answer" meta.binding.tnix variable.other.readwrite.tnix
+ 12 "|>" meta.binding.tnix keyword.operator.pipe.tnix
+ 12 "toString" meta.binding.tnix support.function.builtin.tnix
+ 12 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 13 "implies" meta.binding.tnix entity.other.attribute-name.tnix
+ 13 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 13 "enabled" meta.binding.tnix variable.other.readwrite.tnix
+ 13 "->" meta.binding.tnix keyword.operator.logical.implication.tnix
+ 13 "enabled" meta.binding.tnix variable.other.readwrite.tnix
+ 13 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 14 "has" meta.binding.tnix entity.other.attribute-name.tnix
+ 14 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 14 "args" meta.binding.tnix variable.other.readwrite.tnix
+ 14 "?" meta.binding.tnix keyword.operator.has-attr.tnix
+ 14 "lib" meta.binding.tnix variable.other.readwrite.tnix
+ 14 "." meta.binding.tnix punctuation.accessor.tnix
+ 14 "version" meta.binding.tnix variable.other.property.tnix
+ 14 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 15 "fallback" meta.binding.tnix entity.other.attribute-name.tnix
+ 15 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 15 "args" meta.binding.tnix variable.other.readwrite.tnix
+ 15 "." meta.binding.tnix punctuation.accessor.tnix
+ 15 "missing" meta.binding.tnix variable.other.property.tnix
+ 15 "or" meta.binding.tnix keyword.operator.or.tnix
+ 15 "\"" meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 15 "default" meta.binding.tnix string.quoted.double.tnix
+ 15 "\"" meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 15 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 16 "nested" meta.binding.tnix entity.other.attribute-name.tnix
+ 16 "." meta.binding.tnix punctuation.accessor.tnix
+ 16 "attr" meta.binding.tnix entity.other.attribute-name.tnix
+ 16 "." meta.binding.tnix punctuation.accessor.tnix
+ 16 "\"" meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 16 "quoted key" meta.binding.tnix string.quoted.double.tnix
+ 16 "\"" meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 16 "." meta.binding.tnix punctuation.accessor.tnix
+ 16 "${" meta.binding.tnix meta.embedded.interpolation.tnix punctuation.section.embedded.begin.tnix
+ 16 "answer" meta.binding.tnix meta.embedded.interpolation.tnix variable.other.readwrite.tnix
+ 16 "}" meta.binding.tnix meta.embedded.interpolation.tnix punctuation.section.embedded.end.tnix
+ 16 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 16 "1" meta.binding.tnix constant.numeric.integer.tnix
+ 16 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 17 "inherit" meta.inherit.tnix keyword.other.inherit.tnix
+ 17 "(" meta.inherit.tnix punctuation.section.parens.begin.tnix
+ 17 "lib" meta.inherit.tnix variable.other.readwrite.tnix
+ 17 ")" meta.inherit.tnix punctuation.section.parens.end.tnix
+ 17 "mkIf" meta.inherit.tnix entity.other.attribute-name.tnix
+ 17 "optional" meta.inherit.tnix entity.other.attribute-name.tnix
+ 17 ";" meta.inherit.tnix punctuation.terminator.inherit.tnix
+ 18 "inherit" meta.inherit.tnix keyword.other.inherit.tnix
+ 18 "answer" meta.inherit.tnix entity.other.attribute-name.tnix
+ 18 ";" meta.inherit.tnix punctuation.terminator.inherit.tnix
+ 19 "math" meta.binding.tnix entity.other.attribute-name.tnix
+ 19 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 19 "1" meta.binding.tnix constant.numeric.integer.tnix
+ 19 "+" meta.binding.tnix keyword.operator.arithmetic.tnix
+ 19 "2" meta.binding.tnix constant.numeric.integer.tnix
+ 19 "-" meta.binding.tnix keyword.operator.arithmetic.tnix
+ 19 "3" meta.binding.tnix constant.numeric.integer.tnix
+ 19 "*" meta.binding.tnix keyword.operator.arithmetic.tnix
+ 19 "4" meta.binding.tnix constant.numeric.integer.tnix
+ 19 "/" meta.binding.tnix keyword.operator.arithmetic.tnix
+ 19 "5" meta.binding.tnix constant.numeric.integer.tnix
+ 19 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 20 "cmp" meta.binding.tnix entity.other.attribute-name.tnix
+ 20 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 20 "1" meta.binding.tnix constant.numeric.integer.tnix
+ 20 "<" meta.binding.tnix keyword.operator.relational.tnix
+ 20 "2" meta.binding.tnix constant.numeric.integer.tnix
+ 20 "&&" meta.binding.tnix keyword.operator.logical.tnix
+ 20 "2" meta.binding.tnix constant.numeric.integer.tnix
+ 20 "<=" meta.binding.tnix keyword.operator.relational.tnix
+ 20 "3" meta.binding.tnix constant.numeric.integer.tnix
+ 20 "&&" meta.binding.tnix keyword.operator.logical.tnix
+ 20 "3" meta.binding.tnix constant.numeric.integer.tnix
+ 20 ">" meta.binding.tnix keyword.operator.relational.tnix
+ 20 "2" meta.binding.tnix constant.numeric.integer.tnix
+ 20 "&&" meta.binding.tnix keyword.operator.logical.tnix
+ 20 "3" meta.binding.tnix constant.numeric.integer.tnix
+ 20 ">=" meta.binding.tnix keyword.operator.relational.tnix
+ 20 "3" meta.binding.tnix constant.numeric.integer.tnix
+ 20 "&&" meta.binding.tnix keyword.operator.logical.tnix
+ 20 "1" meta.binding.tnix constant.numeric.integer.tnix
+ 20 "!=" meta.binding.tnix keyword.operator.comparison.tnix
+ 20 "2" meta.binding.tnix constant.numeric.integer.tnix
+ 20 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 21 "kebab-case'" meta.binding.tnix entity.other.attribute-name.tnix
+ 21 "=" meta.binding.tnix keyword.operator.assignment.tnix
+ 21 "answer" meta.binding.tnix variable.other.readwrite.tnix
+ 21 ";" meta.binding.tnix punctuation.terminator.binding.tnix
+ 22 "in" keyword.other.in.tnix
+ 23 "assert" meta.assert.tnix keyword.control.assert.tnix
+ 23 "answer" meta.assert.tnix variable.other.readwrite.tnix
+ 23 ">" meta.assert.tnix keyword.operator.relational.tnix
+ 23 "0" meta.assert.tnix constant.numeric.integer.tnix
+ 23 ";" meta.assert.tnix punctuation.terminator.assert.tnix
+ 24 "with" meta.with.tnix keyword.other.with.tnix
+ 24 "lib" meta.with.tnix variable.other.readwrite.tnix
+ 24 ";" meta.with.tnix punctuation.terminator.with.tnix
+ 25 "rec" storage.modifier.rec.tnix
+ 25 "{" meta.braces.tnix punctuation.section.braces.begin.tnix
+ 26 "name" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 26 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 26 "if" meta.braces.tnix meta.binding.tnix keyword.control.conditional.tnix
+ 26 "enabled" meta.braces.tnix meta.binding.tnix variable.other.readwrite.tnix
+ 26 "then" meta.braces.tnix meta.binding.tnix keyword.control.conditional.tnix
+ 26 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 26 "on" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 26 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 26 "else" meta.braces.tnix meta.binding.tnix keyword.control.conditional.tnix
+ 26 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 26 "off" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 26 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 26 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 27 "value" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 27 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 27 "builtins" meta.braces.tnix meta.binding.tnix variable.language.builtins.tnix
+ 27 "." meta.braces.tnix meta.binding.tnix punctuation.accessor.tnix
+ 27 "map" meta.braces.tnix meta.binding.tnix support.function.builtin.tnix
+ 27 "(" meta.braces.tnix meta.binding.tnix punctuation.section.parens.begin.tnix
+ 27 "x" meta.braces.tnix meta.binding.tnix variable.parameter.tnix
+ 27 ":" meta.braces.tnix meta.binding.tnix storage.type.function.arrow.tnix
+ 27 "x" meta.braces.tnix meta.binding.tnix variable.other.readwrite.tnix
+ 27 "*" meta.braces.tnix meta.binding.tnix keyword.operator.arithmetic.tnix
+ 27 "2" meta.braces.tnix meta.binding.tnix constant.numeric.integer.tnix
+ 27 ")" meta.braces.tnix meta.binding.tnix punctuation.section.parens.end.tnix
+ 27 "[" meta.braces.tnix meta.binding.tnix meta.list.tnix punctuation.section.brackets.begin.tnix
+ 27 "1" meta.braces.tnix meta.binding.tnix meta.list.tnix constant.numeric.integer.tnix
+ 27 "2" meta.braces.tnix meta.binding.tnix meta.list.tnix constant.numeric.integer.tnix
+ 27 "]" meta.braces.tnix meta.binding.tnix meta.list.tnix punctuation.section.brackets.end.tnix
+ 27 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 28 "thrown" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 28 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 28 "throw" meta.braces.tnix meta.binding.tnix support.function.builtin.tnix
+ 28 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 28 "nope" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 28 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 28 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 29 "imported" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 29 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 29 "import" meta.braces.tnix meta.binding.tnix keyword.control.import.tnix
+ 29 "./default.nix" meta.braces.tnix meta.binding.tnix string.unquoted.path.tnix
+ 29 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 30 "formatted" meta.braces.tnix meta.binding.tnix entity.other.attribute-name.tnix
+ 30 "=" meta.braces.tnix meta.binding.tnix keyword.operator.assignment.tnix
+ 30 "lib" meta.braces.tnix meta.binding.tnix variable.other.readwrite.tnix
+ 30 "." meta.braces.tnix meta.binding.tnix punctuation.accessor.tnix
+ 30 "concatStringsSep" meta.braces.tnix meta.binding.tnix variable.other.property.tnix
+ 30 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 30 ", " meta.braces.tnix meta.binding.tnix string.quoted.double.tnix
+ 30 "\"" meta.braces.tnix meta.binding.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 30 "[" meta.braces.tnix meta.binding.tnix meta.list.tnix punctuation.section.brackets.begin.tnix
+ 30 "\"" meta.braces.tnix meta.binding.tnix meta.list.tnix string.quoted.double.tnix punctuation.definition.string.begin.tnix
+ 30 "a" meta.braces.tnix meta.binding.tnix meta.list.tnix string.quoted.double.tnix
+ 30 "\"" meta.braces.tnix meta.binding.tnix meta.list.tnix string.quoted.double.tnix punctuation.definition.string.end.tnix
+ 30 "]" meta.braces.tnix meta.binding.tnix meta.list.tnix punctuation.section.brackets.end.tnix
+ 30 ";" meta.braces.tnix meta.binding.tnix punctuation.terminator.binding.tnix
+ 31 "}" meta.braces.tnix punctuation.section.braces.end.tnix

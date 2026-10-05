@@ -2,8 +2,8 @@
   "name": "tnix",
   "version": "0.5.0",
   "publisher": "ubugeeei",
-  "displayName": "tnix",
-  "description": "Gradual typing support for Nix via tnix-lsp.",
+  "displayName": "tnix — TypeScript for Nix",
+  "description": "Gradual types for Nix: syntax highlighting, diagnostics, hover, completion and more for .tnix, .d.tnix and .nix files via tnix-lsp.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/extension.cjs",
@@ -16,34 +16,48 @@
     "url": "https://github.com/ubugeeei/tnix/issues"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Linters",
+    "Formatters",
+    "Snippets"
   ],
   "keywords": [
     "nix",
-    "lsp",
+    "tnix",
+    "nixos",
+    "flake",
     "types",
-    "gradual-typing"
+    "typescript",
+    "gradual-typing",
+    "lsp",
+    "language-server"
   ],
   "engines": {
     "vscode": "^1.110.0"
   },
   "activationEvents": [
     "onLanguage:tnix",
-    "onLanguage:nix"
+    "onLanguage:nix",
+    "workspaceContains:**/*.tnix"
   ],
   "contributes": {
     "languages": [
       {
         "id": "tnix",
         "aliases": [
-          "tnix"
+          "tnix",
+          "Typed Nix"
         ],
         "extensions": [
           ".nix",
           ".tnix",
           ".d.tnix"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/tnix-file-light.svg",
+          "dark": "./icons/tnix-file-dark.svg"
+        }
       }
     ],
     "configuration": {
@@ -52,7 +66,9 @@
         "tnix.server.path": {
           "type": "string",
           "default": "",
-          "description": "Path to the tnix language server executable. Leave blank to auto-detect common Nix profile locations before falling back to tnix-lsp on PATH."
+          "description": "Path to the tnix language server executable. Leave blank to auto-detect common Nix profile locations before falling back to tnix-lsp on PATH.",
+          "markdownDescription": "Path to the `tnix-lsp` executable. Leave blank to auto-detect common Nix profile locations before falling back to `tnix-lsp` on `PATH`.",
+          "scope": "machine-overridable"
         },
         "tnix.server.args": {
           "type": "array",
@@ -60,7 +76,8 @@
           "items": {
             "type": "string"
           },
-          "description": "Additional command-line arguments passed to the tnix language server."
+          "description": "Additional command-line arguments passed to the tnix language server.",
+          "scope": "machine-overridable"
         },
         "tnix.server.cwd": {
           "type": "string",
@@ -76,25 +93,263 @@
           ],
           "default": "off",
           "description": "Traces the JSON-RPC communication between VS Code and the tnix language server. Set to 'messages' or 'verbose' to debug the server in the tnix output channel."
+        },
+        "tnix.server.promptInstall": {
+          "type": "boolean",
+          "default": true,
+          "description": "Offer to install the tnix toolchain when tnix-lsp cannot be found."
+        },
+        "tnix.cli.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Path to the `tnix` CLI used by **tnix: Run Doctor** and **tnix: Show Version**. Leave blank to auto-detect."
+        },
+        "tnix.inlayHints.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inlay hints (inferred types) from tnix-lsp."
+        },
+        "tnix.inlayHints.typeHints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inferred-type inlay hints after bindings."
+        },
+        "tnix.inlayHints.parameterHints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show parameter inlay hints."
+        },
+        "tnix.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show tnix diagnostics. When disabled, diagnostics from tnix-lsp are hidden."
+        },
+        "tnix.diagnostics.severityOverrides": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning",
+              "information",
+              "hint",
+              "off"
+            ]
+          },
+          "markdownDescription": "Override the severity of diagnostics by code, e.g. `{ \"TNIX-T0001\": \"warning\", \"TNIX-P0002\": \"off\" }`. Codes match case-insensitively; `off` hides the diagnostic."
         }
       }
     },
     "commands": [
       {
         "command": "tnix.restartServer",
-        "title": "tnix: Restart Language Server",
+        "title": "Restart Language Server",
+        "category": "tnix",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "tnix.showOutput",
+        "title": "Show Output",
+        "category": "tnix",
+        "icon": "$(output)"
+      },
+      {
+        "command": "tnix.showVersion",
+        "title": "Show Version",
+        "category": "tnix"
+      },
+      {
+        "command": "tnix.runDoctor",
+        "title": "Run Doctor",
+        "category": "tnix"
+      },
+      {
+        "command": "tnix.installServer",
+        "title": "Install tnix Toolchain",
+        "category": "tnix"
+      },
+      {
+        "command": "tnix.showMenu",
+        "title": "Show Actions",
         "category": "tnix"
       }
-    ]
+    ],
+    "grammars": [
+      {
+        "language": "tnix",
+        "scopeName": "source.tnix",
+        "path": "./syntaxes/tnix.tmLanguage.json"
+      },
+      {
+        "scopeName": "markdown.tnix.codeblock",
+        "path": "./syntaxes/tnix-markdown-injection.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.tnix": "tnix"
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "tnix",
+        "path": "./snippets/tnix.code-snippets"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "tnix",
+        "scopes": {
+          "keyword": [
+            "keyword.other.tnix"
+          ],
+          "type": [
+            "entity.name.type.tnix"
+          ],
+          "typeParameter": [
+            "entity.name.type.parameter.tnix"
+          ],
+          "function": [
+            "entity.name.function.tnix"
+          ],
+          "method": [
+            "entity.name.function.tnix"
+          ],
+          "variable": [
+            "variable.other.readwrite.tnix"
+          ],
+          "parameter": [
+            "variable.parameter.tnix"
+          ],
+          "property": [
+            "entity.other.attribute-name.tnix"
+          ],
+          "string": [
+            "string.quoted.double.tnix"
+          ],
+          "number": [
+            "constant.numeric.tnix"
+          ],
+          "operator": [
+            "keyword.operator.tnix"
+          ],
+          "comment": [
+            "comment.line.number-sign.tnix"
+          ],
+          "namespace": [
+            "entity.name.namespace.tnix"
+          ],
+          "enumMember": [
+            "constant.other.enum-member.tnix"
+          ],
+          "macro": [
+            "keyword.control.directive.tnix"
+          ],
+          "variable.readonly": [
+            "variable.other.constant.tnix"
+          ],
+          "variable.defaultLibrary": [
+            "variable.language.builtins.tnix"
+          ],
+          "function.defaultLibrary": [
+            "support.function.builtin.tnix"
+          ],
+          "type.defaultLibrary": [
+            "support.type.primitive.tnix"
+          ]
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "[tnix]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.semanticHighlighting.enabled": true,
+        "editor.bracketPairColorization.enabled": true
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "tnix.gettingStarted",
+        "title": "Get started with tnix",
+        "description": "Install the toolchain and add types to your Nix code.",
+        "steps": [
+          {
+            "id": "install",
+            "title": "Install tnix",
+            "description": "tnix-lsp powers diagnostics, hover and completion.\n[Install tnix](command:tnix.installServer)",
+            "media": {
+              "markdown": "walkthrough/install.md"
+            },
+            "completionEvents": [
+              "onCommand:tnix.installServer"
+            ]
+          },
+          {
+            "id": "verify",
+            "title": "Check the installation",
+            "description": "Confirm the server and CLI are reachable.\n[Show Version](command:tnix.showVersion)\n[Run Doctor](command:tnix.runDoctor)",
+            "media": {
+              "markdown": "walkthrough/doctor.md"
+            },
+            "completionEvents": [
+              "onCommand:tnix.showVersion",
+              "onCommand:tnix.runDoctor"
+            ]
+          },
+          {
+            "id": "first-file",
+            "title": "Write a typed file",
+            "description": "Create a .tnix file and annotate a binding.\n[New tnix File](command:workbench.action.files.newUntitledFile?%7B%22languageId%22%3A%22tnix%22%7D)",
+            "media": {
+              "markdown": "walkthrough/first-file.md"
+            },
+            "completionEvents": [
+              "onLanguage:tnix"
+            ]
+          },
+          {
+            "id": "declarations",
+            "title": "Type existing Nix",
+            "description": "Describe .nix files with declare blocks and .d.tnix files.",
+            "media": {
+              "markdown": "walkthrough/declarations.md"
+            }
+          },
+          {
+            "id": "settings",
+            "title": "Tune the editor",
+            "description": "Inlay hints, diagnostic severities and tracing.\n[Open tnix Settings](command:workbench.action.openSettings?%5B%22%40ext%3Aubugeeei.tnix%22%5D)",
+            "media": {
+              "markdown": "walkthrough/settings.md"
+            }
+          }
+        ]
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "tnix.showMenu",
+          "when": "false"
+        }
+      ]
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && ./node_modules/.bin/esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
-    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "check": "node scripts/build-grammar.mjs --check && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "tsc -p tsconfig.json && node --test dist/*.spec.js",
     "pretest:integration": "pnpm run build && tsc -p tsconfig.test.json && node -e \"require('fs').writeFileSync('out/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\"",
     "test:integration": "vscode-test",
-    "fmt": "prettier --check src package.json tsconfig.json tsconfig.test.json .vscode-test.mjs language-configuration.json README.md",
-    "package": "vsce package --no-dependencies"
+    "fmt": "prettier --check src scripts package.json tsconfig.json tsconfig.test.json .vscode-test.mjs language-configuration.json README.md walkthrough",
+    "package": "vsce package --no-dependencies",
+    "build:grammar": "node scripts/build-grammar.mjs",
+    "check:corpus": "node scripts/check-corpus.mjs",
+    "test:update-snapshots": "tsc -p tsconfig.json && UPDATE_SNAPSHOTS=1 node --test dist/grammar.spec.js"
   },
   "dependencies": {
     "vscode-languageclient": "^10.1.0"
@@ -110,6 +365,25 @@
     "mocha": "^11.8.0",
     "ovsx": "^1.1.0",
     "prettier": "^3.9.6",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
+  },
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In untrusted workspaces the server and CLI paths from workspace settings are ignored.",
+      "restrictedConfigurations": [
+        "tnix.server.path",
+        "tnix.server.args",
+        "tnix.server.cwd",
+        "tnix.cli.path"
+      ]
+    }
   }
 }

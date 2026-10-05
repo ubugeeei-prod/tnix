@@ -1,0 +1,32 @@
+# Cloudflare Pages response headers for tnix.dev.
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+
+# The installer is meant to be piped to `sh` and read by humans. Serve it as
+# plain text so browsers display it instead of downloading it, and keep the
+# cache short so a fixed installer reaches users quickly.
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/brand/*
+  Cache-Control: public, max-age=86400
+  Access-Control-Allow-Origin: *
+
+/og-image.png
+  Cache-Control: public, max-age=86400
+  Access-Control-Allow-Origin: *
+
+/search-index.json
+  Cache-Control: public, max-age=300

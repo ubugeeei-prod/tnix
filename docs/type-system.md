@@ -28,7 +28,7 @@ checked: they succeed for ordinary widening, structural narrowing, and explicit
 crossings of gradual boundaries such as `any`, `unknown`, or `dynamic`.
 Concrete unrelated casts remain errors.
 
-### 5. Structural subtyping
+### 5. Structural subtyping and rows
 
 Attribute sets are compared structurally rather than nominally.
 
@@ -37,6 +37,20 @@ Attribute sets are compared structurally rather than nominally.
 ```
 
 Function types are contravariant in arguments and covariant in results.
+
+Records can also be **open** and have **optional fields**:
+
+```tnix
+{ name :: String; ... }
+{ name :: String; version? :: String; }
+forall r. { ...r } -> { tag :: String; ...r }
+```
+
+`...` stands for further fields of unknown type, and a named tail such as `...r`
+is a row variable that relates the fields of an argument to those of a result.
+`name? :: T` may be absent. Attribute sets with arbitrary names and uniform
+values are `AttrsOf T`; a record is a subtype of `AttrsOf T` when all of its
+fields fit `T`.
 
 ### 6. Union
 
@@ -51,6 +65,11 @@ String | Int
 ```tnix
 id :: forall a. a -> a;
 ```
+
+Signatures are rigid: the body must work for every instantiation of the
+quantified variables. Unannotated `let` bindings get principal polymorphic
+types through Hindley-Milner let-polymorphism, so a signature is optional
+for generic helpers.
 
 ### 8. Higher-kinded types
 
@@ -75,7 +94,7 @@ type Element t = t extends List (infer a) ? a : t;
 `infer` introduces pattern variables inside the right-hand side of conditional types.
 
 ```tnix
-type ReturnOf f = f extends (_ -> infer r) ? r : dynamic;
+type ReturnOf f = f extends (infer a -> infer r) ? r : dynamic;
 ```
 
 ### 11. Indexed dependent-ish containers
@@ -149,7 +168,7 @@ in xs
 # => accepted
 ```
 
-### 12. Units
+### 13. Units
 
 Units are modeled as lightweight phantom wrappers over validated values:
 
@@ -199,29 +218,67 @@ Examples:
 
 ### Basic rules
 
-- Use annotations on lambda parameters when present.
-- Use `let` annotations as checking boundaries.
-- Infer unannotated regions with meta variables.
-- Generalize at `let` bindings.
+- Inference is Hindley-Milner with row-polymorphic records and gradual
+  boundaries.
+- Lambda parameters, pattern fields, and `let` bindings use their annotations
+  when present.
+- `let` signatures are rigid checking boundaries: the body is checked with the
+  quantified variables held abstract, and later uses see the signature.
+- Unannotated `let` bindings are grouped by dependency, inferred one strongly
+  connected group at a time, and generalized over the inference variables that
+  do not occur in the enclosing environment. A helper can therefore be used at
+  several types in the same `let`, and mutual recursion works without
+  annotations.
+- Selecting a field from a value of unknown shape records an open row
+  (`{ a :: T; ... }`) instead of failing, so `x: x.a + x.b` is
+  `{ a :: Number; b :: Number; ... } -> Number`.
+- Dependencies injected through attrset patterns, and fields selected from
+  values of unknown shape, are gradual: calling one yields `dynamic` rather than
+  fixing its type from the first call site.
+
+```tnix
+let
+  id = x: x;
+  pair = { a = id 1; b = id "s"; };
+  get = x: x.a + x.b;
+in { inherit pair get; }
+```
+
+See [How Checking Works](./reference/type-system-internals.md) for the full
+algorithm.
+
+### `builtins`
+
+Every Nix builtin is typed by a prelude embedded in the binary (the source is
+[`registry/workspace/builtins.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/builtins.d.tnix)).
+Both `builtins.map` and the global `map` are checked with no project setup. A
+workspace that declares `builtins` itself replaces the prelude.
 
 ### `import`
 
-`import ./foo.nix` is typed from workspace declarations:
-
-- `./foo.d.tnix`
-- `declare "./foo.nix" { ... }`
-
-If neither exists, the checker falls back to `dynamic`.
+`import ./foo.nix` is typed from a `declare "./foo.nix" { ... }` block, either
+inline in the importing file or in any `.d.tnix` file under the workspace root
+(conventionally `./foo.d.tnix` next to the module). If no declaration exists,
+the checker falls back to `dynamic`.
 
 Examples:
 
 ```tnix
 declare "./lib.nix" { default :: { value :: Int; }; };
-import ./lib.nix
-# => { value :: Int; }
 
-import ./missing.nix
-# => dynamic
+{
+  typed = import ./lib.nix;
+  untyped = import ./missing.nix;
+}
+```
+
+```text
+root: {
+  typed :: {
+    value :: Int;
+  };
+  untyped :: dynamic;
+}
 ```
 
 ## Attribute sets
@@ -229,21 +286,30 @@ import ./missing.nix
 Attribute sets are modeled as `Record` types. Users should be able to annotate only the public surface they care about while still permitting additional fields.
 
 ```tnix
-{ name = "a"; version = "1"; } :: { name :: String; }
+let
+  pkg :: { name :: String; };
+  pkg = { name = "a"; version = "1"; };
+in pkg
 ```
 
 ## Type-class-like behavior
 
-The first version does not implement full Haskell-style type class resolution. Instead, it models capabilities as dictionary records and leaves room for future constraint sugar.
+tnix does not implement Haskell-style type class resolution yet. Capabilities
+are modeled as dictionary records:
 
 ```tnix
 type Eq a = { eq :: a -> a -> Bool; };
 ```
 
+Signatures may already carry a constraint context (`Functor f =>`,
+`(Eq a, Show a) =>`). It is parsed and kept as documentation, but not enforced.
+
 ## Error Strategy
 
 - Prefer explainable errors over maximal solver cleverness.
 - Return messages that help users make fixes instead of exposing only large type equations.
+- Point at the exact source span: call mismatches point at the argument, and
+  record mismatches name the missing or ill-typed field.
 - Surface `dynamic` fallbacks explicitly in hover and diagnostics.
 
 ## `.d.tnix` emitter
@@ -254,27 +320,43 @@ The emitter extracts only the public type surface from `.tnix`.
 - Any other root value is emitted as a `default`-style export.
 - Required type aliases are emitted alongside it.
 
-Examples:
+- The `declare` target is the compiled `.nix` path, relative to the emitted
+  declaration file.
+
+Example, for `user.tnix`:
 
 ```tnix
 type User = { name :: String; };
-{ make = name: { inherit name; }; }
+
+{
+  make = (name :: String): { inherit name; } as User;
+}
 ```
 
 Generated declaration:
 
 ```tnix
-type User = { name :: String; };
-
-declare "./current-file.nix" {
-  default :: { make :: String -> User; };
+type User  = {
+  name :: String;
+};
+declare "./user.nix" {
+  make :: String %1 -> User;
 };
 ```
 
+If the root is polymorphic (for example `{ make = name: { inherit name; }; }`,
+whose type is `forall t0. { make :: t0 %1 -> { name :: t0; }; }`), the whole
+root is emitted as a single `default` member with a `forall`.
+
 ## Future Work
 
-- row variables
+- type classes, so constraint contexts are enforced
+- flow-sensitive narrowing through `isAttrs`, `?` and `_tag` guards
+- `config`-aware typing of NixOS modules
+- implementing records whose fields carry their own `forall`
 - stronger bidirectional checking
 - exhaustiveness hints
 - richer declaration merging
 - faster and more incremental solving
+
+See the [roadmap](./roadmap.md).

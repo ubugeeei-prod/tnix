@@ -5,10 +5,16 @@ editors, CI logs, and this documentation can refer to the same diagnostic
 without depending on the exact wording. Messages have the shape:
 
 ```
-[Tnnnnn] human-readable message
+line:col: [Tnnnnn] human-readable message
 ```
 
-The leading prefix encodes the phase:
+`line:col` (1-based) is the start of the source span the diagnostic belongs
+to: the offending expression for checker errors, the unexpected token for
+parse errors. Editors underline the whole span. Diagnostics that are not tied
+to one expression (kind errors, driver errors, and a few checker errors such
+as `TC0022`) omit the position.
+
+The leading prefix of the code encodes the phase:
 
 | Prefix | Phase |
 | --- | --- |
@@ -16,6 +22,7 @@ The leading prefix encodes the phase:
 | `TKxxxx` | kind checker |
 | `TCxxxx` | type checker / semantic analysis |
 | `TDxxxx` | driver / project / IO |
+| `TLxxxx` | language-server lints (editor only, see [below](#language-server-lints-tlxxxx)) |
 
 Codes are considered stable once assigned. To retire a code, leave its entry
 here and stop emitting it — never reuse the number.
@@ -124,8 +131,22 @@ selecting.
 
 ### `TC0009` — missing field
 
-A field was selected that does not exist on the inferred record type. The
-message includes the available record so the typo is easy to spot.
+A record lacks a field that is required. There are three shapes:
+
+- a selection names a field the value does not have:
+  `` missing field `license` on { pname :: "hello"; version :: "2.12.1"; } ``,
+  reported at the selection;
+- a record passed to a function or a signature lacks a required field:
+  `` missing field `version`: expected { ... } but got { ... } ``, reported at
+  the argument or binding;
+- a call does not provide a field that the callee's inferred (open) record or
+  attribute-set pattern requires:
+  `` missing field `pname` required by { pname :: ?4; version? :: String; } ``.
+
+Optional fields (`name? :: T`, from pattern defaults) never trigger it, and
+neither does `x.a or default`.
+
+**Fix:** add the field, fix the typo, or give the pattern field a default.
 
 ### `TC0010` — missing field from dynamic key
 
@@ -144,7 +165,13 @@ The expression inside `${ ... }` resolved to a non-string type.
 ### `TC0013` — type mismatch
 
 Two types could not be unified or related by subtyping. The message includes
-both sides rendered via `Pretty`.
+both sides rendered via `Pretty`, actual first. A call mismatch is reported at
+the argument, a signature mismatch at the binding's body. When both sides are
+records, the message names the first field that does not fit:
+`` type mismatch in field `packages`: Vec 1 "git" vs List Derivation ``.
+
+A `forall` signature is rigid, so a body that only works for some
+instantiation reports the type variable itself: `type mismatch: 1 vs a`.
 
 ### `TC0014` — record mismatch
 
@@ -201,6 +228,15 @@ overriding fields present on both.
 **Fix:** update an attribute set with another attribute set. A gradual
 boundary (`dynamic`, `any`) on either side suppresses the error.
 
+### `TC0022` — dynamic attribute in `let`
+
+A `let` binding used a dynamic key such as `${name} = value;`. Nix rejects
+dynamic attributes in `let` blocks because the bound names must be known
+statically.
+
+**Fix:** bind a static name, or build an attribute set with the dynamic key
+and select from it.
+
 ## Driver / Project (`TDxxxx`)
 
 ### `TD0001` — failed to read
@@ -241,10 +277,43 @@ Declaration-only files have no executable root expression.
 `tnix emit`/`tnix.emit` was asked to emit declarations from a file that
 has no root expression.
 
+## Language Server Lints (`TLxxxx`)
+
+These diagnostics come from `tnix-lsp` only; `tnix check` and
+`check-project` never report them, and they never fail a build. They are
+computed from the source text, so they keep working while the file has type
+errors. Their codes are owned by the language server, not by
+`Diagnostics.hs`.
+
+**TL0001: unused binding** (severity: hint, tag: `Unnecessary`, so editors
+render the name faded). A `let` binding, `inherit`ed name, lambda parameter,
+attribute-set pattern field, or `@` alias is never used, for example
+`` `x` is a parameter but never used. `` Names starting with `_` are exempt.
+
+**Fix:** remove the binding, or prefix the name with `_` to keep it on
+purpose. Code actions do either.
+
+**TL0002: use of a deprecated declaration** (severity: hint, tag:
+`Deprecated`, so editors strike the name through). The code uses a binding or
+`builtins` member whose documentation comment (the `#` lines directly above
+it) contains `@deprecated`, optionally followed by a reason that is appended to
+the message, as in `` `hello` is deprecated: use `greet` instead ``:
+
+```tnix
+let
+  # Old spelling.
+  # @deprecated use `greet` instead
+  hello = name: "hello ${name}";
+  greet = name: "hello ${name}";
+in hello "tnix"
+```
+
+**Fix:** switch to the replacement named in the reason.
+
 ## Listing Codes Programmatically
 
 The canonical list lives in
-[`packages/tnix-core/src/Diagnostics.hs`](../packages/tnix-core/src/Diagnostics.hs).
+[`packages/tnix-core/src/Diagnostics.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Diagnostics.hs).
 The `DiagnosticCode` data type is exposed alongside `diagnosticCodeText` and
 `withCode`, so downstream tooling can pattern match on stable variants
 rather than parsing the prefix back out of the message.

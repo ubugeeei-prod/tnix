@@ -3,6 +3,7 @@
 
 module Main (main) where
 
+import Data.Either (isRight)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Parser (ParseError (..), parseProgram, parseProgramDetailed)
@@ -143,10 +144,10 @@ spec = describe "parseProgram" $ do
 
   it "parses the attribute-presence test with a dotted attribute path" $ do
     program <- expectRight $ parseProgram "main.tnix" "a ? b"
-    programExpr program `shouldBe` Just (plain (EHasAttr (EVar "a") ["b"]))
+    programExpr program `shouldBe` Just (plain (EHasAttr (EVar "a") [SelectName "b"]))
     nested <- expectRight $ parseProgram "main.tnix" "a.b ? c.d"
     programExpr nested
-      `shouldBe` Just (plain (EHasAttr (ESelect (EVar "a") [SelectName "b"]) ["c", "d"]))
+      `shouldBe` Just (plain (EHasAttr (ESelect (EVar "a") [SelectName "b"]) [SelectName "c", SelectName "d"]))
 
   it "parses right-associative attribute-set update binding tighter than comparison" $ do
     program <- expectRight $ parseProgram "main.tnix" "a // b // c"
@@ -234,13 +235,13 @@ spec = describe "parseProgram" $ do
     programAliases program
       `shouldBe` [TypeAlias "Pair" [] (TApp (TCon "Tuple") (TTypeList [tInt, tString]))]
 
-  it "reserves import and Tuple while preserving their builtin uses" $ do
+  it "reserves Tuple at the type level while letting terms rebind import, as Nix does" $ do
     program <- expectRight $ parseProgram "main.tnix" "type Pair = Tuple [Int String]; import \"./lib.nix\""
     programAliases program
       `shouldBe` [TypeAlias "Pair" [] (TApp (TCon "Tuple") (TTypeList [tInt, tString]))]
     programExpr program
       `shouldBe` Just (plain (EApp (EVar "import") (EString (DoubleQuoted "./lib.nix"))))
-    parseProgram "main.tnix" "let import = 1; in import" `shouldSatisfy` isLeft
+    parseProgram "main.tnix" "let import = 1; in import" `shouldSatisfy` isRight
     parseProgram "main.tnix" "type Tuple = Int;" `shouldSatisfy` isLeft
 
   it "parses linear function arrows alongside ordinary arrows" $ do
@@ -256,7 +257,7 @@ spec = describe "parseProgram" $ do
 
   it "parses attrset lambda binders used by flakes" $ do
     program <- expectRight $ parseProgram "main.tnix" "{ self, nixpkgs, ... }: self"
-    programExpr program `shouldBe` Just (plain (ELambda (PAttrSet ["self", "nixpkgs"] True) (EVar "self")))
+    programExpr program `shouldBe` Just (plain (ELambda (PAttrSet [PatternField "self" Nothing Nothing, PatternField "nixpkgs" Nothing Nothing] True Nothing) (EVar "self")))
 
   it "parses comments, inherit clauses, and list conditionals" $ do
     program <-
@@ -342,9 +343,14 @@ spec = describe "parseProgram" $ do
     expectStringBody "'' ''${ ''" " ${ "
     expectStringBody "'' ''' ''" " '' "
     expectStringBody "'' ''\\' ''" " ' "
-    expectStringBody "'' ''\\n ''" " \n "
-    expectStringBody "'' ''\\t ''" " \t "
     expectStringBody "'' ''\\x ''" " x "
+
+  it "keeps whitespace escapes verbatim so indentation stripping is preserved" $ do
+    -- Nix computes the indentation to strip from literal lines only, so an
+    -- escaped newline must not be turned into a real one on output.
+    program <- expectRight (parseProgram "main.tnix" "'' a''\\nb ''\\t ''")
+    (markedValue <$> programExpr program)
+      `shouldBe` Just (EInterp InterpIndented [StrText " a", StrEscape 'n', StrText "b ", StrEscape 't', StrText " "])
 
   it "keeps an escaped antiquotation out of the interpolation parts" $ do
     program <- expectRight (parseProgram "main.tnix" "'' ''${value} ''")

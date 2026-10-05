@@ -1,7 +1,10 @@
 local M = {}
 
+local uv = vim.uv or vim.loop
+
 local default_cmd = { "tnix-lsp" }
 local default_root_markers = { "flake.nix", "cabal.project", "pnpm-workspace.yaml", "tnix.config.tnix", ".git" }
+local default_filetypes = { "tnix", "nix" }
 
 local function clone(list)
   return vim.deepcopy(list)
@@ -60,6 +63,50 @@ function M.root_markers(markers)
   return clone(default_root_markers)
 end
 
+---Resolve the filetypes the language server attaches to.
+---
+---Defaults to `{ "tnix", "nix" }` so tnix-lsp also provides ambient typing on
+---plain Nix files. Pass `{ "tnix" }` to leave `.nix` to another server.
+---@param filetypes string[]|nil
+---@return string[]
+function M.filetypes(filetypes)
+  local normalized = normalize_list(filetypes)
+  if #normalized > 0 then
+    return normalized
+  end
+
+  return clone(default_filetypes)
+end
+
+local function source_path(source)
+  if type(source) == "number" then
+    local name = vim.api.nvim_buf_get_name(source == 0 and vim.api.nvim_get_current_buf() or source)
+    return name ~= "" and name or nil
+  end
+  return source
+end
+
+---Find the closest ancestor directory containing one of `markers`.
+---
+---Uses `vim.fs.root` on Neovim 0.10+ and falls back to `vim.fs.find` on older
+---releases.
+---@param source integer|string
+---@param markers string[]
+---@return string|nil
+local function find_root(source, markers)
+  if vim.fs.root then
+    return vim.fs.root(source, markers)
+  end
+
+  local path = source_path(source)
+  if not path then
+    return nil
+  end
+
+  local found = vim.fs.find(markers, { upward = true, path = vim.fs.dirname(path) })[1]
+  return found and vim.fs.dirname(found) or nil
+end
+
 ---Resolve the workspace root for the current buffer or path.
 ---
 ---An explicit string or callback wins over marker-based discovery so callers
@@ -81,10 +128,10 @@ function M.resolve_root_dir(source, opts)
     return opts.root_dir
   end
 
-  return vim.fs.root(source, M.root_markers(opts.root_markers)) or vim.loop.cwd()
+  return find_root(source, M.root_markers(opts.root_markers)) or uv.cwd()
 end
 
----Build the `vim.lsp.start` config used by the tnix plugin.
+---Build the `vim.lsp.start` config used by the tnix plugin on Neovim < 0.11.
 ---@param source integer|string
 ---@param opts table|nil
 ---@return table
@@ -96,6 +143,29 @@ function M.server_config(source, opts)
     cmd = M.normalize_cmd(opts.cmd),
     cmd_env = type(opts.cmd_env) == "table" and opts.cmd_env or nil,
     root_dir = M.resolve_root_dir(source, opts),
+    init_options = type(opts.init_options) == "table" and opts.init_options or nil,
+    settings = type(opts.settings) == "table" and opts.settings or nil,
+  }
+end
+
+---Build the `vim.lsp.config()` table used on Neovim 0.11+.
+---
+---`root_dir` is expressed as the 0.11 callback form so the same discovery
+---rules (explicit root, callback, markers, cwd fallback) apply on both paths.
+---@param opts table|nil
+---@return table
+function M.lsp_config(opts)
+  opts = opts or {}
+
+  return {
+    cmd = M.normalize_cmd(opts.cmd),
+    cmd_env = type(opts.cmd_env) == "table" and opts.cmd_env or nil,
+    filetypes = M.filetypes(opts.filetypes),
+    root_dir = function(bufnr, on_dir)
+      on_dir(M.resolve_root_dir(bufnr, opts))
+    end,
+    init_options = type(opts.init_options) == "table" and opts.init_options or nil,
+    settings = type(opts.settings) == "table" and opts.settings or nil,
   }
 end
 

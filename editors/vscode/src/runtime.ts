@@ -10,6 +10,36 @@ export type RuntimeConfig = {
   watchPattern: string;
 };
 
+/**
+ * Common Nix profile locations for a tnix binary (`tnix-lsp` or `tnix`).
+ */
+export function defaultBinaryCandidates(
+  binary: string,
+  homePath: string = homedir(),
+): string[] {
+  return defaultServerPathCandidates(homePath).map((candidate) =>
+    candidate.replace(/tnix-lsp$/, binary),
+  );
+}
+
+/**
+ * Resolve the `tnix` CLI used by commands such as "Run Doctor": an explicit
+ * setting wins, then common Nix profile locations, then `tnix` on PATH.
+ */
+export function resolveCliPath(
+  configured?: string,
+  homePath: string = homedir(),
+  exists: (path: string) => boolean = existsSync,
+): string {
+  const trimmed = configured?.trim();
+  if (trimmed && trimmed.length > 0) return trimmed;
+  return (
+    defaultBinaryCandidates("tnix", homePath).find((candidate) =>
+      exists(candidate),
+    ) ?? "tnix"
+  );
+}
+
 export function defaultServerPathCandidates(
   homePath: string = homedir(),
 ): string[] {

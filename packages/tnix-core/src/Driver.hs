@@ -15,6 +15,7 @@ module Driver
     analyzeText,
     analyzeTextWith,
     compileFile,
+    compileFileUnchecked,
     compileFileWith,
     compileText,
     emitFileAs,
@@ -27,23 +28,32 @@ module Driver
     lookupSymbolType,
     newSupportCache,
     parseText,
+    AnalysisError (..),
+    analyzeTextDetailedWith,
+    renderAnalysisError,
+    renderAnalysisErrorWithRange,
+    analyzeTextForEditor,
+    analyzeTextForEditorWith,
+    spanToRange,
   )
 where
 
 import Alias
+import BuiltinPrelude (builtinPreludePath, builtinPreludeSource)
 import Check hiding (resolvePath)
 import Check qualified
 import Compile
 import Control.Applicative ((<|>))
 import Control.Exception (IOException, displayException, try)
 import Control.Monad (foldM, forM)
+import Data.ByteString qualified as ByteString
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (group, isSuffixOf, nub, sort)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Text.IO qualified as Text
+import Data.Text.Encoding (decodeUtf8Lenient)
 import Diagnostics (DiagnosticCode (..), withCode)
 import Emit
 import Indexed
@@ -51,7 +61,7 @@ import Kind
 import Parser
 import Pretty (renderExpr)
 import Syntax
-import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
+import System.Directory (doesDirectoryExist, doesFileExist, listDirectory, pathIsSymbolicLink)
 import System.FilePath (isAbsolute, joinPath, normalise, replaceExtension, splitDirectories, takeDirectory, (</>))
 import Type
 
@@ -60,7 +70,11 @@ import Type
 -- Keeping the parsed program alongside inferred schemes lets downstream tools
 -- answer both syntactic and semantic questions without reparsing.
 data Analysis = Analysis
-  { analysisProgram :: Program,
+  { -- | The parsed program with source locations stripped, so structural
+    -- consumers can pattern-match on it directly.
+    analysisProgram :: Program,
+    -- | The same program with 'ELoc' source spans retained.
+    analysisLocatedProgram :: Program,
     analysisRoot :: Maybe Scheme,
     analysisBindings :: Map Name Scheme,
     analysisAliases :: AliasEnv,
@@ -76,28 +90,90 @@ parseText path = either (Left . Text.unpack) Right . parseProgram path
 analyzeText :: FilePath -> Text -> IO (Either String Analysis)
 analyzeText path input = newSupportCache >>= \cache -> analyzeTextWith cache path input
 
+-- | A failed analysis: the coded message and, when known, the 1-based
+-- @(startLine, startColumn, endLine, endColumn)@ source range it refers to.
+data AnalysisError = AnalysisError
+  { analysisErrorMessage :: String,
+    analysisErrorRange :: Maybe (Int, Int, Int, Int)
+  }
+  deriving (Eq, Show)
+
+-- | Render an analysis error as text, prefixing `line:column:` when the
+-- error carries a location (matching the parser's convention).
+renderAnalysisError :: AnalysisError -> String
+renderAnalysisError err =
+  case analysisErrorRange err of
+    Just (line, column, _, _) -> show line <> ":" <> show column <> ": " <> analysisErrorMessage err
+    Nothing -> analysisErrorMessage err
+
+-- | Render an analysis error with its full 1-based range as a
+-- `line:col:endLine:endCol:` prefix, for editors that underline the span.
+renderAnalysisErrorWithRange :: AnalysisError -> String
+renderAnalysisErrorWithRange err =
+  case analysisErrorRange err of
+    Just (line, column, endLine, endColumn) ->
+      show line <> ":" <> show column <> ":" <> show endLine <> ":" <> show endColumn <> ": " <> analysisErrorMessage err
+    Nothing -> analysisErrorMessage err
+
+-- | 'analyzeText' with errors rendered by 'renderAnalysisErrorWithRange'.
+analyzeTextForEditor :: FilePath -> Text -> IO (Either String Analysis)
+analyzeTextForEditor path input = newSupportCache >>= \cache -> analyzeTextForEditorWith cache path input
+
+analyzeTextForEditorWith :: SupportCache -> FilePath -> Text -> IO (Either String Analysis)
+analyzeTextForEditorWith cache path input =
+  either (Left . renderAnalysisErrorWithRange) Right <$> analyzeTextDetailedWith cache path input
+
+-- | Convert a span of character offsets into a 1-based line/column range.
+-- Trailing whitespace absorbed by the lexer is trimmed from the end.
+spanToRange :: Text -> SrcSpan -> (Int, Int, Int, Int)
+spanToRange input (SrcSpan start end) =
+  let clampedEnd = max start (min end (Text.length input))
+      trimmedEnd = start + Text.length (Text.stripEnd (Text.take (clampedEnd - start) (Text.drop start input)))
+      (startLine, startColumn) = position start
+      (endLine, endColumn) = position (max start trimmedEnd)
+   in (startLine, startColumn, endLine, endColumn)
+  where
+    position offset =
+      let before = Text.take offset input
+          lineNo = Text.count "\n" before + 1
+          column = Text.length (snd (Text.breakOnEnd "\n" before)) + 1
+       in (lineNo, column)
+
 -- | 'analyzeText' reusing declaration support already loaded into @cache@.
 analyzeTextWith :: SupportCache -> FilePath -> Text -> IO (Either String Analysis)
-analyzeTextWith cache path input = do
+analyzeTextWith cache path input = either (Left . renderAnalysisError) Right <$> analyzeTextDetailedWith cache path input
+
+-- | Analyze a buffer, keeping structured location information on failure.
+analyzeTextDetailedWith :: SupportCache -> FilePath -> Text -> IO (Either AnalysisError Analysis)
+analyzeTextDetailedWith cache path input = do
   support <- loadSupportWith cache path
   pure $ do
-    supportWorld <- support
-    program <- parseText path input
-    _ <- validateProgramKinds (programAliases program <> worldAliases supportWorld) program
-    _ <- validateProgramIndexedTypes program
-    localAmbient <- collectAmbient path program
+    supportWorld <- plain support
+    located <- case parseProgramLocatedDetailed path input of
+      Left err -> Left (AnalysisError (Text.unpack (parseErrorMessage err)) (Just (parseErrorLine err, parseErrorColumn err, parseErrorLine err, parseErrorColumn err)))
+      Right program -> Right program
+    let program = stripProgramLocations located
+    _ <- plain (validateProgramKinds (programAliases program <> worldAliases supportWorld) program)
+    _ <- plain (validateProgramIndexedTypes program)
+    localAmbient <- plain (collectAmbient path program)
     let aliases = mkAliasEnv (programAliases program <> worldAliases supportWorld)
         ambient = localAmbient <> worldAmbient supportWorld
         context = CheckContext{checkAliases = aliases, checkAmbient = ambient, checkFile = path, checkOpenScope = False}
-    result <- checkProgram context program
+    result <- case checkProgramDetailed context located of
+      Left err -> Left (AnalysisError (checkErrorMessage err) (spanToRange input <$> checkErrorSpan err))
+      Right ok -> Right ok
     pure
       Analysis
         { analysisProgram = program,
+          analysisLocatedProgram = located,
           analysisRoot = resultRoot result,
           analysisBindings = resultBindings result,
           analysisAliases = aliases,
           analysisAmbient = ambient
         }
+
+plain :: Either String a -> Either AnalysisError a
+plain = either (\message -> Left (AnalysisError message Nothing)) Right
 
 -- | Read and analyze a file from disk.
 analyzeFile :: FilePath -> IO (Either String Analysis)
@@ -119,6 +195,16 @@ compileTextWith cache path input = do
 -- | Compile a file from disk.
 compileFile :: FilePath -> IO (Either String Text)
 compileFile path = newSupportCache >>= \cache -> compileFileWith cache path
+
+-- | Erase types without type-checking (like TypeScript's transpile-only
+-- mode): parse errors still fail, type errors do not.
+compileFileUnchecked :: FilePath -> IO (Either String Text)
+compileFileUnchecked path = do
+  inputResult <- readTextFile path
+  pure $ do
+    input <- inputResult
+    program <- parseText path input
+    either (Left . Text.unpack) Right (compileProgram program)
 
 -- | 'compileFile' reusing declaration support already loaded into @cache@.
 compileFileWith :: SupportCache -> FilePath -> IO (Either String Text)
@@ -226,7 +312,30 @@ loadSupportWith (SupportCache ref) path = do
       loaded <- loadSupportBundle root
       modifyIORef' ref (Map.insert root loaded)
       pure loaded
-  pure (bundle >>= supportWorldFor path)
+  pure (withBuiltinPrelude <$> (bundle >>= supportWorldFor path))
+
+-- | The `builtins` declarations embedded in every tnix binary.
+--
+-- They are parsed once (lazily) and form the base of every world, so
+-- `builtins.*` and global builtins such as `toString` are typed with no
+-- project setup. A workspace that declares `builtins` itself takes precedence.
+builtinPreludeWorld :: Either String World
+builtinPreludeWorld = do
+  program <- parseText builtinPreludePath builtinPreludeSource
+  ambient <- collectAmbient builtinPreludePath program
+  pure World{worldAliases = programAliases program, worldAmbient = ambient}
+{-# NOINLINE builtinPreludeWorld #-}
+
+withBuiltinPrelude :: World -> World
+withBuiltinPrelude world =
+  case builtinPreludeWorld of
+    Left _ -> world
+    Right prelude ->
+      World
+        { -- Prelude aliases come first so project aliases of the same name win.
+          worldAliases = worldAliases prelude <> worldAliases world,
+          worldAmbient = Map.union (worldAmbient world) (worldAmbient prelude)
+        }
 
 loadSupportBundle :: FilePath -> IO (Either String SupportBundle)
 loadSupportBundle root = do
@@ -407,22 +516,40 @@ findDeclarationFiles dir = do
         then findDeclarationFiles path
         else pure [normalise path | ".d.tnix" `isSuffixOf` name]
 
+-- | Find the `.d.tnix` files a workspace contributes.
+--
+-- A real workspace (one with a marker such as `tnix.config.tnix`,
+-- `flake.nix`, or `.git`) is searched to any depth; a bare directory only a
+-- few levels deep, so running tnix in `$HOME` or a temp directory never walks
+-- an unbounded tree. Hidden directories, build outputs, and symlinked
+-- directories (e.g. Nix `result` links into the store) are always skipped.
 findWorkspaceDeclarationFiles :: FilePath -> IO [FilePath]
-findWorkspaceDeclarationFiles root = go root
+findWorkspaceDeclarationFiles root = do
+  marked <- hasWorkspaceMarker root
+  go (if marked then maxBound else unmarkedSearchDepth) root
   where
-    go dir = do
+    unmarkedSearchDepth = 4 :: Int
+    go depth dir = do
       names <- sort <$> listDirectory dir
       fmap concat $
         forM names $ \name -> do
           let path = dir </> name
           isDir <- doesDirectoryExist path
+          isLink <- pathIsSymbolicLink path
           if isDir
-            then do
-              nestedWorkspace <- if normalise path == normalise root then pure False else hasWorkspaceMarker path
-              if nestedWorkspace
+            then
+              if depth <= 0 || isLink || ignoredDirectory name
                 then pure []
-                else go path
+                else do
+                  nestedWorkspace <- if normalise path == normalise root then pure False else hasWorkspaceMarker path
+                  if nestedWorkspace
+                    then pure []
+                    else go (depth - 1) path
             else pure [normalise path | ".d.tnix" `isSuffixOf` name]
+    ignoredDirectory name =
+      take 1 name == "."
+        || name `elem` ["node_modules", "dist-newstyle", "dist", "target", "result"]
+        || take 7 name == "result-"
 
 -- | Resolve an ambient declaration target.
 --
@@ -492,9 +619,12 @@ duplicateNames = foldr step [] . group . sort
 firstError :: String -> Either String a -> Either String a
 firstError prefix = either (Left . (prefix <>)) Right
 
+-- | Read a source file as UTF-8 regardless of the process locale (Nix build
+-- sandboxes run with a C locale). Invalid bytes become U+FFFD instead of
+-- aborting the read.
 readTextFile :: FilePath -> IO (Either String Text)
 readTextFile path = do
-  result <- try @IOException (Text.readFile path)
+  result <- try @IOException (decodeUtf8Lenient <$> ByteString.readFile path)
   pure $
     case result of
       Left err -> Left (withCode TD0001ReadFailed ("failed to read " <> path <> ": " <> displayException err))

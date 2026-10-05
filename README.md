@@ -39,20 +39,32 @@ declare "./legacy/default.nix" {
 };
 
 let
-  map :: forall f a b. Functor f => (a -> b) -> f a -> f b;
-  map = f: xs: builtins.map f xs;
+  some :: forall a. a -> Option a;
+  some = value: { _tag = "some"; inherit value; };
+
+  labelOf = pkg: { label = pkg.name; };
+
+  legacy = import ./legacy/default.nix;
 in
-  import ./legacy/default.nix {
-    name = "hello";
-    version = "1.0.0";
-  }
+{ name ? "hello", version, ... }@args:
+{
+  package = legacy.mkPkg { inherit name version; };
+  tag = some (labelOf args).label;
+}
 ```
 
-After compilation, type information is erased and only ordinary Nix code remains.
+`tnix check` infers `labelOf :: forall t0. { name :: t0; ... } %1 -> { label :: t0; }`
+(a row-polymorphic record argument), types the file's argument as
+`{ name? :: String; version :: String; ... }`, and checks the call to the
+untyped `legacy/default.nix` against its declaration. `Derivation` comes from
+the built-in prelude that types every Nix builtin. After compilation, type
+information is erased and only ordinary Nix code remains.
 
 ## Design Docs
 
 - [Getting Started](./docs/getting-started.md)
+- [Tutorial](./docs/tutorial/index.md)
+- [Editor Setup](./docs/editors.md)
 - [Adopting tnix (Migration)](./docs/migration.md)
 - [Troubleshooting](./docs/troubleshooting.md)
 - [Language Reference](./docs/language-reference.md)
@@ -75,36 +87,64 @@ After compilation, type information is erased and only ordinary Nix code remains
 - Haskell monorepo for parser, checker, compiler, emitter, CLI, and LSP
 - Nix-based development environment
 - `pnpm`-managed editor tooling
-- VS Code, Zed, and Neovim integrations
+- VS Code, Cursor, VSCodium, Zed, Neovim, and Helix integrations, installed with
+  `tnix ide install <editor>` and diagnosed with `tnix doctor`
+- full Nix expression syntax: attrset patterns with defaults and `@` binders,
+  `inherit (src)`, nested and dynamic attribute paths, `or` defaults, every
+  operator including `/`, `->`, `|>` and `<|`, `<nixpkgs>` and interpolated
+  paths; compiled output parses to the same AST as the source under
+  `nix-instantiate --parse`
+- Hindley-Milner let-polymorphism, row-polymorphic open records
+  (`{ a :: T; ... }`), optional fields (`name? :: T`), `AttrsOf` dictionaries,
+  and rigid `forall` signatures
 - gradual typing with ambient declarations, HKT support, indexed `Vec` / `Matrix` / `Tensor`, and heterogeneous `Tuple`
 - numeric singleton/primitive support via `Float`, `Number`, `Nat`, `Range`, and `Unit`
 - explicit `expr as Type` casts for widening, narrowing, and gradual-boundary assertions
 - TypeScript-style checker directives via `# @tnix-ignore` and `# @tnix-expected`
+- diagnostics with exact source spans (`line:col: [CODE] message`), naming the
+  missing or ill-typed field of a record
+- a typed prelude for every Nix builtin, embedded in the binary, so `builtins.*`
+  and globals such as `toString` and `map` are checked with no setup
 - project bootstrapping via `tnix init`, `tnix scaffold`, and `tnix.config.tnix`
 - shipped declaration files for `builtins`, `flake.nix`, and `tnix.config.tnix`
 - bundled declaration packs under `registry/` for workspace files and popular Nix ecosystem surfaces
 
-Executable `.tnix` currently targets a reliable Nix-like subset rather than full
-parser parity, but it now covers the common flake-oriented shapes that were
-previously awkward: quoted attribute names, dynamic `${...}` selections,
-attrset lambda binders, and indented `'' ... ''` strings all round-trip through
-the parser, checker, and compiler.
+Unannotated Nix code is accepted gradually: dependencies injected through an
+attrset pattern (`{ lib, fetchFromGitHub, ... }:`) stay `dynamic` instead of
+being pinned to their first use, and about 98% of a sample of unannotated
+nixpkgs files type-check as they are.
 
 ## Installation
 
-Install the CLI and language server from the published flake:
+On Linux and macOS, install the prebuilt CLI and language server with:
 
 ```bash
-nix profile install github:ubugeeei/tnix#tnix
-nix profile install github:ubugeeei/tnix#tnix-lsp
+curl -fsSL https://tnix.dev/install.sh | sh
 ```
 
-Or download the prebuilt archives attached to each GitHub release and place
-`tnix` / `tnix-lsp` somewhere on your `PATH`. Prebuilt archives ship for
-Linux x64 and macOS arm64 today; see [docs/support-matrix.md](./docs/support-matrix.md)
-for the full per-platform tier table. **Windows users:** the CLI is not tested
-on Windows. Use WSL2 with the Linux x64 instructions, or build from source
-through the flake on a Linux/macOS host.
+The installer picks the archive for your platform (Linux x64/arm64, macOS
+arm64/x64), verifies its SHA-256 checksum, and installs `tnix` and `tnix-lsp`
+into `~/.tnix/bin`. The binaries do not depend on Nix. Pin a release with
+`curl -fsSL https://tnix.dev/install.sh | TNIX_VERSION=0.5.0 sh`, choose
+another directory with `TNIX_INSTALL_DIR`, and remove everything with
+`curl -fsSL https://tnix.dev/install.sh | sh -s -- --uninstall`.
+
+With Nix, use the flake instead:
+
+```bash
+nix profile install github:ubugeeei-prod/tnix        # tnix + tnix-lsp
+nix run github:ubugeeei-prod/tnix -- check ./main.tnix
+```
+
+The flake also provides `overlays.default` and NixOS / nix-darwin / Home Manager
+modules (`programs.tnix.enable = true;`). See
+[docs/getting-started.md](./docs/getting-started.md#installation) for details.
+
+You can also download the archives (`tnix-<version>-<target>.tar.gz`, with
+`.sha256` checksums and build provenance attestations) from GitHub Releases.
+See [docs/support-matrix.md](./docs/support-matrix.md) for the per-platform
+tier table. **Windows users:** the CLI is not tested on Windows. Use WSL2 and
+run the install script there.
 
 Quick verification:
 
@@ -114,6 +154,21 @@ tnix-lsp --version
 tnix check ./examples/main.tnix
 tnix check-project ./examples
 ```
+
+### Editor setup
+
+One command installs the editor extension and writes the editor config:
+
+```bash
+tnix ide install vscode     # or: cursor, vscodium, zed, neovim, helix
+tnix ide install zed --global --dry-run   # preview user-level changes
+tnix ide list               # supported editors and what is detected
+tnix doctor                 # check tnix / tnix-lsp / project / editor wiring
+```
+
+Settings are merged, never clobbered, and re-running is a no-op. See
+[docs/editors.md](./docs/editors.md) for what each editor gets and for every
+flag.
 
 For local development, enter the reproducible shell first:
 
@@ -206,10 +261,10 @@ Marketplace and Open VSX.
 The flake also exports installable packages and runnable apps:
 
 ```bash
-nix build github:ubugeeei/tnix#tnix
-nix run github:ubugeeei/tnix#tnix -- check ./main.tnix
-nix run github:ubugeeei/tnix#tnix-lsp
-nix flake check github:ubugeeei/tnix --accept-flake-config
+nix build github:ubugeeei-prod/tnix#tnix
+nix run github:ubugeeei-prod/tnix#tnix -- check ./main.tnix
+nix run github:ubugeeei-prod/tnix#tnix-lsp
+nix flake check github:ubugeeei-prod/tnix --accept-flake-config
 ```
 
 See [RELEASING.md](./RELEASING.md) for the release flow.

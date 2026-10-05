@@ -23,6 +23,8 @@ module Type
     freeTypeVars,
     schemeFromAnnotation,
     tAny,
+    tAttrsOf,
+    mkOpenRecord,
     substituteMetas,
     substituteTypeVars,
     tBool,
@@ -109,6 +111,14 @@ data Type
   | TUnknown
   | TFun Multiplicity Type Type
   | TRecord (Map Name Type)
+  | -- | An open record (row): at least these fields, plus whatever the tail
+    -- describes. During inference the tail is a meta, so field requirements
+    -- can accumulate; after generalization it becomes a row variable. A
+    -- `dynamic` tail means "unknown further fields".
+    TOpenRecord (Map Name Type) Type
+  | -- | Marks a record field that may be absent, written `name? :: T`. Only
+    -- meaningful as a field type of 'TRecord' or 'TOpenRecord'.
+    TOptional Type
   | TUnion [Type]
   | TApp Type Type
   | TForall [Name] Type
@@ -149,6 +159,19 @@ tAny = TAny
 tDynamic = TDynamic
 tUnknown = TUnknown
 
+-- | Smart constructor for the built-in attribute-set dictionary type.
+tAttrsOf :: Type -> Type
+tAttrsOf = TApp (TCon "AttrsOf")
+
+-- | Build an open record, flattening nested rows: a tail that is itself a
+-- record contributes its fields (earlier fields win), and a closed tail closes
+-- the result.
+mkOpenRecord :: Map Name Type -> Type -> Type
+mkOpenRecord fields = \case
+  TOpenRecord more tail' -> mkOpenRecord (Map.union fields more) tail'
+  TRecord more -> TRecord (Map.union fields more)
+  tail' -> TOpenRecord fields tail'
+
 -- | Smart constructor for the built-in list type constructor.
 tList :: Type -> Type
 tList = TApp (TCon "List")
@@ -180,6 +203,8 @@ freeTypeVars = \case
   TAny -> Set.empty
   TFun _ a b -> freeTypeVars a <> freeTypeVars b
   TRecord fields -> foldMap freeTypeVars fields
+  TOpenRecord fields tail' -> foldMap freeTypeVars fields <> freeTypeVars tail'
+  TOptional inner -> freeTypeVars inner
   TUnion members -> foldMap freeTypeVars members
   TApp f x -> freeTypeVars f <> freeTypeVars x
   TForall vars body -> freeTypeVars body `Set.difference` Set.fromList vars
@@ -197,6 +222,8 @@ freeMetas = \case
   TAny -> Set.empty
   TFun _ a b -> freeMetas a <> freeMetas b
   TRecord fields -> foldMap freeMetas fields
+  TOpenRecord fields tail' -> foldMap freeMetas fields <> freeMetas tail'
+  TOptional inner -> freeMetas inner
   TUnion members -> foldMap freeMetas members
   TApp f x -> freeMetas f <> freeMetas x
   TForall _ body -> freeMetas body
@@ -226,6 +253,8 @@ substituteTypeVars env
       TAny -> TAny
       TFun mult a b -> TFun mult (go a) (go b)
       TRecord fields -> TRecord (fmap go fields)
+      TOpenRecord fields tail' -> mkOpenRecord (fmap go fields) (go tail')
+      TOptional inner -> TOptional (go inner)
       TUnion members -> TUnion (go <$> members)
       TApp f x -> TApp (go f) (go x)
       TForall vars body -> TForall vars (substituteTypeVars (foldr Map.delete env vars) body)
@@ -250,6 +279,8 @@ substituteMetas env
       TAny -> TAny
       TFun mult a b -> TFun mult (go a) (go b)
       TRecord fields -> TRecord (fmap go fields)
+      TOpenRecord fields tail' -> mkOpenRecord (fmap go fields) (go tail')
+      TOptional inner -> TOptional (go inner)
       TUnion members -> TUnion (go <$> members)
       TApp f x -> TApp (go f) (go x)
       TForall vars body -> TForall vars (go body)

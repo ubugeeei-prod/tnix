@@ -16,15 +16,27 @@ import Type
 
 -- | Entry point for type parsing.
 typeParser :: Parser Type
-typeParser = forallParser <|> conditionalParser
+typeParser = forallParser <|> (optional constraintContext *> conditionalParser)
 
 -- | Parse explicit universal quantification.
 forallParser :: Parser Type
 forallParser = try $ do
   reserved "forall"
-  vars <- some identifier
+  vars <- some typeIdentifier
   _ <- symbol "."
   TForall vars <$> typeParser
+
+-- | Parse a Haskell-style constraint context such as `Functor f =>` or
+-- `(Eq a, Show a) =>`.
+--
+-- Constraints are accepted so signatures can document the capabilities they
+-- rely on, but they are not enforced yet: tnix has no type classes, so the
+-- context is dropped after parsing.
+constraintContext :: Parser [Type]
+constraintContext = try $ do
+  constraints <- try (parens (sepBy1 appParser (symbol ","))) <|> (pure <$> appParser)
+  _ <- symbol "=>"
+  pure constraints
 
 -- | Parse conditional types of the form `A extends B ? C : D`.
 conditionalParser :: Parser Type
@@ -88,15 +100,26 @@ atomParser =
     ]
 
 -- | Parse structural record types.
+--
+-- Fields are `name :: T;`, optional fields `name? :: T;`. A trailing `...`
+-- (optionally named, `...r`) makes the record open: it may hold further
+-- fields of unknown type.
 recordParser :: Parser Type
-recordParser = TRecord . Map.fromList <$> braces (many fieldParser)
+recordParser = braces $ do
+  fields <- many fieldParser
+  rowTail <- optional (symbol "..." *> optional typeIdentifier <* optional (symbol ";"))
+  pure $ case rowTail of
+    Nothing -> TRecord (Map.fromList fields)
+    Just Nothing -> TOpenRecord (Map.fromList fields) TDynamic
+    Just (Just name) -> TOpenRecord (Map.fromList fields) (TVar name)
   where
     fieldParser = do
       name <- attrName
+      isOptional <- option False (True <$ symbol "?")
       _ <- symbol "::"
       ty <- typeParser
       _ <- symbol ";"
-      pure (name, ty)
+      pure (name, if isOptional then TOptional ty else ty)
 
 -- | Parse type-level shape lists such as `[2 3 4]`.
 typeListParser :: Parser Type
@@ -121,7 +144,7 @@ shapeItemParser =
 
 -- | Parse an `infer` binder used inside conditional-type patterns.
 inferParser :: Parser Type
-inferParser = reserved "infer" *> (TInfer <$> identifier)
+inferParser = reserved "infer" *> (TInfer <$> typeIdentifier)
 
 -- | Parse either a constructor-like name or a type variable.
 --
@@ -129,7 +152,7 @@ inferParser = reserved "infer" *> (TInfer <$> identifier)
 -- aliases that feel familiar to both Haskell and TypeScript audiences.
 varOrConParser :: Parser Type
 varOrConParser = do
-  name <- identifier
+  name <- typeIdentifier
   pure $
     case name of
       _

@@ -9,17 +9,26 @@
 module Main (main) where
 
 import Cli qualified
+import Control.Monad (unless)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Data.Version (showVersion)
+import GHC.IO.Encoding (setLocaleEncoding)
 import Options.Applicative
 import Paths_tnix_cli qualified as PackageInfo
+import System.Environment (lookupEnv)
 import System.Exit (die, exitFailure)
+import System.IO (hIsTerminalDevice, hSetEncoding, stderr, stdout, utf8)
 import System.Process (callProcess)
 
 -- | Parse arguments and execute the requested command.
 main :: IO ()
-main = execParser opts >>= run
+main = do
+  -- Reports use ✓/✗ marks; do not let a C locale turn them into a crash.
+  mapM_ (`hSetEncoding` utf8) [stdout, stderr]
+  -- Source and config files are UTF-8 whatever the locale says.
+  setLocaleEncoding utf8
+  execParser opts >>= run
   where
     opts =
       info
@@ -36,6 +45,13 @@ run (Cli.Version format) =
   putPayload (Cli.renderVersion (Text.pack (showVersion PackageInfo.version)) format)
 run (Cli.Lsp logFile) =
   callProcess "tnix-lsp" (Cli.lspCommandArgs logFile)
+run (Cli.Doctor format) = do
+  tty <- hIsTerminalDevice stdout
+  noColor <- lookupEnv "NO_COLOR"
+  let color = tty && maybe True null noColor
+  (ok, report) <- Cli.runDoctor (Text.pack (showVersion PackageInfo.version)) color format
+  putPayload report
+  unless ok exitFailure
 run cmd =
   Cli.executeCommand cmd >>= \case
     Left err ->

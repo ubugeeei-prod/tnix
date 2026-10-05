@@ -20,23 +20,40 @@ jobs:
   build-assets:
     name: Build Release Assets (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # Linux release binaries are fully static (pkgsStatic / musl). Until the
+    # Cachix cache is warm that means compiling the musl GHC cross compiler,
+    # which can take a few hours on a cold runner.
+    timeout-minutes: ${{ matrix.timeout }}
     permissions:
       attestations: write
       contents: read
       id-token: write
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
             label: linux-x64
+            timeout: 360
             archive: tnix-${{ github.ref_name }}-linux-x64.tar.gz
             sha: tnix-${{ github.ref_name }}-linux-x64.sha256
+          - os: ubuntu-24.04-arm
+            label: linux-arm64
+            timeout: 360
+            archive: tnix-${{ github.ref_name }}-linux-arm64.tar.gz
+            sha: tnix-${{ github.ref_name }}-linux-arm64.sha256
           - os: macos-latest
             label: macos-arm64
+            timeout: 90
             archive: tnix-${{ github.ref_name }}-macos-arm64.tar.gz
             sha: tnix-${{ github.ref_name }}-macos-arm64.sha256
+          - os: macos-15-intel
+            label: macos-x64
+            timeout: 120
+            archive: tnix-${{ github.ref_name }}-macos-x64.tar.gz
+            sha: tnix-${{ github.ref_name }}-macos-x64.sha256
     steps:
       - name: Check out sources (Blacksmith)
         if: ${{ startsWith(matrix.os, 'blacksmith-') }}
@@ -55,107 +72,43 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Mount Cabal package cache
-        if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@94697d49e77d0dd78b77deb85ad3de63a28b4b8a # v1.4.0
+      # Optional binary cache: pulls from and pushes to https://tnix.cachix.org
+      # when the CACHIX_AUTH_TOKEN secret is configured, skipped otherwise.
+      - name: Set up Cachix
+        if: ${{ env.CACHIX_AUTH_TOKEN != '' }}
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
-          key: ${{ github.repository }}-cabal-packages-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
-          path: ~/.cabal/packages
-
-      - name: Mount Cabal store
-        if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@94697d49e77d0dd78b77deb85ad3de63a28b4b8a # v1.4.0
-        with:
-          key: ${{ github.repository }}-cabal-store-${{ runner.os }}-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
-          path: ~/.cabal/store
-
-      - name: Cache Cabal dependencies
-        if: ${{ !startsWith(matrix.os, 'blacksmith-') }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
-        with:
-          path: |
-            ~/.cabal/packages
-            ~/.cabal/store
-          key: ${{ runner.os }}-cabal-${{ hashFiles('cabal.project', 'packages/*/*.cabal') }}
-          restore-keys: |
-            ${{ runner.os }}-cabal-
-
-      - name: Resolve pnpm store path
-        id: pnpm-store
-        run: |
-          store_path="$(nix develop --accept-flake-config --command pnpm store path --silent | tail -n 1)"
-          echo "path=$store_path" >> "$GITHUB_OUTPUT"
-
-      - name: Mount pnpm store
-        if: ${{ startsWith(matrix.os, 'blacksmith-') }}
-        uses: useblacksmith/stickydisk@94697d49e77d0dd78b77deb85ad3de63a28b4b8a # v1.4.0
-        with:
-          key: ${{ github.repository }}-pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          path: ${{ steps.pnpm-store.outputs.path }}
-
-      - name: Cache pnpm store
-        if: ${{ !startsWith(matrix.os, 'blacksmith-') }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
-        with:
-          path: ${{ steps.pnpm-store.outputs.path }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-
-      - name: Install workspace dependencies
-        run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
-
-      - name: Prime the Cabal package index
-        run: nix develop --accept-flake-config --command cabal update
+          name: tnix
+          authToken: ${{ env.CACHIX_AUTH_TOKEN }}
 
       - name: Validate release metadata
-        run: nix develop --accept-flake-config --command vp run check:versions
+        run: nix run --accept-flake-config --inputs-from . nixpkgs#nodejs_24 -- --experimental-strip-types ./scripts/check-version-sync.ts
 
-      - name: Build release binaries
-        env:
-          REF_NAME: ${{ github.ref_name }}
-        run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/package-release.ts "$REF_NAME" "${{ matrix.label }}" "${{ matrix.archive }}" "${{ matrix.sha }}"
-
-      - name: Smoke test packaged binaries
+      # `.#release-bundle` is built natively for the runner's system, so every
+      # target is produced on a matching host. The derivation itself rejects
+      # binaries that are not static (Linux) or that load anything outside
+      # /usr/lib and /System (macOS).
+      - name: Build release bundle
+        id: bundle
         run: |
           set -euo pipefail
-          stage_dir="$(mktemp -d)"
-          tar -C "$stage_dir" -xzf "${{ matrix.archive }}"
-          archive_root="$(find "$stage_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-          tnix_bin="$archive_root/bin/tnix"
-          lsp_bin="$archive_root/bin/tnix-lsp"
+          bundle="$(nix build --accept-flake-config --no-link --print-out-paths -L .#release-bundle | tail -n 1)"
+          echo "path=$bundle" >> "$GITHUB_OUTPUT"
+          ls -l "$bundle/bin"
 
-          # Version probes: confirms the binaries actually start and load their data files.
-          "$tnix_bin" --version
-          "$lsp_bin" --version
-
-          # Functional smoke against the in-tree examples and dogfood corpora, so a
-          # binary that links but can't type-check anything fails the release.
-          "$tnix_bin" check ./examples/main.tnix
-          "$tnix_bin" check-project ./examples --format json >/dev/null
-          "$tnix_bin" check ./dogfood/flake-surface.tnix
-
-          # Minimal JSON-RPC handshake against the packaged LSP. We send
-          # `initialize`, then `exit` (which the server handles by exiting
-          # cleanly), and assert the server emits at least one JSON-RPC
-          # response before terminating.
-          lsp_log="$(mktemp)"
-          send_message() {
-            local body="$1"
-            printf 'Content-Length: %s\r\n\r\n%s' "${#body}" "$body"
-          }
-          {
-            send_message '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
-            send_message '{"jsonrpc":"2.0","method":"exit","params":null}'
-          } | "$lsp_bin" --stdio >"$lsp_log" 2>&1 || true
-          if ! grep -q '"jsonrpc":"2.0"' "$lsp_log"; then
-            echo "tnix-lsp did not emit any JSON-RPC response during smoke test" >&2
-            cat "$lsp_log" >&2
-            exit 1
-          fi
+      - name: Package release archive
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          LABEL: ${{ matrix.label }}
+          ARCHIVE: ${{ matrix.archive }}
+          SHA: ${{ matrix.sha }}
+          BUNDLE: ${{ steps.bundle.outputs.path }}
+        run: nix run --accept-flake-config --inputs-from . nixpkgs#nodejs_24 -- --experimental-strip-types ./scripts/package-release.ts "$REF_NAME" "$LABEL" "$ARCHIVE" "$SHA" --bundle "$BUNDLE"
 
       - name: Verify release checksum
-        run: nix develop --accept-flake-config --command node --experimental-strip-types ./scripts/package-release.ts verify-checksum "${{ matrix.sha }}"
+        env:
+          SHA: ${{ matrix.sha }}
+        run: nix run --accept-flake-config --inputs-from . nixpkgs#nodejs_24 -- --experimental-strip-types ./scripts/package-release.ts verify-checksum "$SHA"
 
       - name: Generate SBOM for release archive
         id: sbom
@@ -186,6 +139,124 @@ jobs:
             ./${{ matrix.sha }}
             ./tnix-${{ github.ref_name }}-${{ matrix.label }}.cdx.json
           retention-days: 7
+
+  # Runs every archive on a fresh runner that never had Nix installed, through
+  # the same install.sh that https://tnix.dev/install.sh serves, so a binary
+  # that still needs /nix/store fails the release before it is published.
+  smoke-test-assets:
+    name: Smoke Test (${{ matrix.label }}, no Nix)
+    needs: build-assets
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x64
+          - os: ubuntu-24.04-arm
+            label: linux-arm64
+          - os: macos-latest
+            label: macos-arm64
+          - os: macos-15-intel
+            label: macos-x64
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download release archive
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ matrix.label }}
+          path: ./release-download/${{ github.ref_name }}
+
+      - name: Assert Nix is absent
+        run: |
+          if command -v nix >/dev/null 2>&1 || [ -d /nix/store ]; then
+            echo "this job must run on a machine without Nix" >&2
+            exit 1
+          fi
+
+      - name: Install with install.sh from the local release
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          export TNIX_DOWNLOAD_BASE="file://$PWD/release-download"
+          export TNIX_VERSION="$REF_NAME"
+          export TNIX_INSTALL_DIR="$RUNNER_TEMP/tnix/bin"
+          sh ./docs/public/install.sh
+          echo "$TNIX_INSTALL_DIR" >> "$GITHUB_PATH"
+
+      - name: Inspect binary dependencies
+        run: |
+          set -euo pipefail
+          for bin in "$(command -v tnix)" "$(command -v tnix-lsp)"; do
+            if [ "$RUNNER_OS" = macOS ]; then
+              otool -L "$bin"
+              if otool -L "$bin" | tail -n +2 | grep -Ev '^[[:space:]]+(/usr/lib/|/System/Library/)'; then
+                echo "$bin links libraries outside /usr/lib and /System" >&2
+                exit 1
+              fi
+            else
+              file "$bin"
+              file "$bin" | grep -Eq 'statically linked|static-pie linked'
+            fi
+          done
+
+      - name: Smoke test packaged binaries
+        run: |
+          set -euo pipefail
+          # Version probes: confirms the binaries actually start.
+          tnix --version
+          tnix-lsp --version
+
+          # Functional smoke against the in-tree examples and dogfood corpora, so a
+          # binary that links but can't type-check anything fails the release.
+          tnix check ./examples/main.tnix
+          tnix check-project ./examples --format json >/dev/null
+          tnix check ./dogfood/flake-surface.tnix
+
+          # Minimal JSON-RPC handshake against the packaged LSP. We send
+          # `initialize`, then `exit` (which the server handles by exiting
+          # cleanly), and assert the server emits at least one JSON-RPC
+          # response before terminating.
+          lsp_log="$(mktemp)"
+          send_message() {
+            local body="$1"
+            printf 'Content-Length: %s\r\n\r\n%s' "${#body}" "$body"
+          }
+          {
+            send_message '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+            send_message '{"jsonrpc":"2.0","method":"exit","params":null}'
+          } | tnix-lsp --stdio >"$lsp_log" 2>&1 || true
+          if ! grep -q '"jsonrpc":"2.0"' "$lsp_log"; then
+            echo "tnix-lsp did not emit any JSON-RPC response during smoke test" >&2
+            cat "$lsp_log" >&2
+            exit 1
+          fi
+
+      - name: Run static Linux binaries on other distributions
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          set -euo pipefail
+          bin_dir="$(dirname "$(command -v tnix)")"
+          for image in alpine:latest debian:oldstable-slim; do
+            echo "::group::$image"
+            docker run --rm -v "$bin_dir:/opt/tnix:ro" -v "$PWD:/src:ro" -w /src "$image" \
+              sh -c '/opt/tnix/tnix --version && /opt/tnix/tnix-lsp --version && /opt/tnix/tnix check ./examples/main.tnix >/dev/null'
+            echo "::endgroup::"
+          done
+
+      - name: Uninstall with install.sh
+        run: |
+          set -euo pipefail
+          TNIX_INSTALL_DIR="$RUNNER_TEMP/tnix/bin" sh ./docs/public/install.sh --uninstall
+          test ! -e "$RUNNER_TEMP/tnix/bin/tnix"
 
   build-vscode-extension:
     name: Build VS Code Extension
@@ -281,6 +352,7 @@ jobs:
     timeout-minutes: 15
     needs:
       - build-assets
+      - smoke-test-assets
       - build-vscode-extension
     permissions:
       contents: write
@@ -372,3 +444,46 @@ jobs:
       - name: Skip marketplace publish
         if: ${{ env.VSCE_PAT == '' && env.OVSX_PAT == '' }}
         run: echo "No VSCE_PAT or OVSX_PAT secret configured; skipping marketplace publish."
+
+  # Installs the just-published release through install.sh on every supported
+  # platform, as `curl -fsSL https://tnix.dev/install.sh | sh` would
+  # (tnix.dev/download/* redirects to these GitHub release assets).
+  verify-install-script:
+    name: Verify install.sh (${{ matrix.label }})
+    needs: publish-release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x64
+          - os: ubuntu-24.04-arm
+            label: linux-arm64
+          - os: macos-latest
+            label: macos-arm64
+          - os: macos-15-intel
+            label: macos-x64
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the published release
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          export TNIX_REPO="$REPOSITORY"
+          export TNIX_DOWNLOAD_BASE="https://github.com/$REPOSITORY/releases/download"
+          export TNIX_VERSION="$REF_NAME"
+          export TNIX_INSTALL_DIR="$RUNNER_TEMP/tnix/bin"
+          sh ./docs/public/install.sh
+          "$TNIX_INSTALL_DIR/tnix" --version
+          "$TNIX_INSTALL_DIR/tnix-lsp" --version
+          "$TNIX_INSTALL_DIR/tnix" check ./examples/main.tnix

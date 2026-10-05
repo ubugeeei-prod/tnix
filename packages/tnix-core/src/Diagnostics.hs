@@ -59,6 +59,7 @@ data DiagnosticCode
   | TC0019NotComparable
   | TC0020NotConcatenable
   | TC0021NotUpdatable
+  | TC0022DynamicLetBinding
   | -- Driver / project (TD)
     TD0001ReadFailed
   | TD0002DuplicateAmbientDeclaration
@@ -111,6 +112,7 @@ diagnosticCodeText code = case code of
   TC0019NotComparable -> "TC0019"
   TC0020NotConcatenable -> "TC0020"
   TC0021NotUpdatable -> "TC0021"
+  TC0022DynamicLetBinding -> "TC0022"
   TD0001ReadFailed -> "TD0001"
   TD0002DuplicateAmbientDeclaration -> "TD0002"
   TD0003DuplicateAmbientEntry -> "TD0003"

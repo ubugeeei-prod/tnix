@@ -14,6 +14,7 @@ synopsis:           Core parser, type checker, compiler, and emitter for tnix
 library
   exposed-modules:
       Alias
+    , BuiltinPrelude
     , Check
     , Compile
     , Diagnostics
@@ -33,6 +34,7 @@ library
       src
   build-depends:
       base >=4.19 && <5
+    , bytestring
     , containers
     , directory
     , filepath
@@ -48,6 +50,7 @@ common spec-defaults
       src
   other-modules:
       Alias
+    , BuiltinPrelude
     , Check
     , Compile
     , Diagnostics
@@ -66,6 +69,7 @@ common spec-defaults
     , Type
   build-depends:
       base >=4.19 && <5
+    , bytestring
     , containers
     , directory
     , filepath

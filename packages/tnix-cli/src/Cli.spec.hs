@@ -11,6 +11,8 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Driver (Analysis (..))
+import Ide (Editor (..), InstallOptions (..), Scope (..), defaultInstallOptions)
+import IdeSpec (ideSpec)
 import Options.Applicative (ParserPrefs, ParserResult (..), defaultPrefs, execParserPure, getParseResult, info, renderFailure)
 import System.Directory (createDirectory, createDirectoryIfMissing, createDirectoryLink, doesFileExist, getTemporaryDirectory, listDirectory, removeFile, removePathForcibly)
 import System.FilePath (takeDirectory, (</>))
@@ -24,16 +26,17 @@ main = hspec spec
 
 spec :: Spec
 spec = do
+  ideSpec
   describe "commandParser" $ do
     it "parses compile with output" $
       parse ["compile", "main.tnix", "-o", "dist/main.nix"]
-        `shouldBe` Just (Compile "main.tnix" (Just "dist/main.nix"))
+        `shouldBe` Just (Compile "main.tnix" (Just "dist/main.nix") False)
 
     it "parses check, emit, init, scaffold, and project commands" $ do
       parse ["check", "main.tnix"] `shouldBe` Just (Check "main.tnix" TextFormat)
       parse ["check", "main.tnix", "--format", "json"] `shouldBe` Just (Check "main.tnix" JsonFormat)
       parse ["emit", "main.tnix"] `shouldBe` Just (Emit "main.tnix" Nothing)
-      parse ["init"] `shouldBe` Just (Init Nothing)
+      parse ["init"] `shouldBe` Just (Init Nothing [])
       parse ["scaffold", "demo"] `shouldBe` Just (Scaffold (Just "demo"))
       parse ["check-project"] `shouldBe` Just (CheckProject Nothing TextFormat)
       parse ["build", "demo", "--format", "json"] `shouldBe` Just (BuildProject (Just "demo") JsonFormat)
@@ -42,6 +45,27 @@ spec = do
       parse ["version", "--format", "json"] `shouldBe` Just (Version JsonFormat)
       parse ["lsp"] `shouldBe` Just (Lsp Nothing)
       parse ["lsp", "--log-file", "tnix-lsp.log"] `shouldBe` Just (Lsp (Just "tnix-lsp.log"))
+
+    it "parses ide, doctor, and init --editor" $ do
+      parse ["ide", "install", "vscode"] `shouldBe` Just (IdeInstall (defaultInstallOptions VSCode))
+      parse ["ide", "install", "nvim", "--global", "--dry-run", "--no-extension", "--force", "--lsp-path", "/bin/tnix-lsp"]
+        `shouldBe` Just
+          ( IdeInstall
+              (defaultInstallOptions Neovim)
+                { installScope = GlobalScope,
+                  installDryRun = True,
+                  installExtension = False,
+                  installForce = True,
+                  installLspPath = Just "/bin/tnix-lsp"
+                }
+          )
+      parse ["ide", "install", "zed", "--project", "demo"] `shouldBe` Just (IdeInstall (defaultInstallOptions Zed){installScope = ProjectScope "demo"})
+      parse ["ide", "install", "helix", "--project", "demo", "--global"] `shouldBe` Nothing
+      parse ["ide", "install", "emacs"] `shouldBe` Nothing
+      parse ["ide", "list"] `shouldBe` Just IdeList
+      parse ["doctor"] `shouldBe` Just (Doctor TextFormat)
+      parse ["doctor", "--format", "json"] `shouldBe` Just (Doctor JsonFormat)
+      parse ["init", "demo", "--editor", "vscode", "--editor", "helix"] `shouldBe` Just (Init (Just "demo") [VSCode, Helix])
 
     it "reports an error for missing subcommands" $ do
       case parserResult [] of
@@ -55,6 +79,7 @@ spec = do
       let analysis =
             Analysis
               { analysisProgram = error "unused in cli tests",
+                analysisLocatedProgram = error "unused in cli tests",
                 analysisRoot = Just (Scheme [] tInt),
                 analysisBindings = Map.fromList [("box", Scheme [] tString), ("id", Scheme ["a"] (TFun Many (TVar "a") (TVar "a")))],
                 analysisAliases = mempty,
@@ -65,10 +90,10 @@ spec = do
 
   describe "commandOutputPath" $
     it "tracks explicit destinations only for write commands" $ do
-      commandOutputPath (Compile "main.tnix" (Just "dist/main.nix")) `shouldBe` Just "dist/main.nix"
+      commandOutputPath (Compile "main.tnix" (Just "dist/main.nix") False) `shouldBe` Just "dist/main.nix"
       commandOutputPath (Emit "main.tnix" (Just "types/main.d.tnix")) `shouldBe` Just "types/main.d.tnix"
       commandOutputPath (Check "main.tnix" TextFormat) `shouldBe` Nothing
-      commandOutputPath (Init Nothing) `shouldBe` Nothing
+      commandOutputPath (Init Nothing []) `shouldBe` Nothing
       commandOutputPath (Scaffold Nothing) `shouldBe` Nothing
       commandOutputPath (Version TextFormat) `shouldBe` Nothing
       commandOutputPath (Lsp Nothing) `shouldBe` Nothing
@@ -80,8 +105,8 @@ spec = do
       commandOutputFormat (BuildProject Nothing JsonFormat) `shouldBe` Just JsonFormat
       commandOutputFormat (EmitProject Nothing JsonFormat) `shouldBe` Just JsonFormat
       commandOutputFormat (Version JsonFormat) `shouldBe` Just JsonFormat
-      commandOutputFormat (Compile "main.tnix" Nothing) `shouldBe` Nothing
-      commandOutputFormat (Init Nothing) `shouldBe` Nothing
+      commandOutputFormat (Compile "main.tnix" Nothing False) `shouldBe` Nothing
+      commandOutputFormat (Init Nothing []) `shouldBe` Nothing
       commandOutputFormat (Lsp Nothing) `shouldBe` Nothing
 
   describe "lspCommandArgs" $
@@ -110,7 +135,7 @@ spec = do
           )
         ]
         ( \root -> do
-            output <- executeCommand (Compile (root <> "/main.tnix") Nothing) >>= expectRight
+            output <- executeCommand (Compile (root <> "/main.tnix") Nothing False) >>= expectRight
             output `shouldBe` Text.stripEnd (source ["let", "  value = 1;", "in value"])
         )
 
@@ -151,7 +176,7 @@ spec = do
     it "surfaces driver failures without writing partial output" $
       withTempTree [("types.d.tnix", "declare \"./lib.nix\" { default :: Int; };")] $
         \root ->
-          executeCommand (Compile (root <> "/types.d.tnix") Nothing)
+          executeCommand (Compile (root <> "/types.d.tnix") Nothing False)
             >>= (`expectLeftContaining` "declaration-only")
 
     it "surfaces missing source files as user-facing errors" $
@@ -164,7 +189,7 @@ spec = do
 
     it "initializes a project with tnix.config.tnix and starter files" $
       withTempTree [] $ \root -> do
-        output <- executeCommand (Init (Just root)) >>= expectRight
+        output <- executeCommand (Init (Just root) []) >>= expectRight
         let configPath = root </> "tnix.config.tnix"
             configDeclPath = root </> "tnix.config.d.tnix"
             entryPath = root </> "src/main.tnix"
@@ -193,7 +218,7 @@ spec = do
     it "escapes generated string literals during project initialization" $
       withTempTree [] $ \root -> do
         let projectRoot = root </> "quote\"and\\slash"
-        _ <- executeCommand (Init (Just projectRoot)) >>= expectRight
+        _ <- executeCommand (Init (Just projectRoot) []) >>= expectRight
         config <- TextIO.readFile (projectRoot </> "tnix.config.tnix")
         entry <- TextIO.readFile (projectRoot </> "src/main.tnix")
         Text.isInfixOf "name = \"quote\\\"and\\\\slash\";" config `shouldBe` True

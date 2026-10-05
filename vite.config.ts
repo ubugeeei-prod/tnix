@@ -7,13 +7,19 @@ export default defineConfig({
         command: "vp run build:haskell && pnpm --filter tnix build && vp run build:zed && vp run docs:build",
       },
       "workspace:check": {
-        command: "vp run check:versions && vp run check:haskell && vp run test:haskell && vp run check:dogfood && vp run check:examples && pnpm --filter tnix check && pnpm --filter tnix test && vp run check:zed && vp run test:zed && vp run check:neovim",
+        command: "vp run check:versions && vp run check:prelude && vp run check:haskell && vp run test:haskell && vp run check:dogfood && vp run check:examples && pnpm --filter tnix check && pnpm --filter tnix test && vp run check:zed && vp run test:zed && vp run check:neovim",
       },
       "workspace:fmt": {
         command: "vp run fmt:haskell && pnpm --filter tnix fmt",
       },
       "docs:build": {
         command: "vp build --config vite.docs.config.ts",
+      },
+      // Publishes dist/docs to the `tnix` Cloudflare Pages project (tnix.dev).
+      // Requires `wrangler login` or CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID.
+      "docs:deploy": {
+        command: "vp run docs:build && pnpm dlx wrangler@4.147.0 pages deploy dist/docs --project-name tnix",
+        cache: false,
       },
       ide: {
         command: "node --experimental-strip-types ./scripts/install-ide.ts",
@@ -35,6 +41,18 @@ export default defineConfig({
       "fmt:haskell": {
         command:
           "if rg --files -g '*.hs' >/dev/null 2>&1; then fourmolu -m inplace $(rg --files -g '*.hs'); else echo 'no haskell sources'; fi",
+        cache: false,
+      },
+      "check:prelude": {
+        command: "node --experimental-strip-types ./scripts/generate-prelude.ts --check",
+        cache: false,
+      },
+      "generate:brand": {
+        command: "node --experimental-strip-types ./scripts/generate-brand.ts",
+        cache: false,
+      },
+      "generate:prelude": {
+        command: "node --experimental-strip-types ./scripts/generate-prelude.ts",
         cache: false,
       },
       "check:versions": {

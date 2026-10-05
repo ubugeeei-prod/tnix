@@ -121,7 +121,7 @@ spec = describe "bundled registry" $ do
       ]
       ( \tmp -> do
           analysis <- analyzeFile (tmp </> "src/main.tnix") >>= expectRight
-          renderedRoot analysis `shouldBe` "Tuple [ (List (Path | String)) String ]"
+          renderedRoot analysis `shouldBe` "Tuple [ (List TnixProjectPath) String ]"
       )
 
   it "lets projects reuse bundled nixpkgs aliases inside ambient declarations" $ do
@@ -145,7 +145,7 @@ spec = describe "bundled registry" $ do
           renderedRoot libAnalysis `shouldBe` "String -> List String -> String"
           let renderedPkgs = renderedRoot pkgsAnalysis
           Text.isInfixOf "String -> String ->" renderedPkgs `shouldBe` True
-          Text.isInfixOf "derivationType :: \"derivation\"" renderedPkgs `shouldBe` True
+          Text.isInfixOf "NixpkgsDerivation" renderedPkgs `shouldBe` True
       )
 
   it "lets projects load bundled ecosystem aliases via declarationPacks without copying" $ do
@@ -175,7 +175,7 @@ spec = describe "bundled registry" $ do
           renderedRoot libAnalysis `shouldBe` "String -> List String -> String"
           let renderedPkgs = renderedRoot pkgsAnalysis
           Text.isInfixOf "String -> String ->" renderedPkgs `shouldBe` True
-          Text.isInfixOf "derivationType :: \"derivation\"" renderedPkgs `shouldBe` True
+          Text.isInfixOf "NixpkgsDerivation" renderedPkgs `shouldBe` True
       )
 
   it "lets projects reuse bundled flake ecosystem aliases" $ do
@@ -208,18 +208,14 @@ spec = describe "bundled registry" $ do
           let renderedFlakeUtils = renderedRoot flakeUtilsAnalysis
               renderedNixpkgsFlake = renderedRoot nixpkgsFlakeAnalysis
               renderedNixDarwin = renderedRoot nixDarwinAnalysis
-          Text.isInfixOf "forall" renderedFlakeUtils `shouldBe` True
-          Text.isInfixOf "\"aarch64-linux\"" renderedFlakeUtils `shouldBe` True
-          Text.isInfixOf "x86_64-darwin" renderedFlakeUtils `shouldBe` True
+          Text.isInfixOf "NixpkgsSystem ->" renderedFlakeUtils `shouldBe` True
+          Text.isSuffixOf "-> NixFlakeOutputs" renderedFlakeUtils `shouldBe` True
           Text.isInfixOf "forall" renderedNixpkgsFlake `shouldBe` True
           Text.isInfixOf "Bool ->" renderedNixpkgsFlake `shouldBe` True
           Text.isInfixOf "List" renderedNixpkgsFlake `shouldBe` True
-          renderedRoot homeManagerAnalysis `shouldBe` "dynamic -> dynamic"
-          Text.isInfixOf "modules :: List dynamic" renderedNixDarwin `shouldBe` True
-          Text.isInfixOf "pkgs ::" renderedNixDarwin `shouldBe` True
-          Text.isInfixOf "system ::" renderedNixDarwin `shouldBe` True
-          Text.isSuffixOf "} -> dynamic" renderedNixDarwin `shouldBe` True
-          renderedRoot flakePartsAnalysis `shouldBe` "dynamic -> dynamic -> dynamic"
+          renderedRoot homeManagerAnalysis `shouldBe` "HomeManagerConfigurationArgs -> HomeManagerConfiguration"
+          renderedNixDarwin `shouldBe` "NixDarwinEvalConfigArgs -> NixosConfiguration"
+          renderedRoot flakePartsAnalysis `shouldBe` "FlakePartsMkFlakeArgs -> FlakePartsModule -> NixFlakeOutputs"
       )
 
   it "lets projects reuse bundled community flake aliases" $ do
@@ -268,17 +264,14 @@ spec = describe "bundled registry" $ do
               renderedPreCommit = renderedRoot preCommitAnalysis
               renderedCrane = renderedRoot craneAnalysis
               renderedAgenix = renderedRoot agenixAnalysis
-          renderedRoot devenvAnalysis `shouldBe` "dynamic -> dynamic"
-          Text.isInfixOf "-> dynamic -> {" renderedTreefmt `shouldBe` True
-          Text.isInfixOf "check ::" renderedTreefmt `shouldBe` True
-          Text.isInfixOf "shellHook :: String" renderedPreCommit `shouldBe` True
-          Text.isInfixOf "enabledPackages :: List dynamic" renderedPreCommit `shouldBe` True
-          Text.isInfixOf "dynamic ->" renderedCrane `shouldBe` True
-          Text.isInfixOf "derivationType :: \"derivation\"" renderedCrane `shouldBe` True
+          Text.isInfixOf "pkgs :: NixpkgsPkgs" (renderedRoot devenvAnalysis) `shouldBe` True
+          renderedTreefmt `shouldBe` "NixpkgsPkgs -> dynamic -> TreefmtNixEvalResult"
+          renderedPreCommit `shouldBe` "PreCommitHooksRunArgs -> PreCommitHooksRunResult"
+          renderedCrane `shouldBe` "CraneBuildArgs -> NixpkgsDerivation"
           renderedRoot deployAnalysis `shouldBe` "dynamic -> dynamic"
           renderedRoot nixvimAnalysis `shouldBe` "dynamic"
           renderedRoot sopsAnalysis `shouldBe` "dynamic"
-          Text.isInfixOf "derivationType :: \"derivation\"" renderedAgenix `shouldBe` True
+          renderedAgenix `shouldBe` "NixpkgsPackage"
           renderedRoot diskoAnalysis `shouldBe` "dynamic"
           renderedRoot colmenaAnalysis `shouldBe` "dynamic -> dynamic"
       )
@@ -288,7 +281,8 @@ registryFiles =
   [ "registry/ecosystem/nixpkgs-lib.d.tnix",
     "registry/ecosystem/nixpkgs-pkgs.d.tnix",
     "registry/ecosystem/flake-ecosystem.d.tnix",
-    "registry/ecosystem/community-flakes.d.tnix"
+    "registry/ecosystem/community-flakes.d.tnix",
+    "registry/ecosystem/nixos-modules.d.tnix"
   ]
 
 bundledDeclarationFiles :: [FilePath]

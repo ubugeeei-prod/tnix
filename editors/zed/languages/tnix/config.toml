@@ -1,11 +1,20 @@
 name = "tnix"
-grammar = "nix"
-path_suffixes = ["nix", "tnix"]
+grammar = "tnix"
+# `.d.tnix` declaration files are covered by the `tnix` suffix. Plain `.nix`
+# files stay with Zed's Nix extension; tnix-lsp still attaches to them via the
+# `Nix` entry in extension.toml's `language_servers.tnix-lsp.languages`.
+path_suffixes = ["tnix"]
 line_comments = ["# "]
+block_comment = { start = "/*", prefix = "", end = "*/", tab_size = 0 }
+tab_size = 2
+hard_tabs = false
+word_characters = ["-", "'", "_"]
+autoclose_before = ";:.,=}])> \n\t\""
 brackets = [
   { start = "(", end = ")", close = true, newline = true },
   { start = "[", end = "]", close = true, newline = true },
   { start = "{", end = "}", close = true, newline = true },
-  { start = "\"", end = "\"", close = true, newline = false, not_in = ["comment"] }
+  { start = "\"", end = "\"", close = true, newline = false, not_in = ["comment", "string"] },
+  { start = "''", end = "''", close = true, newline = true, not_in = ["comment", "string"] },
+  { start = "/*", end = " */", close = true, newline = false, not_in = ["comment", "string"] },
 ]
-block_comment = { start = "/*", prefix = "", end = "*/", tab_size = 0 }
