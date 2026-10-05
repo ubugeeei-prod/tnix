@@ -36,8 +36,8 @@ function printHelp(): void {
     "Linux, /usr/lib-only on macOS). --bundle points at an already-built bundle dir.",
     "",
     "Examples:",
-    "  node --experimental-strip-types ./scripts/package-release.ts v0.2.0 linux-x64 tnix-v0.2.0-linux-x64.tar.gz tnix-v0.2.0-linux-x64.sha256",
-    "  node --experimental-strip-types ./scripts/package-release.ts verify-checksum tnix-v0.2.0-linux-x64.sha256",
+    "  node --experimental-strip-types ./scripts/package-release.ts v0.2.0 linux-x64 tynix-v0.2.0-linux-x64.tar.gz tynix-v0.2.0-linux-x64.sha256",
+    "  node --experimental-strip-types ./scripts/package-release.ts verify-checksum tynix-v0.2.0-linux-x64.sha256",
   ]);
 }
 
@@ -130,7 +130,7 @@ const TARGET_HOSTS: Record<string, { platform: NodeJS.Platform; arch: string }> 
   "macos-x64": { platform: "darwin", arch: "x64" },
 };
 
-const RELEASE_BINARIES = ["tnix", "tnix-lsp"] as const;
+const RELEASE_BINARIES = ["tynix", "tynix-lsp"] as const;
 
 function assertTargetMatchesHost(target: string): void {
   const expected = TARGET_HOSTS[target];
@@ -199,8 +199,8 @@ async function packageRelease(
   assertTargetMatchesHost(target);
 
   const bundle = bundleDir ? resolve(bundleDir) : buildReleaseBundle();
-  const stageDir = join(tmpdir(), `tnix-release-${process.pid}-${Date.now()}`);
-  const releaseDir = join(stageDir, `tnix-${version.replace(/^v/, "")}-${target}`);
+  const stageDir = join(tmpdir(), `tynix-release-${process.pid}-${Date.now()}`);
+  const releaseDir = join(stageDir, `tynix-${version.replace(/^v/, "")}-${target}`);
 
   mkdirSync(join(releaseDir, "bin"), { recursive: true });
 

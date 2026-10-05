@@ -1,15 +1,15 @@
 #!/bin/sh
 # Syntax-parity regression check against nixpkgs.
 #
-# Every sampled nixpkgs file is compiled with `tnix compile --no-check` and
+# Every sampled nixpkgs file is compiled with `tynix compile --no-check` and
 # the result must parse (`nix-instantiate --parse`) to the same expression as
 # the original. Adjacent string literals are joined before comparing, since
-# tnix may split an equal string value differently.
+# tynix may split an equal string value differently.
 #
-# usage: scripts/check-nix-parity.sh <tnix-binary> [stride] [limit]
+# usage: scripts/check-nix-parity.sh <tynix-binary> [stride] [limit]
 set -eu
 
-tnix=$1
+tynix=$1
 stride=${2:-25}
 limit=${3:-1000}
 # Resolve the locked nixpkgs from flake.lock directly; evaluating the flake
@@ -25,8 +25,8 @@ total=0
 failed=0
 while IFS= read -r file; do
   total=$((total + 1))
-  cat "$file" > "$work/input.tnix"
-  if ! "$tnix" compile --no-check "$work/input.tnix" > "$work/output.nix" 2> "$work/error"; then
+  cat "$file" > "$work/input.tynix"
+  if ! "$tynix" compile --no-check "$work/input.tynix" > "$work/output.nix" 2> "$work/error"; then
     failed=$((failed + 1))
     echo "compile failed: $file"
     head -n 3 "$work/error"

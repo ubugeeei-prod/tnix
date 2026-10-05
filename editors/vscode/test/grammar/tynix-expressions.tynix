@@ -1,0 +1,26 @@
+let
+  # @tynix-expected
+  value :: Int;
+  value = "oops";
+
+  # @tynix-ignore
+  other = missing;
+
+  id :: forall a. a -> a;
+  id = x: x;
+
+  consume :: Int %1 -> Int;
+  consume = (x :: Int): x;
+
+  fromUnknown :: unknown;
+  fromUnknown = 1;
+
+  mkGreeting = { name, greeting ? "hi", ... }: "${greeting} ${name}";
+  widened = 1 as Number;
+  narrowed = payload as { value :: String; };
+  chained = (import ./opaque.nix) as dynamic as Int;
+in {
+  int = id 1;
+  result = fromUnknown as Int;
+  typed = [ (consume 1 as Int) ];
+}

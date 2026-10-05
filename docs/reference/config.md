@@ -1,20 +1,20 @@
 ---
 title: Configuration Reference
-description: Every field of tnix.config.tnix, its default, and how project sources are discovered.
+description: Every field of tynix.config.tynix, its default, and how project sources are discovered.
 ---
 
 # Configuration Reference
 
-A tnix project is a directory with a `tnix.config.tnix` file. The file is
-parsed with the ordinary tnix parser and must be a single attribute set of
+A tynix project is a directory with a `tynix.config.tynix` file. The file is
+parsed with the ordinary tynix parser and must be a single attribute set of
 literal values: no `let`, no `inherit`, no computed values. Unknown fields are
 ignored.
 
-```tnix [tnix.config.tnix]
+```tynix [tynix.config.tynix]
 {
-  name = "hello-tnix";
+  name = "hello-tynix";
   sourceDir = ./src;
-  entry = ./src/main.tnix;
+  entry = ./src/main.tynix;
   declarationDir = ./types;
   declarationPacks = [];
   buildDir = ./dist;
@@ -26,32 +26,32 @@ ignored.
 }
 ```
 
-`tnix init` writes exactly this file, with `name` set to the directory name.
-The presence of `tnix.config.tnix` also marks the
+`tynix init` writes exactly this file, with `name` set to the directory name.
+The presence of `tynix.config.tynix` also marks the
 [workspace root](./type-system-internals.md#declarations-and-the-ambient-world).
 
 ## Fields
 
 Path values may be Nix path literals (`./src`) or strings (`"src"`). Relative
-paths are resolved against the directory that contains `tnix.config.tnix`.
+paths are resolved against the directory that contains `tynix.config.tynix`.
 
 | Field | Type | Default | Used by |
 | --- | --- | --- | --- |
 | `name` | `String` | directory name | report headers |
 | `sourceDir` | path | `./src` | source discovery, output layout |
-| `entry` | path | `<sourceDir>/main.tnix` | `scaffold` (creates it if missing) |
-| `declarationDir` | path | `./types` | `scaffold` (location of `builtins.d.tnix`) |
+| `entry` | path | `<sourceDir>/main.tynix` | `scaffold` (creates it if missing) |
+| `declarationDir` | path | `./types` | `scaffold` (location of `builtins.d.tynix`) |
 | `declarationPacks` | list of paths | `[]` | every analysis in the workspace |
 | `buildDir` | path | `./dist` | `build` (compiled `.nix`) |
 | `generatedDeclarationDir` | path | `<buildDir>/types` | `build`, `emit-project` |
 | `entries` | list of paths | `[]` | source discovery |
 | `include` | list of paths | `[]` | source discovery |
 | `exclude` | list of paths | `[]` | source discovery |
-| `builtins` | `Bool` | `true` | `scaffold` (whether to create `builtins.d.tnix`) |
+| `builtins` | `Bool` | `true` | `scaffold` (whether to create `builtins.d.tynix`) |
 
 `builtins` only controls scaffolding. Every analysis already types
-`builtins` with the prelude built into tnix, and a scaffolded
-`builtins.d.tnix` *replaces* that prelude with its short starter list. Set
+`builtins` with the prelude built into tynix, and a scaffolded
+`builtins.d.tynix` *replaces* that prelude with its short starter list. Set
 `builtins = false;` and delete the file to keep the full prelude.
 
 A field with the wrong kind of value fails the command, for example
@@ -61,25 +61,25 @@ read during every analysis, not just by project commands.
 
 ### `declarationPacks`
 
-Each entry is a `.d.tnix` file or a directory, which is searched recursively
-for `.d.tnix` files. Packs are loaded in addition to the declaration files that
+Each entry is a `.d.tynix` file or a directory, which is searched recursively
+for `.d.tynix` files. Packs are loaded in addition to the declaration files that
 already live under the workspace root, so you only need this field for
-declarations stored *outside* the project, such as a vendored copy of the tnix
+declarations stored *outside* the project, such as a vendored copy of the tynix
 registry:
 
-```tnix
+```tynix
 {
   declarationPacks = [
-    ./vendor/tnix/registry/ecosystem
-    ./vendor/tnix/registry/workspace
+    ./vendor/tynix/registry/ecosystem
+    ./vendor/tynix/registry/workspace
   ];
 }
 ```
 
 Files under a `registry/workspace/` directory are rebased onto your project
 root, so their `declare "../../flake.nix"` style targets describe *your*
-`flake.nix` and `tnix.config.tnix`. An entry that does not exist, or a file that
-is not `.d.tnix`, is `TD0006`.
+`flake.nix` and `tynix.config.tynix`. An entry that does not exist, or a file that
+is not `.d.tynix`, is `TD0006`.
 
 ## Source discovery
 
@@ -89,7 +89,7 @@ follows:
 1. If `entries` is non-empty, use those paths. Directories are walked
    recursively; files are used as given.
 2. Otherwise, walk `sourceDir` recursively.
-3. Keep only files ending in `.tnix` and not in `.d.tnix`.
+3. Keep only files ending in `.tynix` and not in `.d.tynix`.
 4. If `include` is non-empty, keep only files equal to or under one of its
    paths.
 5. Drop files equal to or under any `exclude` path.
@@ -102,37 +102,37 @@ Results are de-duplicated and sorted.
 For a source file `S`, let `R` be its path relative to `sourceDir`, or relative
 to the project root when `S` is outside `sourceDir` (possible with `entries`).
 
-- `tnix build` writes `buildDir/R` with the extension `.nix`.
-- `tnix build` and `tnix emit-project` write `generatedDeclarationDir/R` with
-  the extension `.d.tnix`. Its `declare` target points at the compiled file.
+- `tynix build` writes `buildDir/R` with the extension `.nix`.
+- `tynix build` and `tynix emit-project` write `generatedDeclarationDir/R` with
+  the extension `.d.tynix`. Its `declare` target points at the compiled file.
 
 Because generated declarations usually live under the project root, they are
 also discovered as workspace declarations on the next run. That is intended:
 it lets other files import the compiled output with types.
 
-## `tnix.config.d.tnix`
+## `tynix.config.d.tynix`
 
-`tnix scaffold` writes a declaration for the config file itself so that typed
-code can `import ./tnix.config.tnix` and get a `TnixProjectConfig`:
+`tynix scaffold` writes a declaration for the config file itself so that typed
+code can `import ./tynix.config.tynix` and get a `TynixProjectConfig`:
 
-```tnix [tnix.config.d.tnix]
-type TnixProjectPath = Path | String;
+```tynix [tynix.config.d.tynix]
+type TynixProjectPath = Path | String;
 
-type TnixProjectConfig = {
+type TynixProjectConfig = {
   name :: String;
-  sourceDir :: TnixProjectPath;
-  entry :: TnixProjectPath;
-  declarationDir :: TnixProjectPath;
-  declarationPacks :: List TnixProjectPath;
-  buildDir :: TnixProjectPath;
-  generatedDeclarationDir :: TnixProjectPath;
-  entries :: List TnixProjectPath;
-  include :: List TnixProjectPath;
-  exclude :: List TnixProjectPath;
+  sourceDir :: TynixProjectPath;
+  entry :: TynixProjectPath;
+  declarationDir :: TynixProjectPath;
+  declarationPacks :: List TynixProjectPath;
+  buildDir :: TynixProjectPath;
+  generatedDeclarationDir :: TynixProjectPath;
+  entries :: List TynixProjectPath;
+  include :: List TynixProjectPath;
+  exclude :: List TynixProjectPath;
   builtins :: Bool;
 };
 
-declare "./tnix.config.tnix" {
-  default :: TnixProjectConfig;
+declare "./tynix.config.tynix" {
+  default :: TynixProjectConfig;
 };
 ```

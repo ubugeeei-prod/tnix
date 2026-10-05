@@ -1,5 +1,5 @@
 name: Bug report
-description: Report incorrect behavior in the tnix CLI, language server, or editor integrations.
+description: Report incorrect behavior in the tynix CLI, language server, or editor integrations.
 labels: ["bug"]
 body:
   - type: markdown
@@ -11,10 +11,10 @@ body:
     id: area
     attributes:
       label: Area
-      description: Which part of tnix is affected?
+      description: Which part of tynix is affected?
       options:
-        - CLI (tnix)
-        - Language server (tnix-lsp)
+        - CLI (tynix)
+        - Language server (tynix-lsp)
         - VS Code extension
         - Zed extension
         - Neovim plugin
@@ -26,8 +26,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: tnix version
-      description: Output of `tnix --version` (or the commit you built from).
+      label: tynix version
+      description: Output of `tynix --version` (or the commit you built from).
       placeholder: "0.5.0"
     validations:
       required: true
@@ -43,7 +43,7 @@ body:
     id: repro
     attributes:
       label: Reproduction
-      description: The smallest `.tnix`/`.d.tnix` snippet and the exact command(s) that trigger the bug.
+      description: The smallest `.tynix`/`.d.tynix` snippet and the exact command(s) that trigger the bug.
       render: shell
     validations:
       required: true

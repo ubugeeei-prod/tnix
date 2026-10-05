@@ -1,0 +1,20 @@
+name = "tynix"
+grammar = "tynix"
+# `.d.tynix` declaration files are covered by the `tynix` suffix. Plain `.nix`
+# files stay with Zed's Nix extension; tynix-lsp still attaches to them via the
+# `Nix` entry in extension.toml's `language_servers.tynix-lsp.languages`.
+path_suffixes = ["tynix"]
+line_comments = ["# "]
+block_comment = { start = "/*", prefix = "", end = "*/", tab_size = 0 }
+tab_size = 2
+hard_tabs = false
+word_characters = ["-", "'", "_"]
+autoclose_before = ";:.,=}])> \n\t\""
+brackets = [
+  { start = "(", end = ")", close = true, newline = true },
+  { start = "[", end = "]", close = true, newline = true },
+  { start = "{", end = "}", close = true, newline = true },
+  { start = "\"", end = "\"", close = true, newline = false, not_in = ["comment", "string"] },
+  { start = "''", end = "''", close = true, newline = true, not_in = ["comment", "string"] },
+  { start = "/*", end = " */", close = true, newline = false, not_in = ["comment", "string"] },
+]

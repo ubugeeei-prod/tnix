@@ -1,6 +1,0 @@
-let
-  pkg = {
-    name = "tnix";
-    meta = { license = "MIT"; };
-  };
-in pkg.meta.license

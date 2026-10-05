@@ -1,4 +1,0 @@
-let
-  # @tnix-ignore
-  value = missing;
-in value

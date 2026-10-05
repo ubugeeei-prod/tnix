@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Tokenize tnix sources with the shipped TextMate grammar, exactly the way VS
+// Tokenize tynix sources with the shipped TextMate grammar, exactly the way VS
 // Code does (vscode-textmate + the Oniguruma WASM build).
 //
-//   node scripts/tokenize.mjs file.tnix   # print a token dump
+//   node scripts/tokenize.mjs file.tynix   # print a token dump
 //
-// The module also exports `loadTnixGrammar` / `renderTokens` for the grammar
+// The module also exports `loadTynixGrammar` / `renderTokens` for the grammar
 // snapshot tests in src/grammar.spec.ts.
 
 import { readFileSync } from "node:fs";
@@ -28,9 +28,9 @@ function registry() {
       wasm.buffer.slice(wasm.byteOffset, wasm.byteOffset + wasm.byteLength),
     );
     const files = {
-      "source.tnix": "syntaxes/tnix.tmLanguage.json",
-      "markdown.tnix.codeblock":
-        "syntaxes/tnix-markdown-injection.tmLanguage.json",
+      "source.tynix": "syntaxes/tynix.tmLanguage.json",
+      "markdown.tynix.codeblock":
+        "syntaxes/tynix-markdown-injection.tmLanguage.json",
     };
     return new textmate.Registry({
       onigLib: Promise.resolve({
@@ -50,10 +50,10 @@ function registry() {
   return registryPromise;
 }
 
-/** Load the `source.tnix` grammar. */
-export async function loadTnixGrammar() {
-  const grammar = await (await registry()).loadGrammar("source.tnix");
-  if (!grammar) throw new Error("source.tnix grammar failed to load");
+/** Load the `source.tynix` grammar. */
+export async function loadTynixGrammar() {
+  const grammar = await (await registry()).loadGrammar("source.tynix");
+  if (!grammar) throw new Error("source.tynix grammar failed to load");
   return grammar;
 }
 
@@ -62,7 +62,7 @@ export async function loadTnixGrammar() {
  * @returns {{ line: number, text: string, scopes: string[] }[]}
  */
 export async function tokenize(source) {
-  const grammar = await loadTnixGrammar();
+  const grammar = await loadTynixGrammar();
   let state = textmate.INITIAL;
   const tokens = [];
   source.split(/\r?\n/).forEach((lineText, index) => {
@@ -84,7 +84,7 @@ export async function tokenize(source) {
  * begin/end region opened in the file was closed again.
  */
 export async function finalStackDepth(source) {
-  const grammar = await loadTnixGrammar();
+  const grammar = await loadTynixGrammar();
   let state = textmate.INITIAL;
   for (const lineText of source.split(/\r?\n/)) {
     state = grammar.tokenizeLine(lineText, state).ruleStack;
@@ -94,13 +94,13 @@ export async function finalStackDepth(source) {
 
 /**
  * Render a stable, human-reviewable snapshot: one token per row, whitespace
- * tokens dropped, the root `source.tnix` scope elided.
+ * tokens dropped, the root `source.tynix` scope elided.
  */
 export async function renderTokens(source) {
   const rows = [];
   for (const token of await tokenize(source)) {
     if (token.text.trim() === "") continue;
-    const scopes = token.scopes.filter((s) => s !== "source.tnix");
+    const scopes = token.scopes.filter((s) => s !== "source.tynix");
     rows.push(
       `${String(token.line).padStart(3)} ${JSON.stringify(token.text)} ${scopes.join(" ")}`.trimEnd(),
     );

@@ -1,9 +1,9 @@
 // A minimal, deterministic LSP server used only by the VS Code integration
-// tests. It implements just enough of the protocol over stdio for the tnix
+// tests. It implements just enough of the protocol over stdio for the tynix
 // extension to connect and for the test suite to exercise every provider the
-// client wires up — without depending on the real Haskell `tnix-lsp` binary.
+// client wires up — without depending on the real Haskell `tynix-lsp` binary.
 //
-// Every response uses a recognizable marker (e.g. "tnix-stub") so the tests can
+// Every response uses a recognizable marker (e.g. "tynix-stub") so the tests can
 // assert the extension forwarded the request and surfaced the reply. Real
 // feature correctness is covered by the Haskell `Session*.spec.hs` suites.
 //
@@ -12,7 +12,7 @@
 
 import process from "node:process";
 
-const STUB = "tnix-stub";
+const STUB = "tynix-stub";
 
 function log(message) {
   process.stderr.write(`[stub-server] ${message}\n`);
@@ -50,7 +50,7 @@ function publishDiagnostics(uri) {
         range: fullRange,
         severity: 2,
         source: STUB,
-        code: "TNIX-STUB-0001",
+        code: "TYNIX-STUB-0001",
         message: `${STUB} diagnostic`,
       },
     ],
@@ -169,7 +169,7 @@ function handleRequest(id, method, params) {
       return;
     case "textDocument/documentLink":
       respond(id, [
-        { range: fullRange, target: "https://example.invalid/tnix-stub" },
+        { range: fullRange, target: "https://example.invalid/tynix-stub" },
       ]);
       return;
     case "textDocument/inlayHint":

@@ -1,8 +1,8 @@
 {
-  "name": "tnix-docs-site",
+  "name": "tynix-docs-site",
   "private": true,
   "type": "module",
-  "description": "Cloudflare deployment of the tnix.dev documentation site",
+  "description": "Cloudflare deployment of the tynix.dev documentation site",
   "scripts": {
     "deploy": "cf deploy",
     "preview": "cf previews deploy",

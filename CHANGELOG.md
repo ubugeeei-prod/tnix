@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.0.0 - 2026-10-05
+
+### Changed (breaking): tnix is now tynix
+
+The project is renamed to **tynix** ("tie-nix", typed Nix) and moves to
+[tynix.dev](https://tynix.dev). There is no compatibility layer; update
+projects and editors as follows:
+
+| Before | After |
+| --- | --- |
+| `.tnix`, `.d.tnix` | `.tynix`, `.d.tynix` |
+| `tnix.config.tnix` | `tynix.config.tynix` |
+| `tnix`, `tnix-lsp` | `tynix`, `tynix-lsp` |
+| `# @tnix-ignore`, `# @tnix-expected` | `# @tynix-ignore`, `# @tynix-expected` |
+| `TNIX_*` environment variables | `TYNIX_*` |
+| VS Code extension `ubugeeei.tnix` | `ubugeeei.tynix` |
+| `github:ubugeeei-prod/tnix` | `github:ubugeeei-prod/tynix` |
+| `https://tnix.dev/install.sh` | `https://tynix.dev/install.sh` |
+
+A project can be migrated with:
+
+```bash
+find . -name '*.tnix' -exec sh -c 'mv "$1" "${1%.tnix}.tynix"' _ {} \;
+perl -pi -e 's/\@tnix-/\@tynix-/g' $(git ls-files '*.tynix')
+```
+
+The language, the type checker, and the declaration packs are unchanged from
+v1.0.0. The wordmark is redrawn for the new name.
+
 ## v1.0.0 - 2026-10-05
 
 ### Added

@@ -6,16 +6,16 @@ description: Write polymorphic functions with forall, parameterize type aliases,
 # 7. Generics and higher-kinded types
 
 Nix code is full of helpers that work for any element type: `map`, `filter`,
-`foldl'`. tnix expresses them with **parametric polymorphism**, and goes one
+`foldl'`. tynix expresses them with **parametric polymorphism**, and goes one
 level further with **higher-kinded types**, where the thing you abstract over
 is itself a type constructor such as `List`.
 
-This step continues in the `tnix-tour` workspace. `builtins.head` below is
+This step continues in the `tynix-tour` workspace. `builtins.head` below is
 typed by the built-in prelude from step 6 (`forall a. List a -> a`).
 
 ## Generic functions and aliases
 
-```tnix [generics.tnix]
+```tynix [generics.tynix]
 type Pair a b = { fst :: a; snd :: b; };
 type Maybe a = a | Null;
 
@@ -59,7 +59,7 @@ swap :: forall a b. Pair a b -> Pair b a
 
 Instantiation is checked as you would expect:
 
-```tnix [generics-bad.tnix]
+```tynix [generics-bad.tynix]
 let
   first :: forall a. List a -> a;
   first = xs: builtins.head xs;
@@ -76,11 +76,11 @@ in n
 ## Abstracting over type constructors
 
 `List` on its own is not a type; it is a **type constructor** that becomes a
-type once you apply it: `List Int`. tnix lets type parameters stand for type
+type once you apply it: `List Int`. tynix lets type parameters stand for type
 constructors. The classic example is a functor, a record that knows how to map
 over some container `f`:
 
-```tnix [functor.d.tnix]
+```tynix [functor.d.tynix]
 type Functor f = {
   map :: forall a b. (a -> b) -> f a -> f b;
 };
@@ -93,7 +93,7 @@ declare "./functors.nix" {
 };
 ```
 
-In `Functor f`, `f` is applied to arguments (`f a`), so tnix infers that `f`
+In `Functor f`, `f` is applied to arguments (`f a`), so tynix infers that `f`
 has kind `Type -> Type`. Both `List` and `Box` have that kind, so
 `Functor List` and `Functor Box` are well-formed.
 
@@ -108,7 +108,7 @@ The implementation is plain Nix:
 
 And typed code uses it generically:
 
-```tnix [hkt.tnix]
+```tynix [hkt.tynix]
 let
   functors = import ./functors.nix;
   inc = (x :: Int): x + 1;
@@ -138,14 +138,14 @@ functor's `map inc` is rejected, because `inc` expects an `Int`.
 > Declaring and *using* values with polymorphic fields, as above, is fully
 > supported. *Implementing* a record whose fields carry their own `forall`
 > (for example writing `boxFunctor :: Functor Box; boxFunctor = { map = ...; };`
-> in a `.tnix` file) is not yet accepted by the checker. Keep such instances in
+> in a `.tynix` file) is not yet accepted by the checker. Keep such instances in
 > `.nix` and describe them with a declaration, as this step does.
 
 ## Composing type constructors
 
 Aliases can take constructors as arguments and apply them:
 
-```tnix [compose.tnix]
+```tynix [compose.tynix]
 type Compose f g a = f (g a);
 
 let
@@ -160,16 +160,16 @@ boxes :: Compose List Box Int
 ```
 
 `Compose List Box Int` expands to `List (Box Int)`, that is, a list of
-`{ value :: Int; }`. `Box` comes from `functor.d.tnix`: aliases declared in
+`{ value :: Int; }`. `Box` comes from `functor.d.tynix`: aliases declared in
 workspace declaration files are visible everywhere in the workspace. A list of
 `{ value = "one"; }` records is rejected.
 
 ## Kinds keep you honest
 
-Because tnix infers kinds, it catches type-level mistakes before checking any
+Because tynix infers kinds, it catches type-level mistakes before checking any
 value:
 
-```tnix [kinds.tnix]
+```tynix [kinds.tynix]
 let
   x :: Int String;
   x = 1;
@@ -183,7 +183,7 @@ in x
 `Int` has kind `Type`; applying it to `String` would require `Type -> ...`.
 Under-applying a constructor in an annotation is caught as well:
 
-```tnix [twice.tnix]
+```tynix [twice.tynix]
 type Twice f a = f (f a);
 
 let
@@ -204,7 +204,7 @@ in x
 - Aliases take parameters, including constructor parameters such as `f`.
 - Kinds (`Type`, `Type -> Type`, ...) are inferred and checked; `TK` diagnostics
   report misuse.
-- Higher-kinded APIs are best declared in `.d.tnix` and implemented in `.nix`
+- Higher-kinded APIs are best declared in `.d.tynix` and implemented in `.nix`
   today.
 
 <div class="tx-pager">

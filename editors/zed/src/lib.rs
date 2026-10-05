@@ -7,12 +7,12 @@ use zed_extension_api::{
     Command, Extension, LanguageServerId, Result, Worktree,
 };
 
-/// Zed extension entry point for tnix.
+/// Zed extension entry point for tynix.
 ///
 /// The extension does not implement language logic itself. Its only job is to
-/// locate the `tnix-lsp` binary, pass through workspace shell environment
+/// locate the `tynix-lsp` binary, pass through workspace shell environment
 /// variables, and respect any user override configured in Zed settings.
-struct Tnix;
+struct Tynix;
 
 fn normalize_binary_path(path: Option<String>) -> Option<String> {
     path.and_then(|value| {
@@ -48,16 +48,16 @@ fn default_binary_candidates(home: Option<&str>) -> Vec<String> {
     let mut candidates = Vec::new();
 
     if let Some(home) = home {
-        candidates.push(format!("{home}/.nix-profile/bin/tnix-lsp"));
+        candidates.push(format!("{home}/.nix-profile/bin/tynix-lsp"));
         candidates.push(format!(
-            "{home}/.local/state/nix/profiles/profile/bin/tnix-lsp"
+            "{home}/.local/state/nix/profiles/profile/bin/tynix-lsp"
         ));
         candidates.push(format!(
-            "{home}/.local/state/nix/profiles/home-manager/home-path/bin/tnix-lsp"
+            "{home}/.local/state/nix/profiles/home-manager/home-path/bin/tynix-lsp"
         ));
     }
 
-    candidates.push("/run/current-system/sw/bin/tnix-lsp".to_string());
+    candidates.push("/run/current-system/sw/bin/tynix-lsp".to_string());
     candidates
 }
 
@@ -70,16 +70,16 @@ where
         .find(|candidate| exists(candidate))
 }
 
-/// Wrap user-provided `lsp.tnix-lsp.settings` under the `tnix` section that
-/// tnix-lsp requests through `workspace/configuration`.
+/// Wrap user-provided `lsp.tynix-lsp.settings` under the `tynix` section that
+/// tynix-lsp requests through `workspace/configuration`.
 ///
-/// Settings that are already namespaced (`{ "tnix": { ... } }`) are passed
+/// Settings that are already namespaced (`{ "tynix": { ... } }`) are passed
 /// through unchanged so both spellings work in Zed's settings.json.
 fn workspace_configuration(settings: Option<Value>) -> Option<Value> {
     let settings = settings?;
     match &settings {
-        Value::Object(map) if map.len() == 1 && map.contains_key("tnix") => Some(settings),
-        _ => Some(serde_json::json!({ "tnix": settings })),
+        Value::Object(map) if map.len() == 1 && map.contains_key("tynix") => Some(settings),
+        _ => Some(serde_json::json!({ "tynix": settings })),
     }
 }
 
@@ -88,15 +88,15 @@ fn resolve_default_binary() -> Option<String> {
     resolve_default_binary_with(home.as_deref(), |candidate| Path::new(candidate).exists())
 }
 
-impl Extension for Tnix {
+impl Extension for Tynix {
     fn new() -> Self {
         Self {}
     }
 
-    /// Resolve the command used to launch the tnix language server.
+    /// Resolve the command used to launch the tynix language server.
     ///
     /// A per-worktree configured binary wins. When no override is present, the
-    /// extension falls back to looking up `tnix-lsp` on the worktree PATH so it
+    /// extension falls back to looking up `tynix-lsp` on the worktree PATH so it
     /// works naturally inside the Nix dev shell.
     fn language_server_command(
         &mut self,
@@ -118,13 +118,13 @@ impl Extension for Tnix {
         }
 
         let path = worktree
-            .which("tnix-lsp")
+            .which("tynix-lsp")
             .or_else(|| resolve_default_binary())
-            .ok_or_else(|| "tnix-lsp must be installed and available in $PATH.".to_string())?;
+            .ok_or_else(|| "tynix-lsp must be installed and available in $PATH.".to_string())?;
         Ok(build_command(path, vec![], env))
     }
 
-    /// Forward `lsp.tnix-lsp.initialization_options` from Zed settings.
+    /// Forward `lsp.tynix-lsp.initialization_options` from Zed settings.
     fn language_server_initialization_options(
         &mut self,
         language_server_id: &LanguageServerId,
@@ -137,7 +137,7 @@ impl Extension for Tnix {
         )
     }
 
-    /// Forward `lsp.tnix-lsp.settings` as the `tnix` configuration section.
+    /// Forward `lsp.tynix-lsp.settings` as the `tynix` configuration section.
     fn language_server_workspace_configuration(
         &mut self,
         language_server_id: &LanguageServerId,
@@ -151,7 +151,7 @@ impl Extension for Tnix {
     }
 }
 
-register_extension!(Tnix);
+register_extension!(Tynix);
 
 #[cfg(test)]
 mod tests {
@@ -171,12 +171,12 @@ mod tests {
     #[test]
     fn normalize_binary_path_trims_explicit_values() {
         assert_eq!(
-            normalize_binary_path(Some(" tnix-lsp ".into())),
-            Some("tnix-lsp".into())
+            normalize_binary_path(Some(" tynix-lsp ".into())),
+            Some("tynix-lsp".into())
         );
         assert_eq!(
-            normalize_binary_path(Some("/nix/store/bin/tnix-lsp".into())),
-            Some("/nix/store/bin/tnix-lsp".into())
+            normalize_binary_path(Some("/nix/store/bin/tynix-lsp".into())),
+            Some("/nix/store/bin/tynix-lsp".into())
         );
     }
 
@@ -188,22 +188,25 @@ mod tests {
             vec!["--stdio".to_string()]
         );
         assert_eq!(
-            normalize_binary_arguments(Some(vec!["--log-file".into(), "/tmp/tnix.log".into()])),
-            vec!["--log-file".to_string(), "/tmp/tnix.log".to_string()]
+            normalize_binary_arguments(Some(vec!["--log-file".into(), "/tmp/tynix.log".into()])),
+            vec!["--log-file".to_string(), "/tmp/tynix.log".to_string()]
         );
     }
 
     #[test]
     fn build_command_preserves_command_args_and_env() {
         let command = build_command(
-            "tnix-lsp".into(),
+            "tynix-lsp".into(),
             vec!["--stdio".into()],
-            vec![("TNIX_ENV".into(), "1".into())],
+            vec![("TYNIX_ENV".into(), "1".into())],
         );
 
-        assert_eq!(command.command, "tnix-lsp");
+        assert_eq!(command.command, "tynix-lsp");
         assert_eq!(command.args, vec!["--stdio".to_string()]);
-        assert_eq!(command.env, vec![("TNIX_ENV".to_string(), "1".to_string())]);
+        assert_eq!(
+            command.env,
+            vec![("TYNIX_ENV".to_string(), "1".to_string())]
+        );
     }
 
     #[test]
@@ -211,11 +214,11 @@ mod tests {
         assert_eq!(
             default_binary_candidates(Some("/home/alice")),
             vec![
-                "/home/alice/.nix-profile/bin/tnix-lsp".to_string(),
-                "/home/alice/.local/state/nix/profiles/profile/bin/tnix-lsp".to_string(),
-                "/home/alice/.local/state/nix/profiles/home-manager/home-path/bin/tnix-lsp"
+                "/home/alice/.nix-profile/bin/tynix-lsp".to_string(),
+                "/home/alice/.local/state/nix/profiles/profile/bin/tynix-lsp".to_string(),
+                "/home/alice/.local/state/nix/profiles/home-manager/home-path/bin/tynix-lsp"
                     .to_string(),
-                "/run/current-system/sw/bin/tnix-lsp".to_string(),
+                "/run/current-system/sw/bin/tynix-lsp".to_string(),
             ]
         );
     }
@@ -223,12 +226,12 @@ mod tests {
     #[test]
     fn resolve_default_binary_with_returns_first_existing_candidate() {
         let resolved = resolve_default_binary_with(Some("/home/alice"), |candidate| {
-            candidate == "/home/alice/.local/state/nix/profiles/profile/bin/tnix-lsp"
+            candidate == "/home/alice/.local/state/nix/profiles/profile/bin/tynix-lsp"
         });
 
         assert_eq!(
             resolved,
-            Some("/home/alice/.local/state/nix/profiles/profile/bin/tnix-lsp".to_string())
+            Some("/home/alice/.local/state/nix/profiles/profile/bin/tynix-lsp".to_string())
         );
         assert_eq!(
             resolve_default_binary_with(Some("/home/alice"), |_| false),
@@ -241,11 +244,11 @@ mod tests {
         assert_eq!(workspace_configuration(None), None);
         assert_eq!(
             workspace_configuration(Some(json!({ "inlayHints": { "enabled": false } }))),
-            Some(json!({ "tnix": { "inlayHints": { "enabled": false } } }))
+            Some(json!({ "tynix": { "inlayHints": { "enabled": false } } }))
         );
         assert_eq!(
-            workspace_configuration(Some(json!({ "tnix": { "trace": "off" } }))),
-            Some(json!({ "tnix": { "trace": "off" } }))
+            workspace_configuration(Some(json!({ "tynix": { "trace": "off" } }))),
+            Some(json!({ "tynix": { "trace": "off" } }))
         );
     }
 }

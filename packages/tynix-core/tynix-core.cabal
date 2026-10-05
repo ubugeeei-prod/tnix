@@ -1,0 +1,152 @@
+cabal-version:      3.8
+name:               tynix-core
+version:            2.0.0.0
+build-type:         Simple
+license:            MIT
+license-file:       LICENSE
+author:             tynix contributors
+maintainer:         tynix contributors
+homepage:           https://github.com/ubugeeei/tynix
+bug-reports:        https://github.com/ubugeeei/tynix/issues
+category:           Language
+synopsis:           Core parser, type checker, compiler, and emitter for tynix
+
+library
+  exposed-modules:
+      Alias
+    , BuiltinPrelude
+    , Check
+    , Compile
+    , Diagnostics
+    , Driver
+    , Emit
+    , Indexed
+    , Kind
+    , Parser
+    , ParserExpr
+    , ParserLexer
+    , ParserType
+    , Pretty
+    , Subtyping
+    , Syntax
+    , Type
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , megaparsec
+    , mtl
+    , parser-combinators
+    , prettyprinter
+    , text
+  default-language: GHC2021
+
+common spec-defaults
+  hs-source-dirs:
+      src
+  other-modules:
+      Alias
+    , BuiltinPrelude
+    , Check
+    , Compile
+    , Diagnostics
+    , Driver
+    , Emit
+    , Indexed
+    , Kind
+    , Parser
+    , ParserExpr
+    , ParserLexer
+    , ParserType
+    , Pretty
+    , Subtyping
+    , Syntax
+    , TestSupport
+    , Type
+  build-depends:
+      base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , megaparsec
+    , mtl
+    , parser-combinators
+    , prettyprinter
+    , QuickCheck
+    , text
+  default-language: GHC2021
+
+test-suite tynix-parser-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Parser.spec.hs
+
+test-suite tynix-subtyping-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Subtyping.spec.hs
+
+test-suite tynix-kind-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Kind.spec.hs
+
+test-suite tynix-indexed-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Indexed.spec.hs
+
+test-suite tynix-driver-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Driver.spec.hs
+
+test-suite tynix-compile-emit-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: CompileEmit.spec.hs
+
+test-suite tynix-registry-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Registry.spec.hs
+
+test-suite tynix-alias-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Alias.spec.hs
+
+test-suite tynix-emit-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Emit.spec.hs
+
+test-suite tynix-pretty-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Pretty.spec.hs
+
+test-suite tynix-diagnostics-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Diagnostics.spec.hs
+
+test-suite tynix-type-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Type.spec.hs
+
+test-suite tynix-check-spec
+  import: spec-defaults
+  type: exitcode-stdio-1.0
+  main-is: Check.spec.hs
+
+source-repository head
+  type: git
+  location: https://github.com/ubugeeei/tynix.git

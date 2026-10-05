@@ -1,0 +1,82 @@
+cabal-version:      3.8
+name:               tynix-cli
+version:            2.0.0.0
+build-type:         Simple
+license:            MIT
+license-file:       LICENSE
+author:             tynix contributors
+maintainer:         tynix contributors
+homepage:           https://github.com/ubugeeei/tynix
+bug-reports:        https://github.com/ubugeeei/tynix/issues
+category:           Language
+synopsis:           CLI for tynix
+
+library
+  exposed-modules:
+      Cli
+    , Doctor
+    , Ide
+    , Jsonc
+    , Project
+  hs-source-dirs: src
+  build-depends:
+      aeson
+    , array
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , optparse-applicative
+    , process
+    , text
+    , tynix-core
+  default-language: GHC2021
+
+executable tynix
+  main-is: Main.hs
+  hs-source-dirs: app
+  other-modules:
+      Paths_tynix_cli
+  build-depends:
+      aeson
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , optparse-applicative
+    , process
+    , text
+    , tynix-cli
+    , tynix-core
+  default-language: GHC2021
+
+test-suite tynix-cli-spec
+  type: exitcode-stdio-1.0
+  main-is: Cli.spec.hs
+  hs-source-dirs: src
+  other-modules:
+      Cli
+    , Doctor
+    , Ide
+    , IdeSpec
+    , Jsonc
+    , Project
+  build-depends:
+      aeson
+    , array
+    , base >=4.19 && <5
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , optparse-applicative
+    , process
+    , text
+    , tynix-cli
+    , tynix-core
+  default-language: GHC2021
+
+source-repository head
+  type: git
+  location: https://github.com/ubugeeei/tynix.git

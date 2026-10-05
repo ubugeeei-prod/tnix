@@ -4,9 +4,9 @@ const rootPackagePath = new URL("../package.json", import.meta.url);
 const vscodePackagePath = new URL("../editors/vscode/package.json", import.meta.url);
 const changelogPath = new URL("../CHANGELOG.md", import.meta.url);
 const cabalPaths = [
-  new URL("../packages/tnix-core/tnix-core.cabal", import.meta.url),
-  new URL("../packages/tnix-cli/tnix-cli.cabal", import.meta.url),
-  new URL("../packages/tnix-lsp/tnix-lsp.cabal", import.meta.url),
+  new URL("../packages/tynix-core/tynix-core.cabal", import.meta.url),
+  new URL("../packages/tynix-cli/tynix-cli.cabal", import.meta.url),
+  new URL("../packages/tynix-lsp/tynix-lsp.cabal", import.meta.url),
 ];
 
 const errors: string[] = [];

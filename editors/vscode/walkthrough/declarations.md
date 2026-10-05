@@ -1,9 +1,9 @@
 # Type existing Nix code
 
 You do not have to rewrite anything. Describe an existing `.nix` file with a
-`declare` block, either inline or in a `.d.tnix` file next to it:
+`declare` block, either inline or in a `.d.tynix` file next to it:
 
-```tnix
+```tynix
 declare "./lib.nix" {
   mkGreeting :: { name :: String; } -> String;
   version :: String;

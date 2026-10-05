@@ -1,0 +1,4 @@
+let
+  value :: any;
+  value = { nested = { label = "tynix"; }; };
+in value.missing

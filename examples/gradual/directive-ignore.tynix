@@ -1,0 +1,4 @@
+let
+  # @tynix-ignore
+  value = missing;
+in value

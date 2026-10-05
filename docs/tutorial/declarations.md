@@ -1,18 +1,18 @@
 ---
 title: "6. Typing existing .nix"
-description: Describe untyped .nix modules with .d.tnix declaration files and declare blocks, type builtins, and generate declarations with tnix emit.
+description: Describe untyped .nix modules with .d.tynix declaration files and declare blocks, type builtins, and generate declarations with tynix emit.
 ---
 
 # 6. Typing existing .nix
 
-You will not rewrite a whole Nix codebase in `.tnix`, and you do not need to.
+You will not rewrite a whole Nix codebase in `.tynix`, and you do not need to.
 **Declarations** describe the type of a `.nix` file without touching it, the way
 `.d.ts` files describe JavaScript libraries. Typed code that imports the file
 then sees real types instead of `dynamic`.
 
 ## A module to describe
 
-Create an ordinary Nix file. tnix will never compile or modify it:
+Create an ordinary Nix file. tynix will never compile or modify it:
 
 ```nix [lib/strings.nix]
 {
@@ -22,11 +22,11 @@ Create an ordinary Nix file. tnix will never compile or modify it:
 }
 ```
 
-## Write a `.d.tnix` file
+## Write a `.d.tynix` file
 
 Next to it, create a declaration file:
 
-```tnix [lib/strings.d.tnix]
+```tynix [lib/strings.d.tynix]
 declare "./strings.nix" {
   shout :: String -> String;
   join :: String -> List String -> String;
@@ -40,7 +40,7 @@ contain `type` aliases and `declare` blocks but no expression.
 
 Now import the module from typed code:
 
-```tnix [main.tnix]
+```tynix [main.tynix]
 let
   strings = import ./lib/strings.nix;
 in {
@@ -51,7 +51,7 @@ in {
 ```
 
 ```bash
-tnix check main.tnix
+tynix check main.tynix
 ```
 
 ```text
@@ -72,12 +72,12 @@ reports `[TC0013] type mismatch: 42 vs String`, pointing at the `42`.
 
 ### How declaration files are found
 
-You did not tell `main.tnix` where `strings.d.tnix` lives. tnix finds the
+You did not tell `main.tynix` where `strings.d.tynix` lives. tynix finds the
 **workspace root** (the nearest ancestor directory with `.git`, `flake.nix`,
-`tnix.config.tnix`, `cabal.project` or `pnpm-workspace.yaml`; this is why you ran
-`git init` in step 1) and loads **every** `.d.tnix` file under it. Each
+`tynix.config.tynix`, `cabal.project` or `pnpm-workspace.yaml`; this is why you ran
+`git init` in step 1) and loads **every** `.d.tynix` file under it. Each
 `declare` block is keyed by the absolute path of its target, and `import` looks
-that path up. Where the `.d.tnix` file lives is therefore up to you: next to the
+that path up. Where the `.d.tynix` file lives is therefore up to you: next to the
 module, or in a `types/` directory.
 
 Two consequences:
@@ -89,7 +89,7 @@ Two consequences:
   with its own `.git`) is skipped, and so are hidden directories,
   `node_modules`, `dist-newstyle`, `result*` build links and symlinked
   directories.
-- Without any workspace marker, only the `.d.tnix` files directly next to the
+- Without any workspace marker, only the `.d.tynix` files directly next to the
   checked file are loaded. Discovery never walks an arbitrary directory tree.
 
 ## Default exports
@@ -97,12 +97,12 @@ Two consequences:
 If a module evaluates to something other than an attribute set, such as a
 function or a string, declare a single member called `default`:
 
-```tnix [greeting.tnix]
+```tynix [greeting.tynix]
 declare "./mk-greeting.nix" {
   default :: String -> String;
 };
 
-(import ./mk-greeting.nix) "tnix"
+(import ./mk-greeting.nix) "tynix"
 ```
 
 ```text
@@ -110,18 +110,18 @@ root: String
 ```
 
 This example also shows that a `declare` block can sit at the top of a regular
-`.tnix` file, before its expression. Inline declarations are handy for one-off
-imports; shared ones belong in a `.d.tnix` file.
+`.tynix` file, before its expression. Inline declarations are handy for one-off
+imports; shared ones belong in a `.d.tynix` file.
 
 ## Typed `builtins`
 
-You never have to declare `builtins` yourself. Every tnix binary embeds a
+You never have to declare `builtins` yourself. Every tynix binary embeds a
 **built-in prelude** that types every Nix builtin, so `builtins.*` members and
 the globals Nix exposes without the prefix (`toString`, `map`, `throw`,
 `import`, `derivation`, `baseNameOf`, `dirOf`, `fetchTarball`, `isNull`,
 `removeAttrs`, `placeholder`, ...) are checked with no project setup:
 
-```tnix [lists.tnix]
+```tynix [lists.tynix]
 let
   n = builtins.length [ 1 2 3 ];
   inc = (x :: Int): x + 1;
@@ -148,7 +148,7 @@ xs :: List Int
 The prelude also defines aliases you can use in your own annotations, such as
 `Derivation`, `DerivationArgs`, `FetchedSource`, `PathLike`, `FileType`,
 `TypeName` and `NameValuePair a`. Its source is
-[`registry/workspace/builtins.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/builtins.d.tnix);
+[`registry/workspace/builtins.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/workspace/builtins.d.tynix);
 see [builtins and the registry](../reference/builtins.md).
 
 `builtins` is a closed record: a misspelled member such as
@@ -159,7 +159,7 @@ see [builtins and the registry](../reference/builtins.md).
 A declaration target of `"builtins"` (a string, not a path) replaces the
 prelude for the whole workspace:
 
-```tnix [types/builtins.d.tnix]
+```tynix [types/builtins.d.tynix]
 declare "builtins" {
   head :: forall a. List a -> a;
   length :: forall a. List a -> Int;
@@ -173,12 +173,12 @@ The replacement is complete, not a merge: with this file in place,
 an older Nix version or to forbid some of them. Otherwise, do not declare
 `builtins` at all. Delete this file again before you continue the tutorial.
 
-## Generate declarations with `tnix emit`
+## Generate declarations with `tynix emit`
 
-For files you *do* write in tnix, there is no need to hand-write declarations.
-`tnix emit` derives one from the checked source:
+For files you *do* write in tynix, there is no need to hand-write declarations.
+`tynix emit` derives one from the checked source:
 
-```tnix [greetings.tnix]
+```tynix [greetings.tynix]
 type Greeting = { text :: String; loud :: Bool; };
 
 {
@@ -188,10 +188,10 @@ type Greeting = { text :: String; loud :: Bool; };
 ```
 
 ```bash
-tnix emit greetings.tnix -o greetings.d.tnix
+tynix emit greetings.tynix -o greetings.d.tynix
 ```
 
-```tnix [greetings.d.tnix]
+```tynix [greetings.d.tynix]
 type Greeting  = {
   loud :: Bool;
   text :: String;
@@ -221,11 +221,11 @@ path, which is what other modules will import at runtime.
 ## Recap
 
 - `declare "./file.nix" { member :: Type; };` describes an existing module.
-- All `.d.tnix` files under the workspace root are loaded automatically.
+- All `.d.tynix` files under the workspace root are loaded automatically.
 - Use `default` for modules that are not attribute sets.
 - `builtins` and global builtins such as `toString` are typed out of the box;
   a workspace `declare "builtins" { ... }` replaces that prelude.
-- `tnix emit` writes declarations for your own `.tnix` files.
+- `tynix emit` writes declarations for your own `.tynix` files.
 
 <div class="tx-pager">
 

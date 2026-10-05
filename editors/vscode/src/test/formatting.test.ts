@@ -11,13 +11,13 @@ import {
 suite("formatting and structure", () => {
   setup(async () => {
     await activateExtension();
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
   });
 
   test("document formatting returns text edits", async () => {
     const edits = await execProvider<vscode.TextEdit[]>(
       "vscode.executeFormatDocumentProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       { tabSize: 2, insertSpaces: true },
     );
     assert.ok(edits.length >= 1);
@@ -27,7 +27,7 @@ suite("formatting and structure", () => {
   test("folding ranges are returned", async () => {
     const ranges = await execProvider<vscode.FoldingRange[]>(
       "vscode.executeFoldingRangeProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
     );
     assert.ok(ranges.length >= 1);
   });

@@ -1,0 +1,19 @@
+type TynixProjectPath = Path | String;
+
+type TynixProjectConfig = {
+  name :: String;
+  sourceDir :: TynixProjectPath;
+  entry :: TynixProjectPath;
+  declarationDir :: TynixProjectPath;
+  declarationPacks :: List TynixProjectPath;
+  buildDir :: TynixProjectPath;
+  generatedDeclarationDir :: TynixProjectPath;
+  entries :: List TynixProjectPath;
+  include :: List TynixProjectPath;
+  exclude :: List TynixProjectPath;
+  builtins :: Bool;
+};
+
+declare "../../tynix.config.tynix" {
+  default :: TynixProjectConfig;
+};

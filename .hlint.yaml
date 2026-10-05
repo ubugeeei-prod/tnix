@@ -1,4 +1,4 @@
-# HLint configuration for tnix.
+# HLint configuration for tynix.
 #
 # The Haskell sources are kept hlint-clean and CI gates on `hlint packages`.
 # Default hints are enabled. Add focused `- ignore:` entries here (with a

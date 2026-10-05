@@ -153,7 +153,7 @@ jobs:
     permissions:
       contents: read
     # Deployment is not done here: Cloudflare Workers Builds (Git integration)
-    # builds and deploys tnix.dev on every push to main, so no Cloudflare
+    # builds and deploys tynix.dev on every push to main, so no Cloudflare
     # token is stored in GitHub. This job checks the same build and validates
     # the Worker config and assets without credentials.
     steps:

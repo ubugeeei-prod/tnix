@@ -1,0 +1,107 @@
+  1 "let" keyword.other.let.tynix
+  2 "simple" meta.binding.tynix entity.other.attribute-name.tynix
+  2 "=" meta.binding.tynix keyword.operator.assignment.tynix
+  2 "\"" meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+  2 "hello " meta.binding.tynix string.quoted.double.tynix
+  2 "\\\"" meta.binding.tynix string.quoted.double.tynix constant.character.escape.tynix
+  2 "world" meta.binding.tynix string.quoted.double.tynix
+  2 "\\\"" meta.binding.tynix string.quoted.double.tynix constant.character.escape.tynix
+  2 "\\n" meta.binding.tynix string.quoted.double.tynix constant.character.escape.tynix
+  2 "\\$" meta.binding.tynix string.quoted.double.tynix constant.character.escape.tynix
+  2 "{not} " meta.binding.tynix string.quoted.double.tynix
+  2 "${" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.begin.tynix
+  2 "name" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix variable.other.readwrite.tynix
+  2 "}" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.end.tynix
+  2 "!" meta.binding.tynix string.quoted.double.tynix
+  2 "\"" meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+  2 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+  3 "nested" meta.binding.tynix entity.other.attribute-name.tynix
+  3 "=" meta.binding.tynix keyword.operator.assignment.tynix
+  3 "\"" meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+  3 "outer " meta.binding.tynix string.quoted.double.tynix
+  3 "${" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.begin.tynix
+  3 "\"" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix string.quoted.double.tynix punctuation.definition.string.begin.tynix
+  3 "inner " meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix string.quoted.double.tynix
+  3 "${" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.begin.tynix
+  3 "toString" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix support.function.builtin.tynix
+  3 "1" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix constant.numeric.integer.tynix
+  3 "}" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.end.tynix
+  3 "\"" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+  3 "}" meta.binding.tynix string.quoted.double.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.end.tynix
+  3 " end" meta.binding.tynix string.quoted.double.tynix
+  3 "\"" meta.binding.tynix string.quoted.double.tynix punctuation.definition.string.end.tynix
+  3 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+  4 "indented" meta.binding.tynix entity.other.attribute-name.tynix
+  4 "=" meta.binding.tynix keyword.operator.assignment.tynix
+  4 "''" meta.binding.tynix string.quoted.other.indented.tynix punctuation.definition.string.begin.tynix
+  5 "    echo " meta.binding.tynix string.quoted.other.indented.tynix
+  5 "${" meta.binding.tynix string.quoted.other.indented.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.begin.tynix
+  5 "pkgs" meta.binding.tynix string.quoted.other.indented.tynix meta.embedded.interpolation.tynix variable.other.readwrite.tynix
+  5 "." meta.binding.tynix string.quoted.other.indented.tynix meta.embedded.interpolation.tynix punctuation.accessor.tynix
+  5 "hello" meta.binding.tynix string.quoted.other.indented.tynix meta.embedded.interpolation.tynix variable.other.property.tynix
+  5 "}" meta.binding.tynix string.quoted.other.indented.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.end.tynix
+  5 "/bin/hello" meta.binding.tynix string.quoted.other.indented.tynix
+  6 "    literal: " meta.binding.tynix string.quoted.other.indented.tynix
+  6 "''$" meta.binding.tynix string.quoted.other.indented.tynix constant.character.escape.tynix
+  6 "{notInterpolated} and " meta.binding.tynix string.quoted.other.indented.tynix
+  6 "'''" meta.binding.tynix string.quoted.other.indented.tynix constant.character.escape.tynix
+  6 " quotes " meta.binding.tynix string.quoted.other.indented.tynix
+  6 "''\\n" meta.binding.tynix string.quoted.other.indented.tynix constant.character.escape.tynix
+  6 " escaped" meta.binding.tynix string.quoted.other.indented.tynix
+  7 "    $HOME stays; semicolons too" meta.binding.tynix string.quoted.other.indented.tynix
+  8 "''" meta.binding.tynix string.quoted.other.indented.tynix punctuation.definition.string.end.tynix
+  8 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+  9 "relative" meta.binding.tynix entity.other.attribute-name.tynix
+  9 "=" meta.binding.tynix keyword.operator.assignment.tynix
+  9 "./foo/bar.nix" meta.binding.tynix string.unquoted.path.tynix
+  9 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 10 "parent" meta.binding.tynix entity.other.attribute-name.tynix
+ 10 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 10 "../lib" meta.binding.tynix string.unquoted.path.tynix
+ 10 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 11 "absolute" meta.binding.tynix entity.other.attribute-name.tynix
+ 11 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 11 "/etc/hosts" meta.binding.tynix string.unquoted.path.tynix
+ 11 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 12 "home" meta.binding.tynix entity.other.attribute-name.tynix
+ 12 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 12 "~/.config/nixpkgs" meta.binding.tynix string.unquoted.path.tynix
+ 12 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 13 "search" meta.binding.tynix entity.other.attribute-name.tynix
+ 13 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 13 "<nixpkgs>" meta.binding.tynix string.unquoted.spath.tynix
+ 13 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 14 "searchSub" meta.binding.tynix entity.other.attribute-name.tynix
+ 14 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 14 "<nixpkgs/lib>" meta.binding.tynix string.unquoted.spath.tynix
+ 14 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 15 "dynamicPath" meta.binding.tynix entity.other.attribute-name.tynix
+ 15 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 15 "./pkgs/" meta.binding.tynix string.unquoted.path.tynix
+ 15 "${" meta.binding.tynix string.unquoted.path.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.begin.tynix
+ 15 "name" meta.binding.tynix string.unquoted.path.tynix meta.embedded.interpolation.tynix variable.other.readwrite.tynix
+ 15 "}" meta.binding.tynix string.unquoted.path.tynix meta.embedded.interpolation.tynix punctuation.section.embedded.end.tynix
+ 15 "/default.nix" meta.binding.tynix string.unquoted.path.tynix
+ 15 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 16 "url" meta.binding.tynix entity.other.attribute-name.tynix
+ 16 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 16 "https://example.com/archive.tar.gz" meta.binding.tynix string.unquoted.uri.tynix
+ 16 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 17 "flakeRef" meta.binding.tynix entity.other.attribute-name.tynix
+ 17 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 17 "github:NixOS/nixpkgs" meta.binding.tynix string.unquoted.uri.tynix
+ 17 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 18 "update" meta.binding.tynix entity.other.attribute-name.tynix
+ 18 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 18 "a" meta.binding.tynix variable.other.readwrite.tynix
+ 18 "//" meta.binding.tynix keyword.operator.update.tynix
+ 18 "b" meta.binding.tynix variable.other.readwrite.tynix
+ 18 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 19 "division" meta.binding.tynix entity.other.attribute-name.tynix
+ 19 "=" meta.binding.tynix keyword.operator.assignment.tynix
+ 19 "a" meta.binding.tynix variable.other.readwrite.tynix
+ 19 "/" meta.binding.tynix keyword.operator.arithmetic.tynix
+ 19 "b" meta.binding.tynix variable.other.readwrite.tynix
+ 19 ";" meta.binding.tynix punctuation.terminator.binding.tynix
+ 20 "in" keyword.other.in.tynix
+ 20 "simple" variable.other.readwrite.tynix

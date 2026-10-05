@@ -1,4 +1,0 @@
-{
-  name = "tnix";
-  count = 1;
-}

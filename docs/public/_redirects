@@ -1,15 +1,15 @@
-# Cloudflare Pages redirects for tnix.dev.
+# Cloudflare Pages redirects for tynix.dev.
 # https://developers.cloudflare.com/pages/configuration/redirects/
 
 # Short links.
-/gh                        https://github.com/ubugeeei-prod/tnix                          302
-/github                    https://github.com/ubugeeei-prod/tnix                          302
-/issues                    https://github.com/ubugeeei-prod/tnix/issues                   302
-/discussions               https://github.com/ubugeeei-prod/tnix/discussions              302
+/gh                        https://github.com/ubugeeei-prod/tynix                          302
+/github                    https://github.com/ubugeeei-prod/tynix                          302
+/issues                    https://github.com/ubugeeei-prod/tynix/issues                   302
+/discussions               https://github.com/ubugeeei-prod/tynix/discussions              302
 /install                   /install.sh                                               302
 
 # Release downloads. install.sh fetches archives through these URLs so the
 # public download location stays stable even if hosting moves.
-/latest                    https://github.com/ubugeeei-prod/tnix/releases/latest          302
-/download/*                https://github.com/ubugeeei-prod/tnix/releases/download/:splat           302
+/latest                    https://github.com/ubugeeei-prod/tynix/releases/latest          302
+/download/*                https://github.com/ubugeeei-prod/tynix/releases/download/:splat           302
 

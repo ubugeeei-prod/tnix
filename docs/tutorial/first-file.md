@@ -1,21 +1,21 @@
 ---
-title: "2. Your first .tnix file"
-description: Write a .tnix file, type-check it, compile it to .nix, and read your first diagnostic.
+title: "2. Your first .tynix file"
+description: Write a .tynix file, type-check it, compile it to .nix, and read your first diagnostic.
 ---
 
-# 2. Your first .tnix file
+# 2. Your first .tynix file
 
-A `.tnix` file is a Nix expression that may also contain type syntax. In this
+A `.tynix` file is a Nix expression that may also contain type syntax. In this
 step you write one, check it, and compile it.
 
 ## Write it
 
-Inside the `tnix-tour` directory, create `hello.tnix`:
+Inside the `tynix-tour` directory, create `hello.tynix`:
 
-```tnix [hello.tnix]
+```tynix [hello.tynix]
 let
   greeting :: String;
-  greeting = "Hello, tnix!";
+  greeting = "Hello, tynix!";
 in greeting
 ```
 
@@ -27,7 +27,7 @@ writes them.
 ## Check it
 
 ```bash
-tnix check hello.tnix
+tynix check hello.tynix
 ```
 
 ```text
@@ -35,23 +35,23 @@ root: String
 greeting :: String
 ```
 
-`tnix check` prints the type of the file's root expression and of every
+`tynix check` prints the type of the file's root expression and of every
 `let`-bound name. Nothing was written to disk; `check` only analyzes.
 
 ## Compile it
 
 ```bash
-tnix compile hello.tnix -o hello.nix
+tynix compile hello.tynix -o hello.nix
 cat hello.nix
 ```
 
 ```nix [hello.nix]
 let
-  greeting = "Hello, tnix!";
+  greeting = "Hello, tynix!";
 in greeting
 ```
 
-The signature is gone. This is **erasure**: tnix removes every piece of type
+The signature is gone. This is **erasure**: tynix removes every piece of type
 syntax and emits ordinary Nix that keeps your layout and names. Nix never sees a
 type, so there is nothing to evaluate at runtime and nothing to slow it down.
 
@@ -60,20 +60,20 @@ nix eval --file hello.nix
 ```
 
 ```text
-"Hello, tnix!"
+"Hello, tynix!"
 ```
 
-Without `-o`, `tnix compile` prints the generated Nix to standard output.
+Without `-o`, `tynix compile` prints the generated Nix to standard output.
 
 > [!NOTE]
-> `tnix compile` type-checks first and refuses to write output for a file that
-> does not check. You never ship `.nix` generated from an ill-typed `.tnix`.
+> `tynix compile` type-checks first and refuses to write output for a file that
+> does not check. You never ship `.nix` generated from an ill-typed `.tynix`.
 
 ## Break it
 
 Change the value so it no longer matches the signature:
 
-```tnix [hello.tnix]
+```tynix [hello.tynix]
 let
   greeting :: String;
   greeting = 42;
@@ -81,7 +81,7 @@ in greeting
 ```
 
 ```bash
-tnix check hello.tnix
+tynix check hello.tynix
 ```
 
 ```text
@@ -107,7 +107,7 @@ the next step.
 A syntax error comes from the parser, which also prints an excerpt of the line
 and what it expected to find:
 
-```tnix [broken.tnix]
+```tynix [broken.tynix]
 let
   greeting :: String
   greeting = "Hello";
@@ -115,7 +115,7 @@ in greeting
 ```
 
 ```text
-3:12: [TP0004] broken.tnix:3:12:
+3:12: [TP0004] broken.tynix:3:12:
   |
 3 |   greeting = "Hello";
   |            ^
@@ -126,18 +126,18 @@ expecting "%1", "->", "Tuple", "any", "dynamic", "extends", "false", "infer", "t
 The signature on line 2 is missing its `;`, so the parser kept reading a type
 and tripped over the `=` on line 3.
 
-Put `"Hello, tnix!"` back before moving on.
+Put `"Hello, tynix!"` back before moving on.
 
 ## Emit a declaration
 
-One more command completes the loop. `tnix emit` writes the *public type
-surface* of a file as a declaration (`.d.tnix`) file:
+One more command completes the loop. `tynix emit` writes the *public type
+surface* of a file as a declaration (`.d.tynix`) file:
 
 ```bash
-tnix emit hello.tnix
+tynix emit hello.tynix
 ```
 
-```tnix
+```tynix
 declare "./hello.nix" {
   default :: String;
 };
@@ -149,9 +149,9 @@ in depth.
 
 ## Recap
 
-- `.tnix` = Nix + type syntax. Signatures look like `name :: Type;`.
-- `tnix check` analyzes, `tnix compile` erases types and emits `.nix`, and
-  `tnix emit` writes a `.d.tnix` declaration.
+- `.tynix` = Nix + type syntax. Signatures look like `name :: Type;`.
+- `tynix check` analyzes, `tynix compile` erases types and emits `.nix`, and
+  `tynix emit` writes a `.d.tynix` declaration.
 - Diagnostics carry a `line:column` position and a stable code such as
   `TC0013`.
 

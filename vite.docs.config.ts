@@ -3,11 +3,11 @@ import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import { defineTheme, oxContent } from "@ox-content/vite-plugin";
 import { codeTheme, fonts, headHtml, themeColors, themeCss } from "./docs/.vite/brand.ts";
-import { tnixGrammar } from "./docs/.vite/tnix-grammar.ts";
+import { tynixGrammar } from "./docs/.vite/tynix-grammar.ts";
 
-// Canonical public origin. Override with TNIX_DOCS_SITE_URL for preview
+// Canonical public origin. Override with TYNIX_DOCS_SITE_URL for preview
 // deployments that should advertise their own URL in OG tags.
-const siteUrl = process.env.TNIX_DOCS_SITE_URL ?? "https://tnix.dev";
+const siteUrl = process.env.TYNIX_DOCS_SITE_URL ?? "https://tynix.dev";
 const outDir = "dist/docs";
 
 const navigation = [
@@ -40,7 +40,7 @@ const navigation = [
   {
     title: "Guides",
     items: [
-      { title: "Adopting tnix", path: "/migration" },
+      { title: "Adopting tynix", path: "/migration" },
       { title: "Editors", path: "/editors" },
       { title: "Troubleshooting", path: "/troubleshooting" },
     ],
@@ -80,17 +80,17 @@ const theme = defineTheme({
     maxContentWidth: "880px",
   },
   header: {
-    logo: "/brand/tnix-mark.svg",
+    logo: "/brand/tynix-mark.svg",
     logoWidth: 28,
     logoHeight: 28,
     showSiteNameText: true,
   },
   footer: {
     message: "TypeScript-grade types for Nix. Zero runtime.",
-    copyright: 'Released under the MIT license · <a href="https://github.com/ubugeeei-prod/tnix">GitHub</a>',
+    copyright: 'Released under the MIT license · <a href="https://github.com/ubugeeei-prod/tynix">GitHub</a>',
   },
   socialLinks: {
-    github: "https://github.com/ubugeeei-prod/tnix",
+    github: "https://github.com/ubugeeei-prod/tynix",
   },
   embed: {
     head: headHtml,
@@ -103,7 +103,7 @@ const theme = defineTheme({
 // The placeholder entry itself is not part of the site, so drop it.
 function dropBuildEntry(): Plugin {
   return {
-    name: "tnix-docs:drop-build-entry",
+    name: "tynix-docs:drop-build-entry",
     apply: "build",
     closeBundle: {
       order: "post",
@@ -137,12 +137,12 @@ export default defineConfig({
       embeds: false,
       highlight: true,
       highlightTheme: codeTheme as never,
-      highlightLangs: ["nix", tnixGrammar] as never,
+      highlightLangs: ["nix", tynixGrammar] as never,
       codeAnnotations: { notation: "both" },
       search: true,
       ssg: {
         clean: false,
-        siteName: "tnix",
+        siteName: "tynix",
         siteUrl,
         ogImage: `${siteUrl}/og-image.png`,
         theme,

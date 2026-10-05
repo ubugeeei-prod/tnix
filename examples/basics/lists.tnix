@@ -1,4 +1,0 @@
-let
-  packages :: List { name :: String; };
-  packages = [{ name = "tnix"; } { name = "nixpkgs"; }];
-in builtins.map ((pkg :: { name :: String; }): pkg.name) packages

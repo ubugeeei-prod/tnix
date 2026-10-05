@@ -9,11 +9,11 @@ import { isAbsolute, join } from "node:path";
  */
 
 export const INSTALL_SCRIPT_COMMAND =
-  "curl -fsSL https://tnix.dev/install.sh | sh";
+  "curl -fsSL https://tynix.dev/install.sh | sh";
 export const NIX_INSTALL_COMMAND =
-  "nix profile install github:ubugeeei/tnix#tnix github:ubugeeei/tnix#tnix-lsp";
+  "nix profile install github:ubugeeei/tynix#tynix github:ubugeeei/tynix#tynix-lsp";
 
-/** Severity names accepted by `tnix.diagnostics.severityOverrides`. */
+/** Severity names accepted by `tynix.diagnostics.severityOverrides`. */
 export type SeverityName = "error" | "warning" | "information" | "hint" | "off";
 
 const SEVERITY_NAMES: readonly SeverityName[] = [
@@ -89,7 +89,7 @@ export function findExecutable(
 }
 
 /**
- * Normalize `tnix.diagnostics.severityOverrides`: keys are upper-cased
+ * Normalize `tynix.diagnostics.severityOverrides`: keys are upper-cased
  * diagnostic codes, unknown severity names are dropped.
  */
 export function normalizeSeverityOverrides(
@@ -126,7 +126,7 @@ export function diagnosticCode(code: unknown): string | undefined {
  * Returns the original severity when no override applies, a new VS Code
  * severity number when one does, or `null` when the diagnostic is silenced.
  * Codes match case-insensitively, either exactly or as the prefix of the
- * message (tnix prefixes messages with `[CODE]` when no code field is set).
+ * message (tynix prefixes messages with `[CODE]` when no code field is set).
  */
 export function overrideSeverity(
   code: unknown,
@@ -146,7 +146,7 @@ export function overrideSeverity(
   return match === "off" ? null : VSCODE_SEVERITY[match];
 }
 
-/** Build the `initializationOptions` payload sent to `tnix-lsp`. */
+/** Build the `initializationOptions` payload sent to `tynix-lsp`. */
 export function buildInitializationOptions(settings: ExtensionSettings) {
   return {
     inlayHints: { ...settings.inlayHints },

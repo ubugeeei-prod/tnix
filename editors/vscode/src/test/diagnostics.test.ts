@@ -11,8 +11,8 @@ import {
 suite("diagnostics", () => {
   test("surfaces diagnostics published by the language server", async () => {
     await activateExtension();
-    const uri = fixtureUri("sample.tnix");
-    await openFixture("sample.tnix");
+    const uri = fixtureUri("sample.tynix");
+    await openFixture("sample.tynix");
 
     const diagnostics = await waitFor(
       () => vscode.languages.getDiagnostics(uri),
@@ -26,7 +26,7 @@ suite("diagnostics", () => {
 
   test("clears diagnostics state is queryable for all uris", async () => {
     await activateExtension();
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
     const all = vscode.languages.getDiagnostics();
     assert.ok(Array.isArray(all));
   });

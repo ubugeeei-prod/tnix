@@ -1,9 +1,9 @@
-// Generate the tnix mark and every asset derived from it.
+// Generate the tynix mark and every asset derived from it.
 //
 // The mark is six interlocking lambdas woven into a hexagonal ring, after the
 // Nix lambda snowflake. Its strokes are cut flat like the slanted bars of the
 // Haskell logo, the arms alternate Nix blues and Haskell purples, and the
-// centre holds `::`, the type annotation tnix and Haskell share.
+// centre holds `::`, the type annotation tynix and Haskell share.
 //
 //   node --experimental-strip-types ./scripts/generate-brand.ts
 //
@@ -111,44 +111,54 @@ function markGroup(colors: string[], colonFill: string, margin: number, id: stri
   return `<g transform="translate(256 256) scale(${scale.toFixed(4)}) translate(${(-cx).toFixed(2)} ${(-cy).toFixed(2)})">${legs}${weave}${colon(cx, cy, colonFill)}</g>`;
 }
 
-function svg(body: string, viewBox: string, width: number, height: number, title = "tnix"): string {
+function svg(body: string, viewBox: string, width: number, height: number, title = "tynix"): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}" role="img" aria-label="${title}">\n  <title>${title}</title>\n  ${body}\n</svg>\n`;
 }
 
-const mark = (colors: string[], colonFill = AMBER, id = "tnix") => markGroup(colors, colonFill, 16, id);
+const mark = (colors: string[], colonFill = AMBER, id = "tynix") => markGroup(colors, colonFill, 16, id);
 const tile = (id: string) =>
   `<rect width="512" height="512" rx="116" fill="${TILE}"/>${markGroup(palettes.dark, AMBER, 76, id)}`;
 
-// Wordmark strokes (unchanged from the previous logo), in the 166 x 64 logo space.
+// The wordmark is drawn, not set: rounded strokes in the 194 x 64 logo space,
+// to the right of the 64 x 64 mark. The `y` reuses the slant of the `x`; its
+// tail drops below the baseline.
+const LOGO_WIDTH = 194;
 function wordmark(color: string): string {
-  return `<g fill="none" stroke="${color}" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M84 15.5v23.5q0 7.5 7.5 7.5h2M77.5 26.5h15"/><path d="M103 26.5v20M103 35q0-8.5 8.5-8.5t8.5 8.5v11.5"/><path d="M131 28v18.5"/><path d="M142.5 27l17 19.5M159.5 27l-17 19.5"/></g><circle cx="131" cy="17" r="3.9" fill="${color}"/>`;
+  const t = "M84 15.5v23.5q0 7.5 7.5 7.5h2M77.5 26.5h15";
+  const y = "M103 26.5l8.2 20M120 26.5l-13 29.5";
+  const n = "M131 26.5v20M131 35q0-8.5 8.5-8.5t8.5 8.5v11.5";
+  const i = "M159 28v18.5";
+  const x = "M170.5 27l17 19.5M187.5 27l-17 19.5";
+  const paths = [t, y, n, i, x].map((d) => `<path d="${d}"/>`).join("");
+  return `<g fill="none" stroke="${color}" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">${paths}</g><circle cx="159" cy="17" r="3.9" fill="${color}"/>`;
 }
 
 /** A mark scaled into the 64 x 64 square at the left of the logo. */
 const logoMark = (inner: string) => `<g transform="scale(0.125)">${inner}</g>`;
 
 const files: Record<string, string> = {
-  "docs/public/brand/tnix-mark.svg": svg(mark(palettes.light, AMBER, "m"), "0 0 512 512", 64, 64),
-  "docs/public/brand/tnix-mark-dark.svg": svg(mark(palettes.dark, AMBER, "md"), "0 0 512 512", 64, 64),
-  "docs/public/brand/tnix-mark-mono.svg": svg(mark(Array(6).fill(INK), INK, "mm"), "0 0 512 512", 64, 64),
-  "docs/public/brand/tnix-mark-white.svg": svg(mark(Array(6).fill("#FFFFFF"), "#FFFFFF", "mw"), "0 0 512 512", 64, 64),
-  "docs/public/brand/tnix-app-icon.svg": svg(tile("ai"), "0 0 512 512", 512, 512),
-  "docs/public/brand/tnix-logo.svg": svg(logoMark(mark(palettes.light, AMBER, "l")) + wordmark(INK), "0 0 166 64", 332, 128),
-  "docs/public/brand/tnix-logo-dark.svg": svg(logoMark(mark(palettes.dark, AMBER, "ld")) + wordmark("#F4F7FC"), "0 0 166 64", 332, 128),
-  "docs/public/brand/tnix-logo-mono.svg": svg(logoMark(mark(Array(6).fill(INK), INK, "lm")) + wordmark(INK), "0 0 166 64", 332, 128),
-  "docs/public/brand/tnix-logo-white.svg": svg(
+  "docs/public/brand/tynix-mark.svg": svg(mark(palettes.light, AMBER, "m"), "0 0 512 512", 64, 64),
+  "docs/public/brand/tynix-mark-dark.svg": svg(mark(palettes.dark, AMBER, "md"), "0 0 512 512", 64, 64),
+  "docs/public/brand/tynix-mark-mono.svg": svg(mark(Array(6).fill(INK), INK, "mm"), "0 0 512 512", 64, 64),
+  "docs/public/brand/tynix-mark-white.svg": svg(mark(Array(6).fill("#FFFFFF"), "#FFFFFF", "mw"), "0 0 512 512", 64, 64),
+  "docs/public/brand/tynix-app-icon.svg": svg(tile("ai"), "0 0 512 512", 512, 512),
+  "docs/public/brand/tynix-wordmark.svg": svg(wordmark(INK), `74 0 ${LOGO_WIDTH - 74} 64`, (LOGO_WIDTH - 74) * 2, 128),
+  "docs/public/brand/tynix-logo.svg": svg(logoMark(mark(palettes.light, AMBER, "l")) + wordmark(INK), `0 0 ${LOGO_WIDTH} 64`, LOGO_WIDTH * 2, 128),
+  "docs/public/brand/tynix-logo-dark.svg": svg(logoMark(mark(palettes.dark, AMBER, "ld")) + wordmark("#F4F7FC"), `0 0 ${LOGO_WIDTH} 64`, LOGO_WIDTH * 2, 128),
+  "docs/public/brand/tynix-logo-mono.svg": svg(logoMark(mark(Array(6).fill(INK), INK, "lm")) + wordmark(INK), `0 0 ${LOGO_WIDTH} 64`, LOGO_WIDTH * 2, 128),
+  "docs/public/brand/tynix-logo-white.svg": svg(
     logoMark(mark(Array(6).fill("#FFFFFF"), "#FFFFFF", "lw")) + wordmark("#FFFFFF"),
-    "0 0 166 64",
-    332,
+    `0 0 ${LOGO_WIDTH} 64`,
+    LOGO_WIDTH * 2,
     128,
   ),
   // The site header and favicon use the tile: it reads on light and dark
   // backgrounds alike and stays legible at 16 px.
-  "docs/public/tnix-logo.svg": svg(tile("h"), "0 0 512 512", 64, 64),
+  "docs/public/tynix-logo.svg": svg(tile("h"), "0 0 512 512", 64, 64),
   "docs/public/favicon.svg": svg(tile("f"), "0 0 512 512", 64, 64),
   "editors/vscode/icons/icon.svg": svg(tile("v"), "0 0 512 512", 256, 256),
-  "editors/vscode/icons/tnix-file-light.svg": svg(mark(palettes.light, "#C98A12", "fl"), "0 0 512 512", 16, 16),
-  "editors/vscode/icons/tnix-file-dark.svg": svg(mark(palettes.dark, AMBER, "fd"), "0 0 512 512", 16, 16),
+  "editors/vscode/icons/tynix-file-light.svg": svg(mark(palettes.light, "#C98A12", "fl"), "0 0 512 512", 16, 16),
+  "editors/vscode/icons/tynix-file-dark.svg": svg(mark(palettes.dark, AMBER, "fd"), "0 0 512 512", 16, 16),
 };
 
 for (const [path, content] of Object.entries(files)) {
@@ -172,9 +182,9 @@ function render(source: string, target: string, width: number): void {
 
 try {
   execFileSync("rsvg-convert", ["--version"], { stdio: "ignore" });
-  render("docs/public/brand/tnix-app-icon.svg", "docs/public/brand/tnix-mark-512.png", 512);
-  render("docs/public/brand/tnix-app-icon.svg", "docs/public/apple-touch-icon.png", 180);
-  render("docs/public/brand/tnix-app-icon.svg", "editors/vscode/images/icon.png", 256);
+  render("docs/public/brand/tynix-app-icon.svg", "docs/public/brand/tynix-mark-512.png", 512);
+  render("docs/public/brand/tynix-app-icon.svg", "docs/public/apple-touch-icon.png", 180);
+  render("docs/public/brand/tynix-app-icon.svg", "editors/vscode/images/icon.png", 256);
   render("docs/public/brand/og-image.svg", "docs/public/brand/og-image.png", 1200);
   render("docs/public/brand/og-image.svg", "docs/public/og-image.png", 1200);
 } catch {

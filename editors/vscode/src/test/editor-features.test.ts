@@ -11,13 +11,13 @@ import {
 suite("editor features", () => {
   setup(async () => {
     await activateExtension();
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
   });
 
   test("semantic tokens are provided", async () => {
     const tokens = await execProvider<vscode.SemanticTokens>(
       "vscode.provideDocumentSemanticTokens",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
     );
     assert.ok(tokens.data.length >= 5, "expected at least one 5-tuple token");
   });
@@ -29,7 +29,7 @@ suite("editor features", () => {
     );
     const hints = await execProvider<vscode.InlayHint[]>(
       "vscode.executeInlayHintProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       range,
     );
     assert.ok(hints.length >= 1);
@@ -43,7 +43,7 @@ suite("editor features", () => {
   test("document links are provided", async () => {
     const links = await execProvider<vscode.DocumentLink[]>(
       "vscode.executeLinkProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
     );
     assert.ok(links.length >= 1);
     assert.ok(links[0].target?.toString().includes(STUB));

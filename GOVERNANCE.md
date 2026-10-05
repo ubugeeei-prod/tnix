@@ -1,6 +1,6 @@
 # Project Governance
 
-This document describes how decisions are made in the `tnix` project. It is
+This document describes how decisions are made in the `tynix` project. It is
 deliberately lightweight to match the project's current size; expect it to grow
 as the contributor base and surface area expand.
 

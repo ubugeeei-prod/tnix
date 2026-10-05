@@ -1,6 +1,6 @@
 {
-  "name": "tnix-workspace",
-  "version": "1.0.0",
+  "name": "tynix-workspace",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.8.0",
@@ -11,11 +11,11 @@
     "build": "vp run workspace:build",
     "check": "vp run workspace:check",
     "fmt": "vp run workspace:fmt",
-    "test": "vp run test:haskell && pnpm --filter tnix test && vp run test:zed",
+    "test": "vp run test:haskell && pnpm --filter tynix test && vp run test:zed",
     "docs:build": "vp build --config vite.docs.config.ts",
-    "docs:deploy": "pnpm --filter tnix-docs-site run deploy",
-    "docs:preview": "pnpm --filter tnix-docs-site run preview",
-    "docs:check-deploy": "pnpm --filter tnix-docs-site run check"
+    "docs:deploy": "pnpm --filter tynix-docs-site run deploy",
+    "docs:preview": "pnpm --filter tynix-docs-site run preview",
+    "docs:check-deploy": "pnpm --filter tynix-docs-site run check"
   },
   "devDependencies": {
     "@ox-content/vite-plugin": "3.2.13",

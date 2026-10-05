@@ -1,8 +1,8 @@
 <p align="center">
-  <a href="https://tnix.dev">
+  <a href="https://tynix.dev">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/public/brand/tnix-logo-dark.svg">
-      <img src="docs/public/brand/tnix-logo.svg" alt="tnix" width="332" height="128">
+      <source media="(prefers-color-scheme: dark)" srcset="docs/public/brand/tynix-logo-dark.svg">
+      <img src="docs/public/brand/tynix-logo.svg" alt="tynix" width="388" height="128">
     </picture>
   </a>
 </p>
@@ -10,14 +10,14 @@
 <p align="center"><strong>TypeScript-grade types for Nix. Zero runtime.</strong></p>
 
 <p align="center">
-  <a href="https://tnix.dev">Docs</a> ·
-  <a href="https://tnix.dev/tutorial">Tutorial</a> ·
-  <a href="https://github.com/ubugeeei-prod/tnix/releases">Releases</a>
+  <a href="https://tynix.dev">Docs</a> ·
+  <a href="https://tynix.dev/tutorial">Tutorial</a> ·
+  <a href="https://github.com/ubugeeei-prod/tynix/releases">Releases</a>
 </p>
 
-# tnix
+# tynix
 
-`tnix` is a gradual type system and tooling stack for Nix. It compiles `.tnix` to `.nix`, provides static checking, and emits `.d.tnix` declaration files. It has no runtime and is intentionally limited to complementing existing Nix semantics rather than replacing them.
+`tynix` is a gradual type system and tooling stack for Nix. It compiles `.tynix` to `.nix`, provides static checking, and emits `.d.tynix` declaration files. It has no runtime and is intentionally limited to complementing existing Nix semantics rather than replacing them.
 
 ## Goals
 
@@ -36,19 +36,19 @@
 
 ## File Kinds
 
-- `.tnix`
+- `.tynix`
   - source files with type annotations
   - compiled to `.nix`
-- `.d.tnix`
+- `.d.tynix`
   - declaration-only ambient files
   - used to type existing `.nix` modules and external code
 - `.nix`
   - runtime artifact
-  - `tnix` does not change its behavior
+  - `tynix` does not change its behavior
 
 ## Example
 
-```tnix
+```tynix
 type Option a = { _tag :: "some"; value :: a; } | { _tag :: "none"; };
 
 declare "./legacy/default.nix" {
@@ -70,7 +70,7 @@ in
 }
 ```
 
-`tnix check` infers `labelOf :: forall t0. { name :: t0; ... } %1 -> { label :: t0; }`
+`tynix check` infers `labelOf :: forall t0. { name :: t0; ... } %1 -> { label :: t0; }`
 (a row-polymorphic record argument), types the file's argument as
 `{ name? :: String; version :: String; ... }`, and checks the call to the
 untyped `legacy/default.nix` against its declaration. `Derivation` comes from
@@ -82,7 +82,7 @@ information is erased and only ordinary Nix code remains.
 - [Getting Started](./docs/getting-started.md)
 - [Tutorial](./docs/tutorial/index.md)
 - [Editor Setup](./docs/editors.md)
-- [Adopting tnix (Migration)](./docs/migration.md)
+- [Adopting tynix (Migration)](./docs/migration.md)
 - [Troubleshooting](./docs/troubleshooting.md)
 - [Language Reference](./docs/language-reference.md)
 - [Grammar](./docs/grammar.md)
@@ -99,13 +99,13 @@ information is erased and only ordinary Nix code remains.
 
 ## Current Status
 
-`tnix` is now in its first integrated toolchain release.
+`tynix` is now in its first integrated toolchain release.
 
 - Haskell monorepo for parser, checker, compiler, emitter, CLI, and LSP
 - Nix-based development environment
 - `pnpm`-managed editor tooling
 - VS Code, Cursor, VSCodium, Zed, Neovim, and Helix integrations, installed with
-  `tnix ide install <editor>` and diagnosed with `tnix doctor`
+  `tynix ide install <editor>` and diagnosed with `tynix doctor`
 - full Nix expression syntax: attrset patterns with defaults and `@` binders,
   `inherit (src)`, nested and dynamic attribute paths, `or` defaults, every
   operator including `/`, `->`, `|>` and `<|`, `<nixpkgs>` and interpolated
@@ -117,13 +117,13 @@ information is erased and only ordinary Nix code remains.
 - gradual typing with ambient declarations, HKT support, indexed `Vec` / `Matrix` / `Tensor`, and heterogeneous `Tuple`
 - numeric singleton/primitive support via `Float`, `Number`, `Nat`, `Range`, and `Unit`
 - explicit `expr as Type` casts for widening, narrowing, and gradual-boundary assertions
-- TypeScript-style checker directives via `# @tnix-ignore` and `# @tnix-expected`
+- TypeScript-style checker directives via `# @tynix-ignore` and `# @tynix-expected`
 - diagnostics with exact source spans (`line:col: [CODE] message`), naming the
   missing or ill-typed field of a record
 - a typed prelude for every Nix builtin, embedded in the binary, so `builtins.*`
   and globals such as `toString` and `map` are checked with no setup
-- project bootstrapping via `tnix init`, `tnix scaffold`, and `tnix.config.tnix`
-- shipped declaration files for `builtins`, `flake.nix`, and `tnix.config.tnix`
+- project bootstrapping via `tynix init`, `tynix scaffold`, and `tynix.config.tynix`
+- shipped declaration files for `builtins`, `flake.nix`, and `tynix.config.tynix`
 - bundled declaration packs under `registry/` for workspace files and popular Nix ecosystem surfaces
 
 Unannotated Nix code is accepted gradually: dependencies injected through an
@@ -136,28 +136,28 @@ nixpkgs files type-check as they are.
 On Linux and macOS, install the prebuilt CLI and language server with:
 
 ```bash
-curl -fsSL https://tnix.dev/install.sh | sh
+curl -fsSL https://tynix.dev/install.sh | sh
 ```
 
 The installer picks the archive for your platform (Linux x64/arm64, macOS
-arm64/x64), verifies its SHA-256 checksum, and installs `tnix` and `tnix-lsp`
-into `~/.tnix/bin`. The binaries do not depend on Nix. Pin a release with
-`curl -fsSL https://tnix.dev/install.sh | TNIX_VERSION=0.5.0 sh`, choose
-another directory with `TNIX_INSTALL_DIR`, and remove everything with
-`curl -fsSL https://tnix.dev/install.sh | sh -s -- --uninstall`.
+arm64/x64), verifies its SHA-256 checksum, and installs `tynix` and `tynix-lsp`
+into `~/.tynix/bin`. The binaries do not depend on Nix. Pin a release with
+`curl -fsSL https://tynix.dev/install.sh | TYNIX_VERSION=0.5.0 sh`, choose
+another directory with `TYNIX_INSTALL_DIR`, and remove everything with
+`curl -fsSL https://tynix.dev/install.sh | sh -s -- --uninstall`.
 
 With Nix, use the flake instead:
 
 ```bash
-nix profile install github:ubugeeei-prod/tnix        # tnix + tnix-lsp
-nix run github:ubugeeei-prod/tnix -- check ./main.tnix
+nix profile install github:ubugeeei-prod/tynix        # tynix + tynix-lsp
+nix run github:ubugeeei-prod/tynix -- check ./main.tynix
 ```
 
 The flake also provides `overlays.default` and NixOS / nix-darwin / Home Manager
-modules (`programs.tnix.enable = true;`). See
+modules (`programs.tynix.enable = true;`). See
 [docs/getting-started.md](./docs/getting-started.md#installation) for details.
 
-You can also download the archives (`tnix-<version>-<target>.tar.gz`, with
+You can also download the archives (`tynix-<version>-<target>.tar.gz`, with
 `.sha256` checksums and build provenance attestations) from GitHub Releases.
 See [docs/support-matrix.md](./docs/support-matrix.md) for the per-platform
 tier table. **Windows users:** the CLI is not tested on Windows. Use WSL2 and
@@ -166,10 +166,10 @@ run the install script there.
 Quick verification:
 
 ```bash
-tnix --version
-tnix-lsp --version
-tnix check ./examples/main.tnix
-tnix check-project ./examples
+tynix --version
+tynix-lsp --version
+tynix check ./examples/main.tynix
+tynix check-project ./examples
 ```
 
 ### Editor setup
@@ -177,10 +177,10 @@ tnix check-project ./examples
 One command installs the editor extension and writes the editor config:
 
 ```bash
-tnix ide install vscode     # or: cursor, vscodium, zed, neovim, helix
-tnix ide install zed --global --dry-run   # preview user-level changes
-tnix ide list               # supported editors and what is detected
-tnix doctor                 # check tnix / tnix-lsp / project / editor wiring
+tynix ide install vscode     # or: cursor, vscodium, zed, neovim, helix
+tynix ide install zed --global --dry-run   # preview user-level changes
+tynix ide list               # supported editors and what is detected
+tynix doctor                 # check tynix / tynix-lsp / project / editor wiring
 ```
 
 Settings are merged, never clobbered, and re-running is a no-op. See
@@ -199,56 +199,56 @@ vp ide
 ```
 
 `nix flake check` now exercises the published flake outputs, version metadata,
-smoke-tests the built `tnix` / `tnix-lsp` binaries, runs the Haskell package
+smoke-tests the built `tynix` / `tynix-lsp` binaries, runs the Haskell package
 test suites, and validates the dogfood/example corpus with the packaged CLI.
 `pnpm run check` is the conventional npm-compatible entrypoint and delegates to
 the full workspace verification suite, including editor integrations.
 `vp run workspace:check` is the direct task-runner entrypoint.
-`vp cli` installs the local `tnix` / `tnix-lsp` toolchain into your active Nix
+`vp cli` installs the local `tynix` / `tynix-lsp` toolchain into your active Nix
 profile. `vp ide` reuses that toolchain install, packages the VS Code
 extension, and installs the local Zed extension when its support directory is
 available.
 
 ## Bundled Registry Packs
 
-The repository includes reusable `.d.tnix` packs under `registry/` so projects
+The repository includes reusable `.d.tynix` packs under `registry/` so projects
 can vendor common declarations instead of rewriting ambient files from scratch.
 
 Workspace-oriented packs live under `registry/workspace/`:
 
-- `registry/workspace/builtins.d.tnix`
-- `registry/workspace/flake.d.tnix`
-- `registry/workspace/tnix.config.d.tnix`
+- `registry/workspace/builtins.d.tynix`
+- `registry/workspace/flake.d.tynix`
+- `registry/workspace/tynix.config.d.tynix`
 
 Ecosystem alias packs live under `registry/ecosystem/`:
 
-- `registry/ecosystem/nixpkgs-lib.d.tnix`
-- `registry/ecosystem/nixpkgs-pkgs.d.tnix`
-- `registry/ecosystem/flake-ecosystem.d.tnix`
-- `registry/ecosystem/community-flakes.d.tnix`
+- `registry/ecosystem/nixpkgs-lib.d.tynix`
+- `registry/ecosystem/nixpkgs-pkgs.d.tynix`
+- `registry/ecosystem/flake-ecosystem.d.tynix`
+- `registry/ecosystem/community-flakes.d.tynix`
 
 Typical usage is to copy the pack you want into your declaration directory and
 reuse its aliases from local `declare` blocks:
 
-```tnix
+```tynix
 declare "./flake-utils.nix" { default :: NixFlakeUtilsFlake; };
 declare "./devenv.nix" { default :: DevenvFlake; };
 declare "./treefmt-nix.nix" { default :: TreefmtNixFlake; };
 ```
 
-Projects can also point `tnix.config.tnix` at external pack files or
+Projects can also point `tynix.config.tynix` at external pack files or
 directories directly:
 
-```tnix
+```tynix
 {
   declarationPacks = [
-    ../vendor/tnix/registry/ecosystem
-    ../vendor/tnix/registry/workspace
+    ../vendor/tynix/registry/ecosystem
+    ../vendor/tynix/registry/workspace
   ];
 }
 ```
 
-When a configured pack comes from `registry/workspace/`, tnix rebases its
+When a configured pack comes from `registry/workspace/`, tynix rebases its
 ambient `declare` targets to your project root so upstream workspace packs can
 be used without copying them into the repo first.
 
@@ -262,7 +262,7 @@ It includes basic language features, gradual typing examples, indexed container
 samples, and legacy interop fixtures that can be checked with one command:
 
 ```bash
-tnix check-project ./examples
+tynix check-project ./examples
 ```
 
 See [CHANGELOG.md](./CHANGELOG.md) for the release history.
@@ -270,7 +270,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for the release history.
 ## Distribution
 
 The primary distribution channel is GitHub Releases. Tagged releases publish
-prebuilt `tnix` and `tnix-lsp` archives for supported platforms together with
+prebuilt `tynix` and `tynix-lsp` archives for supported platforms together with
 checksums, plus a packaged VS Code `.vsix` extension. When marketplace tokens
 are configured, the same tag also publishes the extension to VS Code
 Marketplace and Open VSX.
@@ -278,10 +278,10 @@ Marketplace and Open VSX.
 The flake also exports installable packages and runnable apps:
 
 ```bash
-nix build github:ubugeeei-prod/tnix#tnix
-nix run github:ubugeeei-prod/tnix#tnix -- check ./main.tnix
-nix run github:ubugeeei-prod/tnix#tnix-lsp
-nix flake check github:ubugeeei-prod/tnix --accept-flake-config
+nix build github:ubugeeei-prod/tynix#tynix
+nix run github:ubugeeei-prod/tynix#tynix -- check ./main.tynix
+nix run github:ubugeeei-prod/tynix#tynix-lsp
+nix flake check github:ubugeeei-prod/tynix --accept-flake-config
 ```
 
 See [RELEASING.md](./RELEASING.md) for the release flow.

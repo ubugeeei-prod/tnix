@@ -1,5 +1,5 @@
 {
-  description = "tnix: a gradual type system and tooling stack for Nix";
+  description = "tynix: a gradual type system and tooling stack for Nix";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -13,10 +13,10 @@
       flake-utils,
     }:
     let
-      # Builds the tnix Haskell packages on top of any nixpkgs instance. Used
+      # Builds the tynix Haskell packages on top of any nixpkgs instance. Used
       # for the regular per-system packages, for `overlays.default`, and for
       # the portable release builds (`pkgsStatic` on Linux).
-      mkTnix =
+      mkTynix =
         pkgs:
         let
           haskellLib = pkgs.haskell.lib.compose;
@@ -24,9 +24,9 @@
           # the bundled declaration registry, and the diagnostic-code catalogue
           # they hold the compiler to. Both are copied in so `nix flake check`
           # runs the same suite `cabal test` does.
-          tnixCoreSource = pkgs.buildPackages.runCommand "tnix-core-source" { } ''
+          tynixCoreSource = pkgs.buildPackages.runCommand "tynix-core-source" { } ''
             mkdir -p "$out"
-            cp -R ${./packages/tnix-core}/. "$out"/
+            cp -R ${./packages/tynix-core}/. "$out"/
             chmod -R u+w "$out"
             cp -R ${./registry} "$out/registry"
             mkdir -p "$out/docs"
@@ -34,37 +34,37 @@
           '';
           haskellPackages = pkgs.haskellPackages.extend (
             hfinal: _: {
-              "tnix-core" = hfinal.callCabal2nix "tnix-core" tnixCoreSource { };
-              "tnix-cli" = hfinal.callCabal2nix "tnix-cli" ./packages/tnix-cli { };
-              "tnix-lsp" = hfinal.callCabal2nix "tnix-lsp" ./packages/tnix-lsp { };
+              "tynix-core" = hfinal.callCabal2nix "tynix-core" tynixCoreSource { };
+              "tynix-cli" = hfinal.callCabal2nix "tynix-cli" ./packages/tynix-cli { };
+              "tynix-lsp" = hfinal.callCabal2nix "tynix-lsp" ./packages/tynix-lsp { };
             }
           );
-          tnix = haskellPackages."tnix-cli";
-          tnix-lsp = haskellPackages."tnix-lsp";
+          tynix = haskellPackages."tynix-cli";
+          tynix-lsp = haskellPackages."tynix-lsp";
         in
         {
           inherit
             haskellLib
             haskellPackages
-            tnix
-            tnix-lsp
+            tynix
+            tynix-lsp
             ;
-          tnix-core = haskellPackages."tnix-core";
-          tnix-toolchain = pkgs.symlinkJoin {
-            name = "tnix-toolchain-${tnix.version}";
+          tynix-core = haskellPackages."tynix-core";
+          tynix-toolchain = pkgs.symlinkJoin {
+            name = "tynix-toolchain-${tynix.version}";
             paths = [
-              (haskellLib.justStaticExecutables tnix)
-              (haskellLib.justStaticExecutables tnix-lsp)
+              (haskellLib.justStaticExecutables tynix)
+              (haskellLib.justStaticExecutables tynix-lsp)
             ];
             meta = {
-              description = "tnix CLI and language server";
-              mainProgram = "tnix";
+              description = "tynix CLI and language server";
+              mainProgram = "tynix";
             };
           };
         };
 
       overlay = final: _prev: {
-        inherit (mkTnix final) tnix tnix-lsp tnix-toolchain;
+        inherit (mkTynix final) tynix tynix-lsp tynix-toolchain;
       };
 
       # Shared by the NixOS / nix-darwin and Home Manager modules.
@@ -77,16 +77,16 @@
           ...
         }:
         let
-          cfg = config.programs.tnix;
+          cfg = config.programs.tynix;
         in
         {
-          options.programs.tnix = {
-            enable = lib.mkEnableOption "the tnix toolchain (tnix CLI and tnix-lsp)";
+          options.programs.tynix = {
+            enable = lib.mkEnableOption "the tynix toolchain (tynix CLI and tynix-lsp)";
             package = lib.mkOption {
               type = lib.types.package;
-              default = self.packages.${pkgs.stdenv.hostPlatform.system}.tnix-toolchain;
-              defaultText = lib.literalExpression "tnix.packages.\${pkgs.stdenv.hostPlatform.system}.tnix-toolchain";
-              description = "The tnix toolchain package to install.";
+              default = self.packages.${pkgs.stdenv.hostPlatform.system}.tynix-toolchain;
+              defaultText = lib.literalExpression "tynix.packages.\${pkgs.stdenv.hostPlatform.system}.tynix-toolchain";
+              description = "The tynix toolchain package to install.";
             };
           };
           config = lib.mkIf cfg.enable (lib.setAttrByPath installAttr [ cfg.package ]);
@@ -114,21 +114,21 @@
         inherit (pkgs) lib;
 
         haskellPackages = pkgs.haskellPackages;
-        tnixSet = mkTnix pkgs;
-        inherit (tnixSet) haskellLib;
-        tnixCore = tnixSet.tnix-core;
-        tnixCli = tnixSet.tnix;
-        tnixLsp = tnixSet.tnix-lsp;
-        tnixToolchain = tnixSet.tnix-toolchain;
-        tnixCoreChecked = haskellLib.doCheck tnixCore;
-        tnixCliChecked = haskellLib.doCheck tnixCli;
-        tnixLspChecked = haskellLib.doCheck tnixLsp;
+        tynixSet = mkTynix pkgs;
+        inherit (tynixSet) haskellLib;
+        tynixCore = tynixSet.tynix-core;
+        tynixCli = tynixSet.tynix;
+        tynixLsp = tynixSet.tynix-lsp;
+        tynixToolchain = tynixSet.tynix-toolchain;
+        tynixCoreChecked = haskellLib.doCheck tynixCore;
+        tynixCliChecked = haskellLib.doCheck tynixCli;
+        tynixLspChecked = haskellLib.doCheck tynixLsp;
 
         # ---------------------------------------------------------------
         # Portable release binaries
         #
         # The archives attached to GitHub releases (and installed by
-        # https://tnix.dev/install.sh) must run on machines without Nix.
+        # https://tynix.dev/install.sh) must run on machines without Nix.
         #
         # * Linux: fully static musl executables from `pkgsStatic`.
         # * macOS: fully static linking is not possible, so GMP is linked
@@ -142,12 +142,12 @@
         portableExecutables =
           if pkgs.stdenv.hostPlatform.isLinux then
             let
-              staticSet = mkTnix pkgs.pkgsStatic;
+              staticSet = mkTynix pkgs.pkgsStatic;
               portable = drv: haskellLib.justStaticExecutables (haskellLib.dontCheck drv);
             in
             {
-              tnix = portable staticSet.tnix;
-              tnix-lsp = portable staticSet.tnix-lsp;
+              tynix = portable staticSet.tynix;
+              tynix-lsp = portable staticSet.tynix-lsp;
             }
           else
             let
@@ -167,12 +167,12 @@
                 ];
             in
             {
-              tnix = portable tnixCli;
-              tnix-lsp = portable tnixLsp;
+              tynix = portable tynixCli;
+              tynix-lsp = portable tynixLsp;
             };
 
         releaseBundle =
-          pkgs.runCommand "tnix-release-bundle-${tnixCli.version}"
+          pkgs.runCommand "tynix-release-bundle-${tynixCli.version}"
             {
               nativeBuildInputs = [
                 pkgs.file
@@ -192,11 +192,11 @@
             (
               ''
                 mkdir -p "$out/bin"
-                install -m 0755 ${portableExecutables.tnix}/bin/tnix "$out/bin/tnix"
-                install -m 0755 ${portableExecutables.tnix-lsp}/bin/tnix-lsp "$out/bin/tnix-lsp"
+                install -m 0755 ${portableExecutables.tynix}/bin/tynix "$out/bin/tynix"
+                install -m 0755 ${portableExecutables.tynix-lsp}/bin/tynix-lsp "$out/bin/tynix-lsp"
               ''
               + lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
-                for bin in "$out/bin/tnix" "$out/bin/tnix-lsp"; do
+                for bin in "$out/bin/tynix" "$out/bin/tynix-lsp"; do
                   for dep in $(otool -L "$bin" | tail -n +2 | awk '{print $1}' | grep '^/nix/store/' || true); do
                     case "$dep" in
                       */libiconv.2.dylib) replacement=/usr/lib/libiconv.2.dylib ;;
@@ -218,20 +218,20 @@
                 # Leftover store path strings (Paths_* data dirs, toolchain
                 # paths baked into the RTS) are never dereferenced at runtime;
                 # scrub them so the bundle has no store references.
-                for bin in "$out/bin/tnix" "$out/bin/tnix-lsp"; do
+                for bin in "$out/bin/tynix" "$out/bin/tynix-lsp"; do
                   for ref in $(grep -aoE '/nix/store/[a-z0-9]{32}-[^/[:space:]"]+' "$bin" | sort -u); do
                     remove-references-to -t "$ref" "$bin"
                   done
                 done
               ''
               + lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
-                for bin in "$out/bin/tnix" "$out/bin/tnix-lsp"; do
+                for bin in "$out/bin/tynix" "$out/bin/tynix-lsp"; do
                   codesign -f -s - "$bin"
                 done
               ''
               + ''
                 # Verify the bundle is self-contained and starts.
-                for bin in "$out/bin/tnix" "$out/bin/tnix-lsp"; do
+                for bin in "$out/bin/tynix" "$out/bin/tynix-lsp"; do
                   file "$bin"
               ''
               + (
@@ -258,53 +258,53 @@
             );
 
         versionMetadataCheck =
-          pkgs.runCommand "tnix-version-metadata-check" { nativeBuildInputs = [ pkgs.nodejs_24 ]; }
+          pkgs.runCommand "tynix-version-metadata-check" { nativeBuildInputs = [ pkgs.nodejs_24 ]; }
             ''
               export HOME="$TMPDIR"
               workspace="$TMPDIR/version-check"
-              mkdir -p "$workspace/scripts" "$workspace/editors/vscode" "$workspace/packages/tnix-core" "$workspace/packages/tnix-cli" "$workspace/packages/tnix-lsp"
+              mkdir -p "$workspace/scripts" "$workspace/editors/vscode" "$workspace/packages/tynix-core" "$workspace/packages/tynix-cli" "$workspace/packages/tynix-lsp"
               cp ${./scripts/check-version-sync.ts} "$workspace/scripts/check-version-sync.ts"
               cp ${./package.json} "$workspace/package.json"
               cp ${./CHANGELOG.md} "$workspace/CHANGELOG.md"
               cp ${./editors/vscode/package.json} "$workspace/editors/vscode/package.json"
-              cp ${./packages/tnix-core/tnix-core.cabal} "$workspace/packages/tnix-core/tnix-core.cabal"
-              cp ${./packages/tnix-cli/tnix-cli.cabal} "$workspace/packages/tnix-cli/tnix-cli.cabal"
-              cp ${./packages/tnix-lsp/tnix-lsp.cabal} "$workspace/packages/tnix-lsp/tnix-lsp.cabal"
+              cp ${./packages/tynix-core/tynix-core.cabal} "$workspace/packages/tynix-core/tynix-core.cabal"
+              cp ${./packages/tynix-cli/tynix-cli.cabal} "$workspace/packages/tynix-cli/tynix-cli.cabal"
+              cp ${./packages/tynix-lsp/tynix-lsp.cabal} "$workspace/packages/tynix-lsp/tynix-lsp.cabal"
               cd "$workspace"
               node --experimental-strip-types ./scripts/check-version-sync.ts
               touch "$out"
             '';
 
         cliSmokeCheck =
-          pkgs.runCommand "tnix-cli-smoke-check"
+          pkgs.runCommand "tynix-cli-smoke-check"
             {
               nativeBuildInputs = [
-                tnixCli
-                tnixLsp
+                tynixCli
+                tynixLsp
               ];
             }
             ''
               export HOME="$TMPDIR"
-              tnix --version >/dev/null
-              tnix-lsp --version >/dev/null
+              tynix --version >/dev/null
+              tynix-lsp --version >/dev/null
               touch "$out"
             '';
 
         repoFixturesCheck =
-          pkgs.runCommand "tnix-repo-fixtures-check" { nativeBuildInputs = [ tnixCli ]; }
+          pkgs.runCommand "tynix-repo-fixtures-check" { nativeBuildInputs = [ tynixCli ]; }
             ''
               export HOME="$TMPDIR"
               cd ${self}
-              tnix check ./dogfood/flake-surface.tnix >/dev/null
-              tnix check-project ./examples --format json >/dev/null
+              tynix check ./dogfood/flake-surface.tynix >/dev/null
+              tynix check-project ./examples --format json >/dev/null
               touch "$out"
             '';
 
-        # Lints docs/public/install.sh (served at https://tnix.dev/install.sh)
+        # Lints docs/public/install.sh (served at https://tynix.dev/install.sh)
         # and runs it end to end against a fake release directory, so the
         # curl | sh path is exercised without the network.
         installScriptCheck =
-          pkgs.runCommand "tnix-install-script-check"
+          pkgs.runCommand "tynix-install-script-check"
             {
               nativeBuildInputs = [
                 pkgs.shellcheck
@@ -316,12 +316,12 @@
               export HOME="$TMPDIR/home"
               mkdir -p "$HOME"
               shellcheck --shell=sh ${./docs/public/install.sh}
-              sh ${./scripts/test-install-script.sh} ${./docs/public/install.sh} ${tnixToolchain}/bin dash
+              sh ${./scripts/test-install-script.sh} ${./docs/public/install.sh} ${tynixToolchain}/bin dash
               touch "$out"
             '';
 
         # Evaluates the NixOS and Home Manager modules against stub option
-        # sets and asserts `programs.tnix.enable` installs the toolchain.
+        # sets and asserts `programs.tynix.enable` installs the toolchain.
         modulesCheck =
           let
             evalModule =
@@ -340,7 +340,7 @@
                         );
                       }
                       {
-                        programs.tnix.enable = true;
+                        programs.tynix.enable = true;
                         _module.args.pkgs = pkgs;
                       }
                     ];
@@ -358,16 +358,16 @@
               ];
             };
           in
-          pkgs.runCommand "tnix-modules-check"
+          pkgs.runCommand "tynix-modules-check"
             {
-              expected = toString [ tnixToolchain ];
+              expected = toString [ tynixToolchain ];
               nixos = toString installed.nixos;
               homeManager = toString installed.home-manager;
             }
             ''
               for actual in "$nixos" "$homeManager"; do
                 if [ "$actual" != "$expected" ]; then
-                  echo "programs.tnix.enable installed '$actual', expected '$expected'" >&2
+                  echo "programs.tynix.enable installed '$actual', expected '$expected'" >&2
                   exit 1
                 fi
               done
@@ -401,20 +401,20 @@
         formatter = pkgs.nixfmt-rfc-style;
 
         packages = {
-          default = tnixToolchain;
-          tnix = tnixCli;
-          tnix-lsp = tnixLsp;
-          tnix-core = tnixCore;
-          tnix-toolchain = tnixToolchain;
+          default = tynixToolchain;
+          tynix = tynixCli;
+          tynix-lsp = tynixLsp;
+          tynix-core = tynixCore;
+          tynix-toolchain = tynixToolchain;
           # Self-contained binaries for the GitHub release archives. Only
           # meaningful on the release targets: x86_64/aarch64 Linux and macOS.
           release-bundle = releaseBundle;
         };
 
         checks = {
-          tnix-core-tests = tnixCoreChecked;
-          tnix-cli-tests = tnixCliChecked;
-          tnix-lsp-tests = tnixLspChecked;
+          tynix-core-tests = tynixCoreChecked;
+          tynix-cli-tests = tynixCliChecked;
+          tynix-lsp-tests = tynixLspChecked;
           version-metadata = versionMetadataCheck;
           cli-smoke = cliSmokeCheck;
           repo-fixtures = repoFixturesCheck;
@@ -423,16 +423,16 @@
         };
 
         apps = {
-          default = self.apps.${system}.tnix;
-          tnix = {
+          default = self.apps.${system}.tynix;
+          tynix = {
             type = "app";
-            program = "${tnixCli}/bin/tnix";
-            meta.description = "tnix CLI";
+            program = "${tynixCli}/bin/tynix";
+            meta.description = "tynix CLI";
           };
-          tnix-lsp = {
+          tynix-lsp = {
             type = "app";
-            program = "${tnixLsp}/bin/tnix-lsp";
-            meta.description = "tnix language server";
+            program = "${tynixLsp}/bin/tynix-lsp";
+            meta.description = "tynix language server";
           };
         };
 
@@ -461,7 +461,7 @@
           shellHook = ''
             export LANG=C.UTF-8
             export LC_ALL=C.UTF-8
-            echo "tnix dev shell ready"
+            echo "tynix dev shell ready"
             echo "  - Haskell: cabal / ghc / hls"
             echo "  - Tasks: pnpm / vp"
             echo "  - Editors: Node.js / Rust"

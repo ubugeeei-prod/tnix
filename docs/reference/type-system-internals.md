@@ -1,18 +1,18 @@
 ---
 title: How Checking Works
-description: A deep dive into the tnix type checker, from type representation and inference to the gradual lattice, kinds, conditional types, declarations, erasure and diagnostics.
+description: A deep dive into the tynix type checker, from type representation and inference to the gradual lattice, kinds, conditional types, declarations, erasure and diagnostics.
 ---
 
 # How Checking Works
 
-This page explains what the tnix checker actually does, with references to the
-modules in [`packages/tnix-core/src`](https://github.com/ubugeeei-prod/tnix/tree/main/packages/tnix-core/src)
+This page explains what the tynix checker actually does, with references to the
+modules in [`packages/tynix-core/src`](https://github.com/ubugeeei-prod/tynix/tree/main/packages/tynix-core/src)
 that implement each part. It is written for people who want to predict the
 checker's behavior, write declaration packs, or contribute to the core. For
 the user-facing rules alone, see the [type system overview](../type-system.md)
 and the [language reference](../language-reference.md).
 
-The short version: tnix runs **Hindley-Milner inference** (let-polymorphism,
+The short version: tynix runs **Hindley-Milner inference** (let-polymorphism,
 generalization per dependency group, rigid signatures) over a single structural
 type tree, extended with **row-polymorphic records**, **subtyping** for records,
 numbers and shapes, a **consistency** relation for the gradual `dynamic`
@@ -25,11 +25,11 @@ erasure.
 
 <figure class="tx-diagram">
 <svg viewBox="0 0 960 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pipe-title">
-<title id="pipe-title">The tnix analysis pipeline, from source text to compiled Nix, declarations and diagnostics</title>
+<title id="pipe-title">The tynix analysis pipeline, from source text to compiled Nix, declarations and diagnostics</title>
 <defs><marker id="pipe-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" class="d-arrowhead"/></marker></defs>
 <rect x="10" y="20" width="120" height="64" rx="10" class="d-box"/>
 <text x="70" y="47" text-anchor="middle" class="d-head">source</text>
-<text x="70" y="67" text-anchor="middle" class="d-mono">.tnix</text>
+<text x="70" y="67" text-anchor="middle" class="d-mono">.tynix</text>
 <rect x="160" y="20" width="140" height="64" rx="10" class="d-accent"/>
 <text x="230" y="47" text-anchor="middle" class="d-head">parse</text>
 <text x="230" y="67" text-anchor="middle" class="d-muted">directives, Megaparsec</text>
@@ -41,11 +41,11 @@ erasure.
 <text x="585" y="67" text-anchor="middle" class="d-muted">infer, constrain, unify</text>
 <rect x="330" y="150" width="330" height="64" rx="10" class="d-box"/>
 <text x="495" y="177" text-anchor="middle" class="d-head">declaration world</text>
-<text x="495" y="197" text-anchor="middle" class="d-muted">workspace .d.tnix, declarationPacks, local declare blocks</text>
+<text x="495" y="197" text-anchor="middle" class="d-muted">workspace .d.tynix, declarationPacks, local declare blocks</text>
 <rect x="700" y="8" width="250" height="44" rx="10" class="d-mint"/>
 <text x="825" y="35" text-anchor="middle" class="d-text">compile: erase types → .nix</text>
 <rect x="700" y="62" width="250" height="44" rx="10" class="d-mint"/>
-<text x="825" y="89" text-anchor="middle" class="d-text">emit: public surface → .d.tnix</text>
+<text x="825" y="89" text-anchor="middle" class="d-text">emit: public surface → .d.tynix</text>
 <rect x="700" y="116" width="250" height="44" rx="10" class="d-amber"/>
 <text x="825" y="143" text-anchor="middle" class="d-text">diagnostic: [Txxxxx] message</text>
 <path d="M130 52h28" class="d-line" stroke-width="1.5" marker-end="url(#pipe-arrow)"/>
@@ -81,7 +81,7 @@ carry the source span they were raised at (see [diagnostics](#diagnostics)).
 ## Type representation
 
 All phases share one data type, `Type` in
-[`Type.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Type.hs).
+[`Type.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Type.hs).
 There is no separate elaborated IR: parsing, checking, hovering and emitting all
 look at the same tree.
 
@@ -122,7 +122,7 @@ Several "types" are encodings over `TCon` and `TApp` rather than constructors:
 ## Inference
 
 Inference lives in
-[`Check.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Check.hs).
+[`Check.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Check.hs).
 It runs in a state monad holding a counter for fresh metas, a substitution
 map from metas to types, and the set of **soft** metas (see below). `zonk`
 applies the substitution, and `bindMeta` extends it after an **occurs check**
@@ -168,7 +168,7 @@ are soft.
 
 ### Soft metas
 
-Some unknowns stand for values tnix cannot know but that are usually
+Some unknowns stand for values tynix cannot know but that are usually
 polymorphic or overloaded in practice: arguments injected through an
 attribute-set pattern (`callPackage`-style `{ lib, fetchFromGitHub, ... }:`)
 and fields selected from values of unknown shape (`lib.mkOption`). Their metas
@@ -219,10 +219,10 @@ instantiate the signature freshly at every use.
 
 ### Directives
 
-`# @tnix-ignore` and `# @tnix-expected` wrap the attempt to check one `let`
+`# @tynix-ignore` and `# @tynix-expected` wrap the attempt to check one `let`
 item or the root expression. On failure, the checker discards the attempt's
 state and recovers by constraining `dynamic` against the expected type, so a
-suppressed binding keeps its signature. `@tnix-expected` on code that checks
+suppressed binding keeps its signature. `@tynix-expected` on code that checks
 cleanly is itself an error (`TC0006`).
 
 ## Constrain, unify and cast
@@ -267,7 +267,7 @@ consistent. So casts may widen, narrow, and cross any gradual boundary, but
 
 ## Subtyping and the gradual lattice
 
-[`Subtyping.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Subtyping.hs)
+[`Subtyping.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Subtyping.hs)
 implements `isSubtype`, `isConsistent` and `joinTypes`. Both sides are fully
 resolved first (aliases expanded, conditionals reduced, shapes normalized).
 
@@ -351,7 +351,7 @@ everything else becomes a flattened union.
 
 ## Kinds and higher-kinded types
 
-[`Kind.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Kind.hs)
+[`Kind.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Kind.hs)
 infers kinds; there is no kind syntax. The kind language is `Type`, `k1 -> k2`
 and kind metas.
 
@@ -441,7 +441,7 @@ worth knowing:
 
 ## Indexed types
 
-[`Indexed.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Indexed.hs)
+[`Indexed.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Indexed.hs)
 has two jobs: inferring precise shapes from list literals, and validating
 shape annotations before the checker trusts them.
 
@@ -470,17 +470,17 @@ labels that are not string literals.
 
 <figure class="tx-diagram">
 <svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="decl-title">
-<title id="decl-title">How tnix assembles declarations for a source file</title>
+<title id="decl-title">How tynix assembles declarations for a source file</title>
 <defs><marker id="decl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" class="d-arrowhead"/></marker></defs>
 <rect x="10" y="20" width="200" height="56" rx="10" class="d-box"/>
 <text x="110" y="45" text-anchor="middle" class="d-head">find workspace root</text>
-<text x="110" y="64" text-anchor="middle" class="d-muted">.git, flake.nix, tnix.config.tnix, ...</text>
+<text x="110" y="64" text-anchor="middle" class="d-muted">.git, flake.nix, tynix.config.tynix, ...</text>
 <rect x="250" y="20" width="200" height="56" rx="10" class="d-box"/>
-<text x="350" y="45" text-anchor="middle" class="d-head">walk for *.d.tnix</text>
+<text x="350" y="45" text-anchor="middle" class="d-head">walk for *.d.tynix</text>
 <text x="350" y="64" text-anchor="middle" class="d-muted">skips nested workspaces</text>
 <rect x="250" y="120" width="200" height="56" rx="10" class="d-box"/>
 <text x="350" y="145" text-anchor="middle" class="d-head">declarationPacks</text>
-<text x="350" y="164" text-anchor="middle" class="d-muted">from tnix.config.tnix</text>
+<text x="350" y="164" text-anchor="middle" class="d-muted">from tynix.config.tynix</text>
 <rect x="490" y="70" width="190" height="56" rx="10" class="d-accent"/>
 <text x="585" y="95" text-anchor="middle" class="d-head">merge worlds</text>
 <text x="585" y="114" text-anchor="middle" class="d-muted">aliases + path → scheme</text>
@@ -500,7 +500,7 @@ labels that are not string literals.
 </figure>
 
 - The **built-in prelude** is the base of every world. It is
-  [`registry/workspace/builtins.d.tnix`](https://github.com/ubugeeei-prod/tnix/blob/main/registry/workspace/builtins.d.tnix),
+  [`registry/workspace/builtins.d.tynix`](https://github.com/ubugeeei-prod/tynix/blob/main/registry/workspace/builtins.d.tynix),
   embedded into every binary (as the generated `BuiltinPrelude.hs`), and it
   declares `builtins` plus aliases such as `Derivation`, `DerivationArgs`,
   `FetchedSource`, `PathLike`, `FileType`, `TypeName` and `NameValuePair`.
@@ -508,15 +508,15 @@ labels that are not string literals.
   replaces the prelude's.
 - The **workspace root** is the nearest ancestor of the source file that
   contains `flake.nix`, `cabal.project`, `pnpm-workspace.yaml`,
-  `tnix.config.tnix` or a `.git` directory. Without one, the file's own
-  directory is used, and only the `.d.tnix` files directly in it are loaded.
-- In a real workspace, every `.d.tnix` under the root is loaded, except inside
+  `tynix.config.tynix` or a `.git` directory. Without one, the file's own
+  directory is used, and only the `.d.tynix` files directly in it are loaded.
+- In a real workspace, every `.d.tynix` under the root is loaded, except inside
   nested directories that are themselves workspaces. Hidden directories,
   `node_modules`, `dist-newstyle`, `dist`, `target`, `result` and `result-*`
   build links, and symlinked directories are skipped. A declaration file never
   contributes to its own analysis, and it must not contain an expression
   (`TD0007`).
-- `declarationPacks` in `tnix.config.tnix` add files or directories. Packs that
+- `declarationPacks` in `tynix.config.tynix` add files or directories. Packs that
   live under a `registry/workspace/` directory are **rebased** onto your project
   root, so their relative targets (`../../flake.nix`) point at your files.
 - Each `declare` target is resolved relative to the file that contains it,
@@ -539,7 +539,7 @@ builtins such as `toString`, `map`, `throw`, `import`, `derivation`,
 
 ## Erasure and compilation
 
-[`Compile.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Compile.hs)
+[`Compile.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Compile.hs)
 does not translate anything; it deletes:
 
 - `type` aliases and `declare` blocks,
@@ -553,8 +553,8 @@ The remaining tree is pretty-printed as Nix. Names, structure, string forms
 and operators are preserved; whitespace is normalized and comments are not
 carried over. Over a sample of 4000 nixpkgs files, the output parses to the
 same AST as the input under `nix-instantiate --parse`. Because the compiler only
-deletes, the generated `.nix` evaluates exactly like the `.tnix` would if Nix
-ignored the type syntax. `tnix compile` runs the full analysis first and
+deletes, the generated `.nix` evaluates exactly like the `.tynix` would if Nix
+ignored the type syntax. `tynix compile` runs the full analysis first and
 refuses to emit output for a file that does not check.
 
 **Declaration emit** (`Emit.hs`) renders the file's aliases verbatim and a
@@ -566,7 +566,7 @@ becomes an entry. Otherwise the whole root becomes `default`, quantified with
 
 ## Diagnostics
 
-[`Diagnostics.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Diagnostics.hs)
+[`Diagnostics.hs`](https://github.com/ubugeeei-prod/tynix/blob/main/packages/tynix-core/src/Diagnostics.hs)
 assigns every message a stable code, prefixed by phase: `TP` parser, `TK` kind
 checker, `TC` type checker, `TD` driver. The message format is
 `[CODE] text`, prefixed with `line:col:` (and a space) when the error has a source span, and

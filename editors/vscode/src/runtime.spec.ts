@@ -12,15 +12,15 @@ import {
 } from "./runtime.js";
 
 test("normalizeServerPath falls back to the resolved server command for missing or blank values", () => {
-  const resolveDefault = () => "/resolved/tnix-lsp";
+  const resolveDefault = () => "/resolved/tynix-lsp";
   assert.equal(
     normalizeServerPath(undefined, resolveDefault),
-    "/resolved/tnix-lsp",
+    "/resolved/tynix-lsp",
   );
-  assert.equal(normalizeServerPath("", resolveDefault), "/resolved/tnix-lsp");
+  assert.equal(normalizeServerPath("", resolveDefault), "/resolved/tynix-lsp");
   assert.equal(
     normalizeServerPath("   ", resolveDefault),
-    "/resolved/tnix-lsp",
+    "/resolved/tynix-lsp",
   );
 });
 
@@ -29,21 +29,21 @@ test("normalizeServerPath preserves explicit executable paths", () => {
     throw new Error("should not resolve a fallback for explicit paths");
   };
   assert.equal(
-    normalizeServerPath("/nix/store/bin/tnix-lsp", unreachable),
-    "/nix/store/bin/tnix-lsp",
+    normalizeServerPath("/nix/store/bin/tynix-lsp", unreachable),
+    "/nix/store/bin/tynix-lsp",
   );
   assert.equal(
-    normalizeServerPath(" tnix-lsp-dev ", unreachable),
-    "tnix-lsp-dev",
+    normalizeServerPath(" tynix-lsp-dev ", unreachable),
+    "tynix-lsp-dev",
   );
 });
 
 test("defaultServerPathCandidates prioritize common Nix profile locations", () => {
   assert.deepEqual(defaultServerPathCandidates("/home/alice"), [
-    "/home/alice/.nix-profile/bin/tnix-lsp",
-    "/home/alice/.local/state/nix/profiles/profile/bin/tnix-lsp",
-    "/home/alice/.local/state/nix/profiles/home-manager/home-path/bin/tnix-lsp",
-    "/run/current-system/sw/bin/tnix-lsp",
+    "/home/alice/.nix-profile/bin/tynix-lsp",
+    "/home/alice/.local/state/nix/profiles/profile/bin/tynix-lsp",
+    "/home/alice/.local/state/nix/profiles/home-manager/home-path/bin/tynix-lsp",
+    "/run/current-system/sw/bin/tynix-lsp",
   ]);
 });
 
@@ -52,9 +52,9 @@ test("resolveInstalledServerPath returns the first existing Nix profile binary",
     resolveInstalledServerPath(
       "/home/alice",
       (path) =>
-        path === "/home/alice/.local/state/nix/profiles/profile/bin/tnix-lsp",
+        path === "/home/alice/.local/state/nix/profiles/profile/bin/tynix-lsp",
     ),
-    "/home/alice/.local/state/nix/profiles/profile/bin/tnix-lsp",
+    "/home/alice/.local/state/nix/profiles/profile/bin/tynix-lsp",
   );
   assert.equal(
     resolveInstalledServerPath("/home/alice", () => false),
@@ -62,43 +62,43 @@ test("resolveInstalledServerPath returns the first existing Nix profile binary",
   );
 });
 
-test("resolveDefaultServerPath falls back to tnix-lsp when no profile binary exists", () => {
+test("resolveDefaultServerPath falls back to tynix-lsp when no profile binary exists", () => {
   assert.equal(
     resolveDefaultServerPath("/home/alice", () => false),
-    "tnix-lsp",
+    "tynix-lsp",
   );
 });
 
 test("normalizeServerArgs trims and drops blank argv entries", () => {
   assert.deepEqual(normalizeServerArgs(undefined), []);
   assert.deepEqual(normalizeServerArgs(["", " --stdio ", "  "]), ["--stdio"]);
-  assert.deepEqual(normalizeServerArgs(["--log-file", "/tmp/tnix.log"]), [
+  assert.deepEqual(normalizeServerArgs(["--log-file", "/tmp/tynix.log"]), [
     "--log-file",
-    "/tmp/tnix.log",
+    "/tmp/tynix.log",
   ]);
 });
 
 test("resolveRuntimeConfig returns the expected selector and watcher glob", () => {
-  assert.deepEqual(resolveRuntimeConfig("tnix-lsp"), {
-    command: "tnix-lsp",
+  assert.deepEqual(resolveRuntimeConfig("tynix-lsp"), {
+    command: "tynix-lsp",
     args: [],
     cwd: undefined,
-    documentSelector: [{ language: "tnix" }, { language: "nix" }],
-    watchPattern: "**/*.{nix,tnix}",
+    documentSelector: [{ language: "tynix" }, { language: "nix" }],
+    watchPattern: "**/*.{nix,tynix}",
   });
 });
 
 test("resolveRuntimeConfig honors args and cwd overrides", () => {
   assert.deepEqual(
-    resolveRuntimeConfig("tnix-lsp-dev", [" --stdio ", ""], "/tmp/tnix", [
+    resolveRuntimeConfig("tynix-lsp-dev", [" --stdio ", ""], "/tmp/tynix", [
       "/workspace",
     ]),
     {
-      command: "tnix-lsp-dev",
+      command: "tynix-lsp-dev",
       args: ["--stdio"],
-      cwd: "/tmp/tnix",
-      documentSelector: [{ language: "tnix" }, { language: "nix" }],
-      watchPattern: "**/*.{nix,tnix}",
+      cwd: "/tmp/tynix",
+      documentSelector: [{ language: "tynix" }, { language: "nix" }],
+      watchPattern: "**/*.{nix,tynix}",
     },
   );
 });

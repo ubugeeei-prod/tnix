@@ -1,17 +1,17 @@
 ---
 title: "3. Annotations and inference"
-description: Learn where tnix needs annotations, what it infers on its own, and how literal types, numbers, functions and polymorphism behave.
+description: Learn where tynix needs annotations, what it infers on its own, and how literal types, numbers, functions and polymorphism behave.
 ---
 
 # 3. Annotations and inference
 
-tnix infers most types. Annotations are how you state intent, and the checker
+tynix infers most types. Annotations are how you state intent, and the checker
 holds the code to it. This step shows the three places annotations go and what
 inference does everywhere else.
 
 ## Three places for types
 
-```tnix [annotations.tnix]
+```tynix [annotations.tynix]
 let
   port :: Int;
   port = 8080;
@@ -34,7 +34,7 @@ in {
 ```
 
 ```bash
-tnix check annotations.tnix
+tynix check annotations.tynix
 ```
 
 ```text
@@ -61,7 +61,7 @@ port :: Int
    subject of [step 5](./gradual.md).
 
 `toString` is one of the builtins that Nix puts in scope without the
-`builtins.` prefix. tnix ships typed declarations for all of them, and for
+`builtins.` prefix. tynix ships typed declarations for all of them, and for
 every `builtins.*` member, so `toString n` is checked like any other call
 (`toString :: unknown -> String`). Step 6 explains where those types come from.
 
@@ -72,7 +72,7 @@ Look at `name :: "web"`. Without a signature, a string literal keeps its exact
 integers (`8080`), floats (`1.5`) and booleans (`true`). Literal types let
 unions of literals act as enumerations:
 
-```tnix [levels.tnix]
+```tynix [levels.tynix]
 let
   level :: "debug" | "info" | "warn";
   level = "debug";
@@ -96,7 +96,7 @@ Numbers form a small tower: `Nat <: Int <: Number` and `Float <: Number`.
 Arithmetic (`+`, `-`, `*`, `/`) picks the narrowest family that is still
 correct:
 
-```tnix [numbers.tnix]
+```tynix [numbers.tynix]
 let
   count :: Nat;
   count = 3;
@@ -133,7 +133,7 @@ A negative literal is rejected where a `Nat` is expected: `count = -1;` reports
 
 ## Functions and the `%1` arrow
 
-`double` was inferred as `Int %1 -> Int`, not `Int -> Int`. tnix tracks
+`double` was inferred as `Int %1 -> Int`, not `Int -> Int`. tynix tracks
 **multiplicity**: a lambda that uses its argument exactly once gets the linear
 arrow `%1 ->`. A linear function may be used anywhere an ordinary function is
 expected (`%1 ->` is a subtype of `->`), so you can mostly ignore it. It shows
@@ -143,7 +143,7 @@ want to require a function that consumes its argument once.
 A function signature checks the whole body. Here the body returns a string
 where the signature promises an `Int`:
 
-```tnix [bad-fn.tnix]
+```tynix [bad-fn.tynix]
 let
   bad :: Int -> Int;
   bad = x: "${toString x}";
@@ -163,10 +163,10 @@ not a function is caught too: `let a = 1; in a 2` reports
 
 `id :: forall a. a -> a` is polymorphic: each use picks its own `a`, which is
 why `id true` returned `true`. You rarely need to write the `forall` yourself,
-though. tnix infers **principal polymorphic types** for unannotated `let`
+though. tynix infers **principal polymorphic types** for unannotated `let`
 bindings, the way Haskell and OCaml do (Hindley-Milner let-polymorphism):
 
-```tnix [poly.tnix]
+```tynix [poly.tynix]
 let
   id = x: x;
   compose = f: g: x: f (g x);
@@ -194,12 +194,12 @@ s :: "one"
 instance. Inferred type variables are named `t0`, `t1`, ... in output; variables
 you write yourself keep their names.
 
-The bindings of one `let` may refer to each other in any order. tnix sorts them
+The bindings of one `let` may refer to each other in any order. tynix sorts them
 by their dependencies, infers each group of mutually recursive bindings
 together, and generalizes a group as soon as it is solved. Mutual recursion
 works without annotations:
 
-```tnix [even-odd.tnix]
+```tynix [even-odd.tynix]
 let
   isEven = n: if n == 0 then true else isOdd (n - 1);
   isOdd = n: if n == 0 then false else isEven (n - 1);
@@ -218,7 +218,7 @@ A `forall` signature is **rigid**: the body must work for *every* choice of the
 type variables, not just for one. A body that only works for some `a` is
 rejected:
 
-```tnix [rigid.tnix]
+```tynix [rigid.tynix]
 let
   id :: forall a. a -> a;
   id = x: 1;

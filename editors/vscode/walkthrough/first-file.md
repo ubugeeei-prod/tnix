@@ -1,8 +1,8 @@
 # Write your first typed Nix
 
-`.tnix` files are ordinary Nix plus type annotations. Try:
+`.tynix` files are ordinary Nix plus type annotations. Try:
 
-```tnix
+```tynix
 type User = { name :: String; age :: Int; };
 
 let
@@ -17,6 +17,6 @@ in greet alice
 Hover any binding to see its inferred type, and break the program (for
 example `age = "thirty";`) to see a diagnostic.
 
-- `.tnix` — implementation files, compiled to plain `.nix`
-- `.d.tnix` — declaration files describing existing `.nix` code
+- `.tynix` — implementation files, compiled to plain `.nix`
+- `.d.tynix` — declaration files describing existing `.nix` code
 - `.nix` — plain Nix files also get completion and diagnostics

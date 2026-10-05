@@ -14,22 +14,22 @@ const position = new vscode.Position(3, 3);
 suite("server lifecycle", () => {
   test("restarting the server keeps language features working", async () => {
     await activateExtension();
-    await openFixture("sample.tnix");
+    await openFixture("sample.tynix");
 
     // Sanity: hover works before the restart.
     const before = await execProvider<vscode.Hover[]>(
       "vscode.executeHoverProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       position,
     );
     assert.ok(hoverText(before).includes(`${STUB}-hover`));
 
-    await vscode.commands.executeCommand("tnix.restartServer");
+    await vscode.commands.executeCommand("tynix.restartServer");
 
     // After the restart the client should reconnect and serve hovers again.
     const after = await execProvider<vscode.Hover[]>(
       "vscode.executeHoverProvider",
-      fixtureUri("sample.tnix"),
+      fixtureUri("sample.tynix"),
       position,
     );
     assert.ok(hoverText(after).includes(`${STUB}-hover`));
