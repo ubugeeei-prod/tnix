@@ -1,13 +1,13 @@
 ---
 title: Docs Site
-description: How the tnix.dev documentation site is built with Ox Content and deployed to Cloudflare Pages.
+description: How the tnix.dev documentation site is built with Ox Content and deployed to Cloudflare with the cf CLI.
 ---
 
 # Docs Site
 
 The documentation at [tnix.dev](https://tnix.dev) is generated from the
 Markdown files in `docs/` by [Ox Content](https://github.com/ubugeeei/ox-content)
-running as a Vite plugin, and is served by Cloudflare Pages.
+running as a Vite plugin, and is served by a Cloudflare Worker as static assets.
 
 ## Layout
 
@@ -18,7 +18,7 @@ running as a Vite plugin, and is served by Cloudflare Pages.
 | `docs/.vite/brand.ts` | palette, fonts, code theme and CSS layered on the Ox Content theme (see [Brand](./brand.md)) |
 | `docs/.vite/tnix-grammar.ts` | the TextMate grammar used to highlight `tnix` code fences |
 | `vite.docs.config.ts` | site configuration: navigation, theme, highlighting, search, OG metadata |
-| `wrangler.toml` | Cloudflare Pages project settings |
+| `deploy/docs/` | the Cloudflare project: `cloudflare.config.ts` (Worker, domain) and `wrangler.config.ts` (assets directory) for the `cf` CLI |
 
 Navigation is explicit: add a new page to the `navigation` array in
 `vite.docs.config.ts`, under one of the Start, Tutorial, Guides, Reference or
@@ -48,7 +48,7 @@ Project groups.
 ```bash
 nix develop --accept-flake-config
 pnpm install --frozen-lockfile
-vp run docs:build
+pnpm run docs:build
 ```
 
 The site is written to `dist/docs`. Preview it with any static server, for
@@ -57,31 +57,52 @@ build time.
 
 ## Deploy
 
-tnix.dev is a Cloudflare Pages project named `tnix`, configured by
-`wrangler.toml` at the repository root. Deployment is a direct upload with
-Wrangler, the Cloudflare CLI:
+tnix.dev is a Cloudflare Worker named `tnix` that serves `dist/docs` as static
+assets. It is configured for the [Cloudflare CLI](https://github.com/cloudflare/cf)
+(`cf`) in `deploy/docs/`, a workspace package of its own because `cf` targets
+one application rather than the workspace root:
 
-```bash
-vp run docs:deploy
-```
+- `cloudflare.config.ts` names the Worker, enables observability, and attaches
+  the `tnix.dev` custom domain (`cf deploy` creates its DNS record and
+  certificate when the zone is in the same account).
+- `wrangler.config.ts` points the assets directory at `../../dist/docs`.
 
-This builds the site and runs
-`wrangler pages deploy dist/docs --project-name tnix`. Wrangler needs to be
-authenticated, either interactively with `wrangler login` or with the
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` environment variables. The
-token needs the **Cloudflare Pages: Edit** permission. Deploys from the `main`
-branch become the production deployment; any other branch name (pass
-`--branch <name>`) creates a preview deployment.
+From the repository root:
 
-The Docs workflow in `.github/workflows/docs.yml` can perform the same deploy
-from CI. It builds the site on every run, and when the repository has the
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets, it deploys pushes to
-`main` to production and same-repository pull requests to preview URLs. Without
-the secrets the deploy step is skipped.
+| Command | Effect |
+| --- | --- |
+| `pnpm run docs:check-deploy` | `cf deploy --dry-run`: builds the Worker and validates the assets, no credentials needed |
+| `pnpm run docs:deploy` | `cf deploy`: production deploy |
+| `pnpm run docs:preview` | `cf previews deploy`: a preview URL that does not touch production |
+
+Deploying from a workstation needs `cf auth login` first.
+
+### Continuous deployment without tokens
+
+CI never holds a Cloudflare credential. Cloudflare's Git integration (Workers
+Builds) watches the repository and runs the build and deploy on Cloudflare
+itself:
+
+| Setting | Value |
+| --- | --- |
+| Branch | `main` (production); other branches get previews |
+| Build command | `pnpm install --frozen-lockfile && pnpm run docs:build` |
+| Deploy command | `pnpm run docs:deploy` |
+| Preview deploy command | `pnpm run docs:preview` |
+| Path includes | `docs/**`, `deploy/docs/**`, `vite.docs.config.ts`, `package.json`, `pnpm-lock.yaml` |
+
+The GitHub side only needs the Cloudflare GitHub App installed on the
+repository. Connect the Worker once, after its first `cf deploy`, from the
+dashboard (Workers & Pages, `tnix`, Settings, Builds, Connect) or with
+`cf builds workers create` using the values above.
+
+The Docs workflow in `.github/workflows/docs.yml` runs the same
+`pnpm run docs:build` and `pnpm run docs:check-deploy` on every pull request,
+so a change that would break the Cloudflare build fails in review first.
 
 ### Headers and redirects
 
-Cloudflare Pages reads two files from the site root:
+Workers static assets read two files from the site root:
 
 - [`docs/public/_headers`](https://github.com/ubugeeei-prod/tnix/blob/main/docs/public/_headers)
   sets security headers for every response, serves `/install.sh` as

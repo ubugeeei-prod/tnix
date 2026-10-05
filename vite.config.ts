@@ -18,7 +18,7 @@ export default defineConfig({
       // Publishes dist/docs to the `tnix` Cloudflare Pages project (tnix.dev).
       // Requires `wrangler login` or CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID.
       "docs:deploy": {
-        command: "vp run docs:build && pnpm dlx wrangler@4.147.0 pages deploy dist/docs --project-name tnix",
+        command: "vp run docs:build && pnpm --filter tnix-docs-site run deploy",
         cache: false,
       },
       ide: {

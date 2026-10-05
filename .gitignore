@@ -28,3 +28,6 @@ result
 result-*
 *.wasm
 target/
+
+# cf build output
+.cloudflare/
