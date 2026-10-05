@@ -18,7 +18,7 @@ nixpkgs=$(nix eval --raw --impure --expr 'let lock = builtins.fromJSON (builtins
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-normalize() { sed -e 's/" + "//g' -e 's/("/"/g' -e 's/")/"/g'; }
+normalize() { sed 's/" + "//g' | perl -pe '1 while s/\("((?:[^"\\]|\\.)*)"\)/"$1"/g'; }
 
 find "$nixpkgs" -name '*.nix' -not -path '*/tests/*' | sort | awk -v s="$stride" 'NR % s == 0' | head -n "$limit" > "$work/files"
 total=0
