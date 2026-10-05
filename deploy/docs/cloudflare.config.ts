@@ -10,7 +10,7 @@
 // builds and deploys on every push to main. See docs/docs-site.md.
 import { defineConfig } from "cf/config";
 
-export default defineConfig({
+export default defineConfig(({ isPreview }) => ({
   worker: {
     name: "tnix",
     compatibilityDate: "2026-10-01",
@@ -22,6 +22,7 @@ export default defineConfig({
     },
     // `cf deploy` creates the DNS record and certificate for the custom
     // domain when the tnix.dev zone is in the same Cloudflare account.
-    domains: ["tnix.dev"],
+    // Preview uploads cannot carry domains, so only production attaches it.
+    ...(isPreview ? {} : { domains: ["tnix.dev"] }),
   },
-});
+}));
