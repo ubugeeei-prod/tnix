@@ -35,14 +35,14 @@ tnix ide install <vscode|cursor|vscodium|zed|neovim|helix>
                  [--force] [--lsp-path PATH]
 ```
 
-| Flag             | Effect                                                                                                    |
-| ---------------- | --------------------------------------------------------------------------------------------------------- |
-| `--project DIR`  | Write project-level settings under `DIR` (default: the current directory).                               |
-| `--global`, `-g` | Write user-level settings instead.                                                                        |
-| `--dry-run`, `-n`| Print the planned commands and a line diff of every file, without changing anything.                     |
-| `--no-extension` | Only write configuration; do not run the editor CLI.                                                      |
-| `--force`        | Rewrite files that cannot be merged safely (see below), keeping a `.bak` copy of the original first.     |
-| `--lsp-path`     | The `tnix-lsp` path to pin in settings. By default it is found on `PATH` or in a Nix profile. `""` pins nothing. |
+| Flag              | Effect                                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--project DIR`   | Write project-level settings under `DIR` (default: the current directory).                                       |
+| `--global`, `-g`  | Write user-level settings instead.                                                                               |
+| `--dry-run`, `-n` | Print the planned commands and a line diff of every file, without changing anything.                             |
+| `--no-extension`  | Only write configuration; do not run the editor CLI.                                                             |
+| `--force`         | Rewrite files that cannot be merged safely (see below), keeping a `.bak` copy of the original first.             |
+| `--lsp-path`      | The `tnix-lsp` path to pin in settings. By default it is found on `PATH` or in a Nix profile. `""` pins nothing. |
 
 Without `--project` or `--global`, every editor uses project settings except
 Neovim, which uses your user config.
@@ -55,14 +55,14 @@ be written.
 
 ### What each editor gets
 
-| Editor   | Extension                                                                 | Project scope                                                  | `--global`                                         |
-| -------- | ------------------------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------- |
-| vscode   | `code --install-extension ubugeeei.tnix` (VS Code Marketplace)            | `.vscode/settings.json`, `.vscode/extensions.json`             | VS Code user `settings.json`                       |
-| cursor   | `cursor --install-extension ubugeeei.tnix` (Open VSX)                     | same as vscode                                                 | Cursor user `settings.json`                        |
-| vscodium | `codium --install-extension ubugeeei.tnix` (Open VSX)                     | same as vscode                                                 | VSCodium user `settings.json`                      |
-| zed      | `auto_install_extensions` in the settings file                            | `.zed/settings.json`                                           | `~/.config/zed/settings.json`                      |
-| neovim   | none, a generated Lua file                                                | `.nvim.lua` (needs `:set exrc`)                                | `~/.config/nvim/after/plugin/tnix.lua` (default)   |
-| helix    | none, `languages.toml` entries                                            | `.helix/languages.toml`                                        | `~/.config/helix/languages.toml`                   |
+| Editor   | Extension                                                      | Project scope                                      | `--global`                                       |
+| -------- | -------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------ |
+| vscode   | `code --install-extension ubugeeei.tnix` (VS Code Marketplace) | `.vscode/settings.json`, `.vscode/extensions.json` | VS Code user `settings.json`                     |
+| cursor   | `cursor --install-extension ubugeeei.tnix` (Open VSX)          | same as vscode                                     | Cursor user `settings.json`                      |
+| vscodium | `codium --install-extension ubugeeei.tnix` (Open VSX)          | same as vscode                                     | VSCodium user `settings.json`                    |
+| zed      | `auto_install_extensions` in the settings file                 | `.zed/settings.json`                               | `~/.config/zed/settings.json`                    |
+| neovim   | none, a generated Lua file                                     | `.nvim.lua` (needs `:set exrc`)                    | `~/.config/nvim/after/plugin/tnix.lua` (default) |
+| helix    | none, `languages.toml` entries                                 | `.helix/languages.toml`                            | `~/.config/helix/languages.toml`                 |
 
 User settings follow each editor's platform convention: `~/Library/Application
 Support/<App>/User` on macOS, `$XDG_CONFIG_HOME/<App>/User` on Linux.
@@ -152,13 +152,13 @@ tnix doctor
 tnix doctor --format json
 ```
 
-| Check            | Fails when                                                    | Warns when                                         |
-| ---------------- | ------------------------------------------------------------- | -------------------------------------------------- |
-| `tnix`           | `tnix --version` fails                                        | `tnix` is not on `PATH`, or its version differs    |
-| `tnix-lsp`       | not on `PATH`, `tnix-lsp --version` fails, or version differs | the version cannot be read                         |
-| project          | `tnix.config.tnix` exists but does not load                   | no `tnix.config.tnix` in this or a parent directory |
-| each detected editor | —                                                         | the extension or config is missing                 |
-| `nix`            | —                                                             | `nix` is not on `PATH`                             |
+| Check                | Fails when                                                    | Warns when                                          |
+| -------------------- | ------------------------------------------------------------- | --------------------------------------------------- |
+| `tnix`               | `tnix --version` fails                                        | `tnix` is not on `PATH`, or its version differs     |
+| `tnix-lsp`           | not on `PATH`, `tnix-lsp --version` fails, or version differs | the version cannot be read                          |
+| project              | `tnix.config.tnix` exists but does not load                   | no `tnix.config.tnix` in this or a parent directory |
+| each detected editor | —                                                             | the extension or config is missing                  |
+| `nix`                | —                                                             | `nix` is not on `PATH`                              |
 
 What "set up" means for each editor: VS Code, Cursor, and VSCodium have
 `ubugeeei.tnix` in `--list-extensions`. Zed has the extension installed. Neovim

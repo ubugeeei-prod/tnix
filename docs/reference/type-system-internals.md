@@ -569,7 +569,7 @@ becomes an entry. Otherwise the whole root becomes `default`, quantified with
 [`Diagnostics.hs`](https://github.com/ubugeeei-prod/tnix/blob/main/packages/tnix-core/src/Diagnostics.hs)
 assigns every message a stable code, prefixed by phase: `TP` parser, `TK` kind
 checker, `TC` type checker, `TD` driver. The message format is
-`[CODE] text`, prefixed with `line:col: ` when the error has a source span, and
+`[CODE] text`, prefixed with `line:col:` (and a space) when the error has a source span, and
 codes are never reused. The full catalogue with fixes is in
 [diagnostics](../diagnostics.md).
 

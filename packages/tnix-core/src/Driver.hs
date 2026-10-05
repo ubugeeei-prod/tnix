@@ -46,13 +46,14 @@ import Compile
 import Control.Applicative ((<|>))
 import Control.Exception (IOException, displayException, try)
 import Control.Monad (foldM, forM)
+import Data.ByteString qualified as ByteString
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (group, isSuffixOf, nub, sort)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Text.IO qualified as Text
+import Data.Text.Encoding (decodeUtf8Lenient)
 import Diagnostics (DiagnosticCode (..), withCode)
 import Emit
 import Indexed
@@ -618,9 +619,12 @@ duplicateNames = foldr step [] . group . sort
 firstError :: String -> Either String a -> Either String a
 firstError prefix = either (Left . (prefix <>)) Right
 
+-- | Read a source file as UTF-8 regardless of the process locale (Nix build
+-- sandboxes run with a C locale). Invalid bytes become U+FFFD instead of
+-- aborting the read.
 readTextFile :: FilePath -> IO (Either String Text)
 readTextFile path = do
-  result <- try @IOException (Text.readFile path)
+  result <- try @IOException (decodeUtf8Lenient <$> ByteString.readFile path)
   pure $
     case result of
       Left err -> Left (withCode TD0001ReadFailed ("failed to read " <> path <> ": " <> displayException err))

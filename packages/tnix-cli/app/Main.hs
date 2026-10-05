@@ -13,6 +13,7 @@ import Control.Monad (unless)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TextIO
 import Data.Version (showVersion)
+import GHC.IO.Encoding (setLocaleEncoding)
 import Options.Applicative
 import Paths_tnix_cli qualified as PackageInfo
 import System.Environment (lookupEnv)
@@ -25,6 +26,8 @@ main :: IO ()
 main = do
   -- Reports use ✓/✗ marks; do not let a C locale turn them into a crash.
   mapM_ (`hSetEncoding` utf8) [stdout, stderr]
+  -- Source and config files are UTF-8 whatever the locale says.
+  setLocaleEncoding utf8
   execParser opts >>= run
   where
     opts =

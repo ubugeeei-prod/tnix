@@ -42,6 +42,7 @@ import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
 import Driver (Analysis (..), SupportCache, analyzeTextForEditorWith, newSupportCache)
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
 import Paths_tnix_lsp qualified as PackageInfo
 import Server (asText, clearDiagnostics, field, pathUri, respond, respondError, serverCapabilities)
 import ServerProtocol (ReadOutcome (..), notify, readMessageOutcome)
@@ -63,6 +64,8 @@ import System.IO
 -- | Start the stdio event loop and keep the latest document text in memory.
 main :: IO ()
 main = do
+  -- Source files are UTF-8 whatever the locale says (e.g. a C locale).
+  setLocaleEncoding utf8
   args <- getArgs
   handleArgs args
 

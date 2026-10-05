@@ -5,6 +5,8 @@
 # intentional misspellings used as test fixtures.
 
 [default.extend-identifiers]
+# Data.Bifunctor.bimap.
+bimap = "bimap"
 # Qualified import alias for Data.Text.IO.
 TIO = "TIO"
 # "Literals" abbreviations in subtyping specs.
@@ -22,3 +24,10 @@ nmae = "nmae"
 unparseable = "unparseable"
 # Part of the fourmolu `indent-wheres` option name.
 wheres = "wheres"
+# More intentional misspellings: LSP did-you-mean / rename fixtures and the
+# tutorial's missing-field example.
+alpah = "alpah"
+gret = "gret"
+Flie = "Flie"
+# Fragment of the `[Ll]ocation:` header regex in install.sh.
+ocation = "ocation"

@@ -34,6 +34,7 @@ library
       src
   build-depends:
       base >=4.19 && <5
+    , bytestring
     , containers
     , directory
     , filepath
@@ -68,6 +69,7 @@ common spec-defaults
     , Type
   build-depends:
       base >=4.19 && <5
+    , bytestring
     , containers
     , directory
     , filepath
