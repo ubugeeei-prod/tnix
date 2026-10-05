@@ -7,8 +7,8 @@
 //
 //   node --experimental-strip-types ./scripts/generate-brand.ts
 //
-// SVGs are written directly. PNGs (app icon, touch icon, OG image, VS Code
-// icon) are rendered with `rsvg-convert` when it is on PATH.
+// SVG files are written directly. PNG renders (app icon, touch icon, OG image,
+// VS Code icon) are made with `rsvg-convert` when it is on PATH.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
