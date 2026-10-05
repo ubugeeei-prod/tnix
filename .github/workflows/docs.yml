@@ -14,7 +14,7 @@ on:
       - "vite.config.ts"
       - "vite.docs.config.ts"
       - "docs/.vite/**"
-      - "wrangler.toml"
+      - "deploy/docs/**"
       - ".github/workflows/docs.yml"
       - ".markdownlint.jsonc"
       - "lychee.toml"
@@ -147,14 +147,15 @@ jobs:
         run: nix shell nixpkgs#typos --accept-flake-config --command typos
 
   site-build:
-    name: Build and deploy docs site
+    name: Build docs site
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: read
-    env:
-      # Secrets cannot be tested in `if:` directly; expose whether they exist.
-      HAS_CLOUDFLARE_CREDENTIALS: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    # Deployment is not done here: Cloudflare Workers Builds (Git integration)
+    # builds and deploys tnix.dev on every push to main, so no Cloudflare
+    # token is stored in GitHub. This job checks the same build and validates
+    # the Worker config and assets without credentials.
     steps:
       - name: Check out sources
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -169,40 +170,16 @@ jobs:
       - name: Install workspace dependencies
         run: nix develop --accept-flake-config --command pnpm install --frozen-lockfile
 
-      - name: Build Ox Content docs
-        run: nix develop --accept-flake-config --command vp run docs:build
+      - name: Build Ox Content docs (same command as Workers Builds)
+        run: nix develop --accept-flake-config --command pnpm run docs:build
 
-      - name: Verify Cloudflare Pages files
+      - name: Verify static assets
         run: |
           test -f dist/docs/index.html
           test -f dist/docs/_headers
           test -f dist/docs/_redirects
+          test -f dist/docs/install.sh
           test -f dist/docs/og-image.png
 
-      # Production deploys come from pushes to main; same-repository pull
-      # requests get a preview deployment. Fork PRs and scheduled runs never
-      # deploy (forks have no access to the secrets anyway).
-      - name: Choose Cloudflare Pages branch
-        id: pages-branch
-        if: >-
-          env.HAS_CLOUDFLARE_CREDENTIALS == 'true' && (
-            (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-            github.event_name == 'workflow_dispatch' ||
-            (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-          )
-        env:
-          RAW_BRANCH: ${{ github.head_ref || github.ref_name }}
-        run: |
-          # Pages branch aliases must be DNS-safe; never pass the raw ref name
-          # to a shell.
-          branch="$(printf '%s' "$RAW_BRANCH" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | cut -c1-28)"
-          echo "name=${branch:-preview}" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy to Cloudflare Pages
-        if: steps.pages-branch.outputs.name != ''
-        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.147.0"
-          command: pages deploy dist/docs --project-name tnix --branch ${{ steps.pages-branch.outputs.name }}
+      - name: Validate the Worker config and assets with cf (no credentials)
+        run: nix develop --accept-flake-config --command pnpm run docs:check-deploy

@@ -1,0 +1,15 @@
+{
+  "name": "tnix-docs-site",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare deployment of the tnix.dev documentation site",
+  "scripts": {
+    "deploy": "cf deploy",
+    "preview": "cf previews deploy",
+    "check": "cf deploy --dry-run"
+  },
+  "devDependencies": {
+    "cf": "1.0.0-beta.12",
+    "wrangler": "4.147.0"
+  }
+}

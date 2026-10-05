@@ -1,3 +1,20 @@
+<p align="center">
+  <a href="https://tnix.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/public/brand/tnix-logo-dark.svg">
+      <img src="docs/public/brand/tnix-logo.svg" alt="tnix" width="332" height="128">
+    </picture>
+  </a>
+</p>
+
+<p align="center"><strong>TypeScript-grade types for Nix. Zero runtime.</strong></p>
+
+<p align="center">
+  <a href="https://tnix.dev">Docs</a> ·
+  <a href="https://tnix.dev/tutorial">Tutorial</a> ·
+  <a href="https://github.com/ubugeeei-prod/tnix/releases">Releases</a>
+</p>
+
 # tnix
 
 `tnix` is a gradual type system and tooling stack for Nix. It compiles `.tnix` to `.nix`, provides static checking, and emits `.d.tnix` declaration files. It has no runtime and is intentionally limited to complementing existing Nix semantics rather than replacing them.
