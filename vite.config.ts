@@ -47,6 +47,10 @@ export default defineConfig({
         command: "node --experimental-strip-types ./scripts/generate-prelude.ts --check",
         cache: false,
       },
+      "generate:brand": {
+        command: "node --experimental-strip-types ./scripts/generate-brand.ts",
+        cache: false,
+      },
       "generate:prelude": {
         command: "node --experimental-strip-types ./scripts/generate-prelude.ts",
         cache: false,

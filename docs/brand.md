@@ -72,9 +72,19 @@ precise, calm, and on your side.
 
 ## Logo
 
-The mark is a rounded hexagon, a nod to the hexagonal Nix snowflake, holding a
-lowercase **t** followed by a **colon**: `t:`, the start of a type annotation.
-The colon is mint, the color the docs use for "checked".
+The mark brings together the two languages tnix sits between:
+
+- **Nix**: six lambdas interlock into a hexagonal ring, after the Nix lambda
+  snowflake. They are woven, each lying over the next, so the ring has no
+  start or end.
+- **Haskell**: every stroke is cut flat, like the slanted bars of the Haskell
+  logo, and the arms alternate Nix blues with Haskell purples.
+- **tnix**: the ring holds `::`, the type annotation tnix shares with Haskell,
+  drawn as two slanted bars in Annotation Amber, the color the docs use for
+  erased type syntax.
+
+The geometry lives in `scripts/generate-brand.ts`; edit it there and run
+`vp run generate:brand` to regenerate every SVG and PNG below.
 
 <div class="tx-logos">
 <figure class="on-light"><img src="/brand/tnix-logo.svg" alt="tnix logo, color, for light backgrounds"><figcaption>tnix-logo.svg</figcaption></figure>
@@ -82,7 +92,9 @@ The colon is mint, the color the docs use for "checked".
 <figure class="on-light"><img src="/brand/tnix-logo-mono.svg" alt="tnix logo, single color ink"><figcaption>tnix-logo-mono.svg</figcaption></figure>
 <figure class="on-dark"><img src="/brand/tnix-logo-white.svg" alt="tnix logo, single color white"><figcaption>tnix-logo-white.svg</figcaption></figure>
 <figure class="on-light"><img src="/brand/tnix-mark.svg" alt="tnix mark, color"><figcaption>tnix-mark.svg</figcaption></figure>
+<figure class="on-dark"><img src="/brand/tnix-mark-dark.svg" alt="tnix mark, color, for dark backgrounds"><figcaption>tnix-mark-dark.svg</figcaption></figure>
 <figure class="on-dark"><img src="/brand/tnix-mark-white.svg" alt="tnix mark, white"><figcaption>tnix-mark-white.svg</figcaption></figure>
+<figure class="on-light"><img src="/brand/tnix-app-icon.svg" alt="tnix app icon"><figcaption>tnix-app-icon.svg</figcaption></figure>
 </div>
 
 | File | Use |
@@ -90,18 +102,20 @@ The colon is mint, the color the docs use for "checked".
 | `brand/tnix-logo.svg` | default lockup on light backgrounds |
 | `brand/tnix-logo-dark.svg` | lockup on dark backgrounds |
 | `brand/tnix-logo-mono.svg`, `brand/tnix-logo-white.svg` | one-color print, embossing, single-color UIs |
-| `brand/tnix-mark.svg` | the mark alone: avatars, the docs header, app icons |
-| `brand/tnix-mark-mono.svg`, `brand/tnix-mark-white.svg` | one-color mark; the `t:` is knocked out, not painted |
+| `brand/tnix-mark.svg`, `brand/tnix-mark-dark.svg` | the mark alone on light / dark backgrounds |
+| `brand/tnix-mark-mono.svg`, `brand/tnix-mark-white.svg` | one-color mark |
+| `brand/tnix-app-icon.svg` | the mark on its ink tile: app icons, the docs header, the favicon |
 | `brand/tnix-wordmark.svg` | the wordmark alone, where the mark already appears nearby |
-| `brand/tnix-mark-512.png` | raster mark for places that do not accept SVG |
+| `brand/tnix-mark-512.png` | raster app icon for places that do not accept SVG |
 | `favicon.svg`, `apple-touch-icon.png` | browser and home-screen icons |
 | `og-image.png` (source `brand/og-image.svg`) | 1200 × 630 social preview |
 
 Rules:
 
-- Keep clear space around the logo of at least the width of the colon on all
+- Keep clear space around the logo of at least one stroke width on all
   sides. Do not place it on busy imagery.
-- Minimum size: 16 px tall for the mark, 20 px tall for the lockup.
+- Minimum size: 16 px for the app icon, 24 px for the bare mark, 20 px tall
+  for the lockup.
 - Do not recolor, rotate, outline, add shadows to, or re-typeset the wordmark.
   The wordmark is drawn, not set in a font; use the files.
 - On photos or saturated backgrounds, use the white one-color version.
