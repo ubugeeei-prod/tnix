@@ -35,7 +35,11 @@ suite("navigation", () => {
   test("go to declaration resolves a location", async () => {
     const result = await execProvider<
       Array<vscode.Location | vscode.LocationLink>
-    >("vscode.executeDeclarationProvider", fixtureUri("sample.tynix"), position);
+    >(
+      "vscode.executeDeclarationProvider",
+      fixtureUri("sample.tynix"),
+      position,
+    );
     assert.ok(asLocations(result).length >= 1);
   });
 

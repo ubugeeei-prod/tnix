@@ -20,7 +20,9 @@ test("findExecutable searches PATH entries in order", () => {
     "/b/tynix-lsp",
   );
   assert.equal(
-    findExecutable("tynix-lsp", { PATH: "/a" }, "linux", (p) => existing.has(p)),
+    findExecutable("tynix-lsp", { PATH: "/a" }, "linux", (p) =>
+      existing.has(p),
+    ),
     undefined,
   );
 });
@@ -120,7 +122,11 @@ test("resolveCliPath prefers explicit paths, then Nix profiles, then PATH", () =
     "/opt/tynix",
   );
   assert.equal(
-    resolveCliPath("", "/home/a", (p) => p === "/home/a/.nix-profile/bin/tynix"),
+    resolveCliPath(
+      "",
+      "/home/a",
+      (p) => p === "/home/a/.nix-profile/bin/tynix",
+    ),
     "/home/a/.nix-profile/bin/tynix",
   );
   assert.equal(

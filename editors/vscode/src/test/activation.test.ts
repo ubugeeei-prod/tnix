@@ -27,7 +27,10 @@ suite("activation", () => {
   test("contributes the tynix language", async () => {
     await activateExtension();
     const languages = await vscode.languages.getLanguages();
-    assert.ok(languages.includes("tynix"), "tynix language should be registered");
+    assert.ok(
+      languages.includes("tynix"),
+      "tynix language should be registered",
+    );
   });
 
   test("contributes the tynix grammars and snippets", async () => {

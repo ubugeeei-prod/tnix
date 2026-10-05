@@ -18,7 +18,7 @@ spec = do
 
     it "captures relative ../ paths" $
       findDocumentLinks "import ../shared/lib.tynix"
-        `shouldBe` [DocumentLink 0 7 25 "../shared/lib.tynix"]
+        `shouldBe` [DocumentLink 0 7 26 "../shared/lib.tynix"]
 
     it "captures absolute / paths" $
       findDocumentLinks "import /etc/nix/profile.nix"
@@ -26,7 +26,7 @@ spec = do
 
     it "captures the quoted path after declare" $
       findDocumentLinks "declare \"./registry/builtins.d.tynix\" {"
-        `shouldBe` [DocumentLink 0 9 35 "./registry/builtins.d.tynix"]
+        `shouldBe` [DocumentLink 0 9 36 "./registry/builtins.d.tynix"]
 
     it "rejects identifiers that merely start with import or declare" $ do
       findDocumentLinks "importHelper ./foo" `shouldBe` []
@@ -63,8 +63,8 @@ spec = do
               "import ./body.tynix"
             ]
         )
-        `shouldBe` [ DocumentLink 0 9 22 "./shim.d.tynix",
-                     DocumentLink 3 7 18 "./body.tynix"
+        `shouldBe` [ DocumentLink 0 9 23 "./shim.d.tynix",
+                     DocumentLink 3 7 19 "./body.tynix"
                    ]
 
   describe "resolveLinkTarget" $ do

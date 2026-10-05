@@ -107,7 +107,7 @@ spec = do
         kw <- run hoverDocument (at 1 1)
         hoverValue kw `shouldSatisfy` ("Local bindings" `Text.isInfixOf`)
         alias <- run hoverDocument (at 1 10)
-        hoverValue alias `shouldSatisfy` ("type Pair = " `Text.isPrefixOf`) . Text.drop 8
+        hoverValue alias `shouldSatisfy` ("type Pair = " `Text.isPrefixOf`) . Text.drop (Text.length "```tynix\n")
 
   describe "signature help" $
     it "tracks the active parameter of a curried call" $
