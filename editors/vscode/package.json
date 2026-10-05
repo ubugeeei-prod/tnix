@@ -352,7 +352,7 @@
     "test:update-snapshots": "tsc -p tsconfig.json && UPDATE_SNAPSHOTS=1 node --test dist/grammar.spec.js"
   },
   "dependencies": {
-    "vscode-languageclient": "^10.1.0"
+    "vscode-languageclient": "^10.1.2"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -360,11 +360,11 @@
     "@types/vscode": "^1.110.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^3.1.0",
-    "@vscode/vsce": "^3.9.1",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
     "mocha": "^12.0.0",
-    "ovsx": "^1.1.0",
-    "prettier": "^3.9.6",
+    "ovsx": "^1.2.0",
+    "prettier": "^3.9.9",
     "typescript": "^7.0.2",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
