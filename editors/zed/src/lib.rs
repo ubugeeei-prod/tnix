@@ -203,7 +203,10 @@ mod tests {
 
         assert_eq!(command.command, "tynix-lsp");
         assert_eq!(command.args, vec!["--stdio".to_string()]);
-        assert_eq!(command.env, vec![("TYNIX_ENV".to_string(), "1".to_string())]);
+        assert_eq!(
+            command.env,
+            vec![("TYNIX_ENV".to_string(), "1".to_string())]
+        );
     }
 
     #[test]
