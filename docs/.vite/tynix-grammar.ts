@@ -108,11 +108,13 @@ export const tynixGrammar = {
       patterns: [{ include: "#typeExpr" }],
     },
     typedBinder: {
-      match: "\\(([a-z_][A-Za-z0-9_'-]*)\\s*(::)",
-      captures: {
+      begin: "\\(([a-z_][A-Za-z0-9_'-]*)\\s*(::)",
+      beginCaptures: {
         1: { name: "variable.parameter.tynix" },
         2: { name: "keyword.operator.annotation.tynix" },
       },
+      end: "(?=\\))",
+      patterns: [{ include: "#typeExpr" }],
     },
     string: {
       begin: "\"",
