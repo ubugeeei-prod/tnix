@@ -24,8 +24,11 @@ updates:
         patterns:
           - "*"
 
+  # The pnpm workspace root, so updates to editors/vscode and deploy/docs also
+  # regenerate the shared pnpm-lock.yaml (a package directory alone leaves the
+  # lockfile stale and frozen installs fail).
   - package-ecosystem: npm
-    directory: /editors/vscode
+    directory: /
     schedule:
       interval: weekly
       day: monday
@@ -36,6 +39,18 @@ updates:
     commit-message:
       prefix: chore(deps)
       include: scope
+    groups:
+      npm-development:
+        dependency-type: development
+      npm-production:
+        dependency-type: production
+    ignore:
+      # Must not exceed the extension's `engines.vscode`; it moves with an
+      # intentional bump of the minimum supported VS Code version.
+      - dependency-name: "@types/vscode"
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
 
   - package-ecosystem: cargo
     directory: /editors/zed
