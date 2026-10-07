@@ -140,7 +140,7 @@ The codomain is then reduced. The built-in type operators are:
 
 | Operator | Reduces to |
 | --- | --- |
-| `Get r k` | the type of field `k` of `r` (a union of literal keys joins the fields) |
+| `Get r k` | the type of field `k` of `r` (a union of literal keys joins the fields); for a key that is only known to be a `String`, a dictionary's value type, the join of a closed record's fields, or `dynamic` |
 | `KeyOf r` | the union of a closed record's field names; `String` for an open record or dictionary |
 | `Length xs` | `n` for `Vec n a`, the item count of a tuple, `Nat` for a list |
 | `Add a b`, `Sub a b`, `Mul a b` | the literal result for integer literals, otherwise `Nat` / `Int` / `Number` |

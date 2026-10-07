@@ -175,6 +175,11 @@ spec = do
       rootOf "builtins.getAttr \"a\" { a = 1; b = \"s\"; }" `shouldReturn` Just "1"
       rootOf "builtins.length [ 1 2 3 ]" `shouldReturn` Just "3"
 
+    it "degrades type operators whose arguments are known but wide" $ do
+      accepts "k: builtins.getAttr k { a = 1; b = 2; } + 1"
+      accepts "k: (x :: AttrsOf Int): builtins.getAttr k x + 1"
+      accepts "k: (builtins.getAttr k { pkg = { outPath = \"/nix\"; }; }).outPath"
+
     it "checks a dependent signature with the binder as a singleton" $
       accepts
         ( source
@@ -223,6 +228,27 @@ spec = do
         "main.tynix"
         (source ["macro bad {", "  ($x :: Int) => ($x + \"s\");", "};", "1"])
         "[TX0004] rule 1 of macro `bad` does not type-check"
+
+    it "leaves shell variables in template strings alone" $
+      accepts
+        ( source
+            [ "macro script {",
+              "  ($name:string) => ({ name = $name; buildCommand = ''mkdir -p $out''; });",
+              "};",
+              "script!(\"hello\")"
+            ]
+        )
+
+    it "renames inherited bindings in a template let" $
+      rootOf
+        ( source
+            [ "macro names {",
+              "  ($x:expr) => (let inherit (builtins) attrNames; in attrNames $x);",
+              "};",
+              "let attrNames = 1; in names!({ a = 1; })"
+            ]
+        )
+        `shouldReturn` Just "List String"
 
     it "reports invocations no rule matches" $
       rejects "main.tynix" (source (enumMacro <> ["enum!(1 + 2)"])) "TX0001"

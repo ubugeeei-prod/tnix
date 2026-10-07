@@ -164,9 +164,10 @@ instantiateTemplate bindings template = go bindings "" (Text.unpack template)
                   pure (placeholder <> tailOut, Map.insert (Text.pack placeholder) leaf tailLeaves)
                 Just (Repeated _) ->
                   Left (withCode TX0004InvalidTemplate ("metavariable `$" <> Text.unpack name <> "` repeats, so it must be used inside `$( ... )*`"))
-                Nothing
-                  | name == "stringify" -> passThrough ('$' : c : nameRest) remaining
-                  | otherwise -> Left (withCode TX0004InvalidTemplate ("unknown metavariable `$" <> Text.unpack name <> "` in template"))
+                -- Not a pattern variable: `stringify!`, or literal text such
+                -- as a shell `$out` inside a string. A stray use in code is
+                -- still rejected after expansion (TX0006).
+                Nothing -> passThrough ('$' : c : nameRest) remaining
       where
         passThrough consumed remaining = do
           (tailOut, tailLeaves) <- walk env path remaining
@@ -323,12 +324,15 @@ hygienize suffix = go Map.empty
       LetSignature name ty -> Right (LetSignature (renameBinder scope name) ty)
       LetPath (SelectName name : rest) e -> LetPath (SelectName (renameBinder scope name) : rest) <$> go scope e
       LetPath steps e -> LetPath steps <$> go scope e
+      LetInherit source names
+        | all isPlaceholderName names -> (`LetInherit` names) <$> traverse (go scope) source
       -- `inherit x;` is `x = x;` with the right side in the outer scope.
-      LetInherit Nothing names
-        | any (`Map.member` scope) names,
-          [single] <- names ->
-            LetBinding (renameBinder scope single) <$> go outer (EVar single)
-      LetInherit source names -> (`LetInherit` names) <$> traverse (go scope) source
+      LetInherit Nothing [single] ->
+        LetBinding (renameBinder scope single) <$> go outer (EVar single)
+      -- `inherit (src) x;` is `x = src.x;`; the attribute keeps its spelling.
+      LetInherit (Just source) [single] ->
+        LetBinding (renameBinder scope single) . (\src -> ESelect src [SelectName single]) <$> go scope source
+      LetInherit _ _ -> Left (withCode TX0004InvalidTemplate "write one `inherit` per name in a macro template")
     goAttr scope = \case
       AttrField name e -> AttrField name <$> go scope e
       AttrPath steps e -> AttrPath <$> traverse (goStep scope) steps <*> go scope e

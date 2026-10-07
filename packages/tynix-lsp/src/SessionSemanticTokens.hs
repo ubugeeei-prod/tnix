@@ -135,7 +135,7 @@ semanticTokensForScan ctx =
       where
         name = tokText t
 
-    atStatementStart i = i == 0 || textAt (i - 1) `elem` [";", "}"]
+    atStatementStart i = i == 0 || textAt (i - 1) `elem` [";", "}", "opaque"]
 
     typeIdentifier i t
       | name `elem` ["forall", "infer", "extends"] = (tKeyword, 0)

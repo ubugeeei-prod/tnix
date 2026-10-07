@@ -153,12 +153,23 @@ reduceTypeOperator env ty =
           key' = resolveHead env keyTy
       if record' == tDynamic || record' == tAny
         then Just record'
-        else do
-          keys <- stringKeys key'
-          fieldTys <- traverse (lookupRecordField env record') keys
-          case fieldTys of
-            x : xs -> Just (foldRight1 (joinTypes env) x xs)
-            [] -> Nothing
+        else case stringKeys key' of
+          Just keys -> do
+            fieldTys <- traverse (lookupRecordField env record') keys
+            case fieldTys of
+              x : xs -> Just (foldRight1 (joinTypes env) x xs)
+              [] -> Nothing
+          Nothing
+            | symbolic key' -> Nothing
+            -- A known but wide key (`String`) may name any field: a
+            -- dictionary's value type, the join of a closed record's
+            -- fields, or `dynamic` when the fields are not all known.
+            | Just valueTy <- attrsOfView record' -> Just valueTy
+            | TRecord fields <- record',
+              x : xs <- map unOptional (Map.elems fields) ->
+                Just (foldRight1 (joinTypes env) x xs)
+            | isSubtype env key' tString -> Just tDynamic
+            | otherwise -> Nothing
     (TCon "KeyOf", [recordTy]) ->
       case resolveHead env recordTy of
         TRecord fields -> Just (unionOf [TLit (LString name) | name <- Map.keys fields])
