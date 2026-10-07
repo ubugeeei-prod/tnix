@@ -43,6 +43,22 @@ spec = do
     it "generalizes the fields of a rec attribute set" $
       accepts "rec { id = x: x; a = id 1; b = id \"s\"; }"
 
+    it "lets a record meet its own row through an instantiated signature" $
+      accepts
+        ( source
+            [ "lib: with lib; let",
+              "  walk = cond: f: set: let",
+              "    recurse = path: set: let",
+              "      g = name: value: if isAttrs value && cond value",
+              "        then { ${name} = recurse (path ++ [ name ]) value; }",
+              "        else f (path ++ [ name ]) name value;",
+              "    in mapAttrs' g set;",
+              "  in recurse [ ] set;",
+              "  mapAttrs' = f: set: foldl' (a: b: a // b) { } (mapAttrsToList f set);",
+              "in walk (as: as._type == \"param\")"
+            ]
+        )
+
     it "checks higher-rank arguments against every instance" $ do
       let program body =
             source

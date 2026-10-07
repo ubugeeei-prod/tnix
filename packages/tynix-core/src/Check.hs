@@ -1700,11 +1700,15 @@ constrainResolved ctx actual expected = do
           constrainRecord ctx actualFields actualTail expectedFields
           -- An open expected row (`{ ...r }` from a signature) captures the
           -- fields the expectation did not mention, so `r` is solved.
+          -- When both sides already share that row (a record meeting
+          -- itself through an instantiated signature), there is nothing to
+          -- capture, and binding it would only build an infinite row.
           case expectedTail of
-            Just (TMeta n) -> do
-              let extra = Map.difference actualFields expectedFields
-              _ <- bindMeta n (maybe (TRecord extra) (mkOpenRecord extra) actualTail)
-              pure ()
+            Just (TMeta n)
+              | actualTail /= Just (TMeta n) -> do
+                  let extra = Map.difference actualFields expectedFields
+                  _ <- bindMeta n (maybe (TRecord extra) (mkOpenRecord extra) actualTail)
+                  pure ()
             _ -> pure ()
           zonk expected'
       | hasUnresolvedMetas actual' expected',
